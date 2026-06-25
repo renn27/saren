@@ -1,0 +1,26 @@
+{
+  "name": "SAREN - Super App Rendi",
+  "short_name": "SAREN",
+  "description": "Aplikasi internal pencatatan pekerjaan bulanan (garapan) Rendi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080D14",
+  "theme_color": "#080D14",
+  "orientation": "any",
+  "lang": "id",
+  "icons": [
+    {
+      "src": "/saren_logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/saren_logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

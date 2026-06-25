@@ -1,0 +1,74 @@
+// schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Garapan {
+  id        String     @id @default(cuid())
+  bulan     Int        // 1-12
+  tahun     Int
+  aplikasi  Aplikasi[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([bulan, tahun]) // cegah duplikat bulan+tahun yang sama
+  @@map("garapan")
+}
+
+model Aplikasi {
+  id           String   @id @default(cuid())
+  garapanId    String
+  garapan      Garapan  @relation(fields: [garapanId], references: [id], onDelete: Cascade)
+  namaAplikasi String
+  logoUrl      String?  // url dari Vercel Blob, nullable
+  deskripsi    String?  // deskripsi aplikasi, nullable
+  kolom        Kolom[]
+  akun         Akun[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("aplikasi")
+}
+
+enum TipeKolom {
+  TEKS
+  NOMOR
+  NOMINAL
+  CENTANG
+}
+
+model Kolom {
+  id         String    @id @default(cuid())
+  aplikasiId String
+  aplikasi   Aplikasi  @relation(fields: [aplikasiId], references: [id], onDelete: Cascade)
+  namaKolom  String
+  tipeKolom  TipeKolom
+  urutan     Int       @default(0) // urutan tampil kolom, isi otomatis = jumlah kolom existing saat dibuat
+  isTarget   Boolean   @default(false)
+  nilaiTarget String?
+  createdAt  DateTime  @default(now())
+
+  @@unique([aplikasiId, namaKolom]) // nama kolom unik per aplikasi
+  @@map("kolom")
+}
+
+model Akun {
+  id           String   @id @default(cuid())
+  aplikasiId   String
+  aplikasi     Aplikasi @relation(fields: [aplikasiId], references: [id], onDelete: Cascade)
+  nama         String
+  device       String?
+  nomorHp      String?
+  customValues Json     @default("{}") // { [kolomId]: string | number | boolean }
+  urutan       Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("akun")
+}
