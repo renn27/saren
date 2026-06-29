@@ -37,6 +37,59 @@ const MONTH_NAMES = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"
 ];
 
+function compressImage(file: File, maxWidth: number, maxHeight: number, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Gagal membuat context 2D"));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("Kompresi gambar gagal"));
+            }
+          },
+          "image/webp",
+          quality
+        );
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+}
+
 export function AplikasiListClient({ garapan, initialList }: AplikasiListClientProps) {
   const router = useRouter();
   
@@ -133,7 +186,17 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
     formData.append("namaAplikasi", namaAplikasi);
     formData.append("deskripsi", deskripsi);
     if (logoFile) {
-      formData.append("logo", logoFile);
+      try {
+        const compressedBlob = await compressImage(logoFile, 128, 128, 0.8);
+        const compressedFile = new File([compressedBlob], logoFile.name.replace(/\.[^/.]+$/, "") + ".webp", {
+          type: "image/webp",
+          lastModified: Date.now(),
+        });
+        formData.append("logo", compressedFile);
+      } catch (err) {
+        console.error("Gagal kompresi logo, menggunakan file asli:", err);
+        formData.append("logo", logoFile);
+      }
     }
     if (clearLogo) {
       formData.append("clearLogo", "true");
@@ -212,16 +275,16 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
           {initialList.map((item) => (
             <Card
               key={item.id}
               hoverable
               onClick={() => router.push(`/garapan/${garapan.id}/aplikasi/${item.id}`)}
-              className="relative group pr-12 flex flex-col justify-between min-h-[136px] p-5"
+              className="relative group pr-10 sm:pr-12 flex flex-col justify-between min-h-[120px] sm:min-h-[136px] p-4 sm:p-5"
             >
               {/* App logo or placeholder with gradient */}
-              <div className="h-11 w-11 rounded-xl border border-border-soft overflow-hidden bg-gradient-to-tr from-accent-soft to-accent/15 flex items-center justify-center text-accent select-none mb-4 shadow-sm">
+              <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-lg sm:rounded-xl border border-border-soft overflow-hidden bg-gradient-to-tr from-accent-soft to-accent/15 flex items-center justify-center text-accent select-none mb-3 sm:mb-4 shadow-sm">
                 {item.logoUrl ? (
                   <img
                     src={item.logoUrl}
@@ -229,7 +292,7 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <span className="text-[15px] font-semibold font-display">
+                  <span className="text-xs sm:text-[15px] font-semibold font-display">
                     {item.namaAplikasi.slice(0, 2).toUpperCase()}
                   </span>
                 )}
@@ -240,7 +303,7 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
               </h3>
 
               {/* Dropdown Menu */}
-              <div className="absolute right-3 top-5">
+              <div className="absolute right-2 top-4 sm:right-3 sm:top-5">
                 <DropdownMenu
                   trigger={
                     <button className="p-1.5 rounded-lg text-text-secondary hover:bg-accent-soft/80 hover:text-text-primary transition-colors cursor-pointer">
