@@ -74,3 +74,14 @@ model Akun {
 
   @@map("akun")
 }
+
+model Nomor {
+  id         String   @id @default(cuid())
+  provider   String
+  nomorKartu String
+  masaAktif  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("nomor")
+}

@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeaderSettings } from "@/components/HeaderSettings";
+import { AppNavigation } from "@/components/AppNavigation";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -92,8 +93,11 @@ export default function RootLayout({
           </div>
         </header>
 
-        <div className="flex-1 flex flex-col">
-          {children}
+        <div className="flex-1 flex flex-row overflow-hidden">
+          <AppNavigation />
+          <main className="flex-1 flex flex-col h-full overflow-y-auto pb-20 md:pb-0 relative">
+            {children}
+          </main>
         </div>
 
         <Toaster 

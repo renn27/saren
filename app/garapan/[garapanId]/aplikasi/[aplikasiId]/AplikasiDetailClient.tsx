@@ -1556,13 +1556,12 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         title="Detail Akun"
         description="Rincian informasi perangkat dan nomor kontak untuk akun ini."
       >
-        <div className="flex flex-col gap-5 font-sans pt-2">
-          {/* Card Container holding the detailed rows */}
-          <div className="bg-bg-page/40 border border-border-soft rounded-3xl p-5 flex flex-col gap-4.5 shadow-sm">
+        <div className="flex flex-col font-sans pt-1">
+          <div className="flex flex-col">
             
             {/* Row 1: Nama Akun */}
-            <div className="flex items-center gap-4">
-              <div className="h-11 w-11 rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0 border border-accent/5 shadow-sm">
+            <div className="flex items-center gap-3.5 py-3.5 border-b border-border-soft">
+              <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/10">
                 <User className="h-5 w-5" />
               </div>
               <div className="flex flex-col grow min-w-0">
@@ -1573,11 +1572,9 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
               </div>
             </div>
 
-            <div className="h-px bg-border-soft/60" />
-
             {/* Row 2: Perangkat */}
-            <div className="flex items-center gap-4">
-              <div className="h-11 w-11 rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0 border border-accent/5 shadow-sm">
+            <div className="flex items-center gap-3.5 py-3.5 border-b border-border-soft">
+              <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/10">
                 <Smartphone className="h-5 w-5" />
               </div>
               <div className="flex flex-col grow min-w-0">
@@ -1588,17 +1585,15 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
               </div>
             </div>
 
-            <div className="h-px bg-border-soft/60" />
-
             {/* Row 3: Nomor HP & Copy Button */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4 min-w-0 grow">
-                <div className="h-11 w-11 rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0 border border-accent/5 shadow-sm">
+            <div className="flex items-center justify-between py-3.5">
+              <div className="flex items-center gap-3.5 min-w-0 grow">
+                <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/10">
                   <Phone className="h-5 w-5" />
                 </div>
                 <div className="flex flex-col min-w-0 grow">
                   <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">Nomor HP</span>
-                  <span className="text-[15px] font-mono font-bold text-text-primary mt-0.5 truncate">
+                  <span className="text-[16px] font-mono font-bold text-text-primary mt-0.5 truncate">
                     {selectedDetailAccount?.nomorHp || <span className="text-text-secondary/50 font-normal italic select-none">Tidak ada</span>}
                   </span>
                 </div>
@@ -1607,15 +1602,15 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
               {selectedDetailAccount?.nomorHp && (
                 <button
                   type="button"
-                  className="h-11 w-11 flex items-center justify-center rounded-2xl border border-border-soft bg-bg-surface text-text-secondary hover:bg-accent-soft hover:text-accent hover:border-accent/30 shadow-sm transition-all duration-200 cursor-pointer shrink-0"
+                  className="p-2.5 rounded-2xl border border-border-soft text-text-secondary hover:text-accent hover:bg-accent-soft hover:border-accent/30 transition-all shadow-sm shrink-0 ml-4"
                   onClick={(e) => {
                     e.stopPropagation();
                     navigator.clipboard.writeText(selectedDetailAccount.nomorHp || "");
-                    toast.success("Nomor HP berhasil disalin", { duration: 1500 });
+                    toast.success("Nomor HP disalin!");
                   }}
                   title="Salin Nomor HP"
                 >
-                  <Copy className="h-4 w-4 shrink-0" />
+                  <Copy className="h-5 w-5 shrink-0" />
                 </button>
               )}
             </div>
