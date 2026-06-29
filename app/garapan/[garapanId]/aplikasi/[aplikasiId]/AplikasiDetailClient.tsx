@@ -907,9 +907,8 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setClearingColumn(col)}
-                            className="text-amber-600 hover:bg-amber-50 dark:text-amber-500 dark:hover:bg-amber-950/20 hover:text-amber-600"
                           >
-                            <X className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
+                            <X className="h-4 w-4 text-text-secondary" />
                             <span>Kosongkan</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setDeletingColumn(col)} className="text-danger hover:bg-danger-soft">
