@@ -884,7 +884,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                         </div>
                       ) : (
                         <DropdownMenu
-                          className="w-28"
+                          className="w-36"
                           align="left"
                           trigger={
                             <div className="flex items-center gap-1.5 justify-start text-nowrap cursor-pointer hover:text-accent transition-colors w-full h-full py-3 px-3.5 sm:px-6 sm:py-4 select-none">
@@ -902,18 +902,18 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                           }
                         >
                           <DropdownMenuItem onClick={() => setEditingColumn(col)}>
-                            <Edit className="h-4 w-4 mr-2 text-text-secondary" />
+                            <Edit className="h-4 w-4 text-text-secondary" />
                             <span>Edit</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setClearingColumn(col)}
                             className="text-amber-600 hover:bg-amber-50 dark:text-amber-500 dark:hover:bg-amber-950/20 hover:text-amber-600"
                           >
-                            <X className="h-4 w-4 mr-2" />
+                            <X className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
                             <span>Kosongkan</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setDeletingColumn(col)} className="text-danger hover:bg-danger-soft">
-                            <Trash2 className="h-4 w-4 mr-2 text-danger" />
+                            <Trash2 className="h-4 w-4 text-danger" />
                             <span>Hapus</span>
                           </DropdownMenuItem>
                         </DropdownMenu>
