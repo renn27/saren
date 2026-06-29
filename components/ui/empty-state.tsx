@@ -17,11 +17,11 @@ export function EmptyState({
   onAction,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center p-8 md:p-12 text-center bg-bg-surface border border-border-soft rounded-2xl max-w-md mx-auto font-sans">
-      <div className="h-12 w-12 rounded-full bg-accent-soft text-accent flex items-center justify-center mb-4">
-        <Icon className="h-6 w-6" />
+    <div className="flex flex-col items-center justify-center p-8 md:p-12 text-center bg-bg-surface border border-border-soft rounded-3xl [box-shadow:var(--shadow-card)] max-w-md mx-auto font-sans">
+      <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center mb-5 border border-accent/10 empty-float">
+        <Icon className="h-7 w-7" />
       </div>
-      <h3 className="text-base font-semibold text-text-primary mb-1 font-display">
+      <h3 className="text-[17px] font-bold text-text-primary mb-1.5 font-display tracking-tight">
         {title}
       </h3>
       <p className="text-[13px] text-text-secondary mb-6 leading-relaxed">

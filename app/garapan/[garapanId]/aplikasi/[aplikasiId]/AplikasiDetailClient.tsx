@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -40,6 +40,10 @@ import {
   ChevronUp,
   ChevronDown,
   Upload,
+  User,
+  Smartphone,
+  Phone,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -92,6 +96,7 @@ const MONTH_NAMES = [
 
 export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClientProps) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const [isReorderMode, setIsReorderMode] = React.useState(false);
 
@@ -486,7 +491,9 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveLogo = () => {
+  const handleRemoveLogo = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setLogoFile(null);
     setLogoPreview(null);
     setClearLogo(true);
@@ -645,44 +652,50 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   const formattedMonthYear = `${MONTH_NAMES[garapan.bulan - 1]} ${garapan.tahun}`;
 
   return (
-    <div className="w-full">
-      {/* Header Section */}
-      <div className="relative flex flex-col gap-4 mb-4 bg-bg-surface border border-border-soft p-5 rounded-2xl shadow-sm">
+    <div key={pathname} className="w-full animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
+      {/* Breadcrumbs */}
+      <div className="flex flex-col gap-3.5 mb-6">
+        <Link href={`/garapan/${garapan.id}`} className="w-fit">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 px-3.5 gap-1.5 text-text-secondary"
+          >
+            <ChevronLeft className="h-4 w-4 shrink-0" />
+            <span>Kembali ke {formattedMonthYear}</span>
+          </Button>
+        </Link>
+      </div>
+
+      <div className="relative flex flex-col gap-4 mb-6 bg-bg-surface border border-border-soft p-5 sm:p-6 rounded-3xl [box-shadow:var(--shadow-card)]">
         {/* Edit Button in Top-Right Corner */}
         <button
           onClick={() => setIsEditAppOpen(true)}
-          className="absolute top-5 right-5 h-9 w-9 flex items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-text-secondary hover:bg-accent-soft hover:text-accent hover:border-accent/30 shadow-sm transition-all duration-200 cursor-pointer"
+          className="absolute top-5 right-5 h-9 w-9 flex items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-text-secondary hover:bg-accent-soft hover:text-accent hover:border-accent/30 transition-all duration-200 cursor-pointer"
           title="Edit Aplikasi"
         >
           <Edit className="h-4 w-4 shrink-0" />
         </button>
 
-        {/* Breadcrumbs */}
-        <Link
-          href={`/garapan/${garapan.id}`}
-          className="inline-flex items-center text-xs font-semibold text-accent hover:text-accent/80 transition-colors gap-1 group font-sans w-fit"
-        >
-          <ChevronLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
-          <span>{formattedMonthYear}</span>
-        </Link>
-
         {/* Logo, Name, Description, Targets */}
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-4">
             {aplikasi.logoUrl ? (
-              <div className="h-10 w-10 rounded-xl border border-border-soft overflow-hidden bg-accent-soft shrink-0 shadow-sm">
+              <div className="h-14 w-14 rounded-2xl border border-border-soft overflow-hidden bg-accent-soft shrink-0 [box-shadow:var(--shadow-card)]">
                 <img
                   src={aplikasi.logoUrl}
                   alt={aplikasi.namaAplikasi}
                   className="h-full w-full object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
             ) : (
-              <div className="h-10 w-10 rounded-xl border border-border-soft bg-gradient-to-tr from-accent-soft to-accent/15 text-accent text-sm font-semibold font-display flex items-center justify-center shrink-0 shadow-sm">
+              <div className="h-14 w-14 rounded-2xl border border-border-soft bg-gradient-to-br from-accent-soft to-accent/20 text-accent text-base font-bold font-display flex items-center justify-center shrink-0 [box-shadow:var(--shadow-card)]">
                 {aplikasi.namaAplikasi.slice(0, 2).toUpperCase()}
               </div>
             )}
-            <h2 className="text-[22px] font-bold text-text-primary font-display tracking-tight leading-tight">
+            <h2 className="text-[22px] sm:text-[26px] font-bold text-text-primary font-display tracking-tight leading-tight">
               {aplikasi.namaAplikasi}
             </h2>
           </div>
@@ -734,7 +747,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       </div>
 
       {/* Toolbar / Actions Card */}
-      <div className="bg-bg-surface border border-border-soft p-4 rounded-2xl shadow-sm mb-6">
+      <div className="bg-bg-surface border border-border-soft p-4 sm:p-5 rounded-3xl [box-shadow:var(--shadow-card)] mb-6">
         <div className="flex items-center gap-2 w-full">
           <Button
             variant="outline"
@@ -749,8 +762,9 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             </span>
           </Button>
 
+          {/* Primary CTA: Tambah Akun */}
           <Button
-            variant="outline"
+            variant="primary"
             size="sm"
             onClick={() => setIsAddAccountOpen(true)}
             className="h-10 px-3 sm:px-4 flex-1 flex items-center justify-center gap-1.5"
@@ -833,14 +847,14 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                 {isReorderMode && (
                   <TableHead className="w-20 text-center select-none bg-bg-page font-semibold text-text-secondary">Urutan</TableHead>
                 )}
-                <TableHead className="sticky left-0 bg-bg-page z-20 border-r border-border-soft min-w-[90px] sm:min-w-[150px]">Akun</TableHead>
-
+                <TableHead className="sticky left-0 bg-bg-page z-20 border-r border-border-soft min-w-[90px] sm:min-w-[150px] text-center">Akun</TableHead>
+ 
                 {/* Render Dynamic Custom Column Headers */}
                 {aplikasi.kolom.map((col, colIndex) => {
                   return (
                     <TableHead
                       key={col.id}
-                      className={`${
+                      className={`text-center ${
                         isReorderMode
                           ? `group relative pr-12 sm:pr-14 ${
                               col.tipeKolom === "CENTANG"
@@ -851,7 +865,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                       }`}
                     >
                       {isReorderMode ? (
-                        <div className="flex items-center gap-1.5 justify-start text-nowrap py-3 px-3.5 sm:px-6 sm:py-4">
+                        <div className="flex items-center gap-1.5 justify-center text-nowrap py-3 px-3.5 sm:px-6 sm:py-4">
                           <span>{col.namaKolom}</span>
                           {/* Type Icon Badge */}
                           <Badge variant="circle" className="shrink-0">
@@ -862,7 +876,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                               <Check className="h-2.5 w-2.5 stroke-[3]" />
                             )}
                           </Badge>
-
+ 
                           <div className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-bg-surface border border-border-soft rounded-lg shadow-sm p-0.5 z-30">
                             <button
                               disabled={colIndex === 0}
@@ -887,7 +901,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                           className="w-36"
                           align="left"
                           trigger={
-                            <div className="flex items-center gap-1.5 justify-start text-nowrap cursor-pointer hover:text-accent transition-colors w-full h-full py-3 px-3.5 sm:px-6 sm:py-4 select-none">
+                            <div className="flex items-center gap-1.5 justify-center text-nowrap cursor-pointer hover:text-accent transition-colors w-full h-full py-3 px-3.5 sm:px-6 sm:py-4 select-none">
                               <span>{col.namaKolom}</span>
                               {/* Type Icon Badge */}
                               <Badge variant="circle" className="shrink-0">
@@ -920,8 +934,8 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                     </TableHead>
                   );
                 })}
-
-                <TableHead className="w-24 text-right">Aksi</TableHead>
+ 
+                <TableHead className="w-24 text-center">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1446,29 +1460,79 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         title="Detail Akun"
         description="Rincian informasi perangkat dan nomor kontak untuk akun ini."
       >
-        <div className="flex flex-col gap-4 font-sans">
-          <div className="grid grid-cols-3 gap-2 border-b border-border-soft pb-3">
-            <span className="text-xs font-semibold text-text-secondary">Nama Akun</span>
-            <span className="col-span-2 text-sm font-medium text-text-primary">{selectedDetailAccount?.nama}</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 border-b border-border-soft pb-3">
-            <span className="text-xs font-semibold text-text-secondary">Device</span>
-            <span className="col-span-2 text-sm font-medium text-text-primary">
-              {selectedDetailAccount?.device || <span className="text-text-secondary select-none">–</span>}
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 border-b border-border-soft pb-3">
-            <span className="text-xs font-semibold text-text-secondary">No HP</span>
-            <span className="col-span-2 text-sm font-mono text-text-primary">
-              {selectedDetailAccount?.nomorHp || <span className="text-text-secondary select-none">–</span>}
-            </span>
+        <div className="flex flex-col gap-5 font-sans pt-2">
+          {/* Card Container holding the detailed rows */}
+          <div className="bg-bg-page/40 border border-border-soft rounded-3xl p-5 flex flex-col gap-4.5 shadow-sm">
+            
+            {/* Row 1: Nama Akun */}
+            <div className="flex items-center gap-4">
+              <div className="h-11 w-11 rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0 border border-accent/5 shadow-sm">
+                <User className="h-5 w-5" />
+              </div>
+              <div className="flex flex-col grow min-w-0">
+                <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">Nama Akun</span>
+                <span className="text-[15px] font-bold text-text-primary mt-0.5 truncate">
+                  {selectedDetailAccount?.nama}
+                </span>
+              </div>
+            </div>
+
+            <div className="h-px bg-border-soft/60" />
+
+            {/* Row 2: Perangkat */}
+            <div className="flex items-center gap-4">
+              <div className="h-11 w-11 rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0 border border-accent/5 shadow-sm">
+                <Smartphone className="h-5 w-5" />
+              </div>
+              <div className="flex flex-col grow min-w-0">
+                <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">Perangkat</span>
+                <span className="text-[15px] font-bold text-text-primary mt-0.5 truncate">
+                  {selectedDetailAccount?.device || <span className="text-text-secondary/50 font-normal italic select-none">Tidak ada</span>}
+                </span>
+              </div>
+            </div>
+
+            <div className="h-px bg-border-soft/60" />
+
+            {/* Row 3: Nomor HP & Copy Button */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0 grow">
+                <div className="h-11 w-11 rounded-2xl bg-accent-soft text-accent flex items-center justify-center shrink-0 border border-accent/5 shadow-sm">
+                  <Phone className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col min-w-0 grow">
+                  <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">Nomor HP</span>
+                  <span className="text-[15px] font-mono font-bold text-text-primary mt-0.5 truncate">
+                    {selectedDetailAccount?.nomorHp || <span className="text-text-secondary/50 font-normal italic select-none">Tidak ada</span>}
+                  </span>
+                </div>
+              </div>
+
+              {selectedDetailAccount?.nomorHp && (
+                <button
+                  type="button"
+                  className="h-11 w-11 flex items-center justify-center rounded-2xl border border-border-soft bg-bg-surface text-text-secondary hover:bg-accent-soft hover:text-accent hover:border-accent/30 shadow-sm transition-all duration-200 cursor-pointer shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(selectedDetailAccount.nomorHp || "");
+                    toast.success("Nomor HP berhasil disalin", { duration: 1500 });
+                  }}
+                  title="Salin Nomor HP"
+                >
+                  <Copy className="h-4 w-4 shrink-0" />
+                </button>
+              )}
+            </div>
+
           </div>
 
-          <div className="flex items-center justify-end mt-4">
+          {/* Action button: Tutup */}
+          <div className="flex items-center justify-end mt-1">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setSelectedDetailAccount(null)}
+              className="h-10 px-5 font-semibold rounded-2xl shadow-sm bg-bg-surface"
             >
               Tutup
             </Button>
@@ -1506,53 +1570,63 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-text-secondary">Logo Aplikasi (Opsional)</label>
-            <div className="flex items-center gap-4 border border-dashed border-border-soft p-4 rounded-xl bg-bg-page/50">
-              <div className="h-12 w-12 rounded-xl border border-border-soft overflow-hidden bg-accent-soft flex items-center justify-center text-accent shrink-0 select-none">
-                {logoPreview ? (
-                  <img
-                    src={logoPreview}
-                    alt="Preview"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <Upload className="h-5 w-5 opacity-70" />
-                )}
-              </div>
-              <div className="flex flex-col gap-1.5 grow">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="app-logo-upload"
-                />
-                <div className="flex items-center gap-2">
-                  <label
-                    htmlFor="app-logo-upload"
-                    className="h-9 px-3 text-xs font-medium border border-border-soft rounded-lg bg-bg-surface text-text-primary hover:bg-accent-soft/30 cursor-pointer flex items-center justify-center transition-colors focus-within:ring-2 focus-within:ring-accent"
-                  >
-                    Pilih File
-                  </label>
-                  {logoPreview && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleRemoveLogo}
-                      className="h-9 text-xs text-danger hover:bg-danger-soft/50 font-medium"
-                    >
-                      <X className="h-3.5 w-3.5 mr-1" />
-                      Hapus
-                    </Button>
-                  )}
+            <span className="text-xs font-semibold text-text-secondary select-none">Logo Aplikasi (Opsional)</span>
+            <label
+              htmlFor="app-logo-upload"
+              className="flex items-center justify-center border border-dashed border-border-soft p-5 rounded-3xl bg-bg-page/50 cursor-pointer hover:bg-accent-soft/10 hover:border-accent/40 transition-all duration-200 min-h-[96px] w-full"
+            >
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                id="app-logo-upload"
+              />
+              
+              {!logoPreview ? (
+                <div className="flex flex-col items-center justify-center text-center gap-2">
+                  <div className="h-10 w-10 rounded-xl bg-accent-soft flex items-center justify-center text-accent select-none">
+                    <Upload className="h-5 w-5" />
+                  </div>
+                  <div className="flex flex-col gap-0.5 select-none">
+                    <span className="text-xs font-semibold text-text-primary">
+                      Klik di sini untuk mengunggah logo
+                    </span>
+                    <span className="text-[10px] text-text-secondary">
+                      Format JPG, PNG, WEBP (Maksimal 2MB)
+                    </span>
+                  </div>
                 </div>
-                <p className="text-[11px] text-text-secondary">
-                  Format JPG, PNG, WEBP (Maksimal 2MB)
-                </p>
-              </div>
-            </div>
+              ) : (
+                <div className="flex items-center gap-4 w-full text-left">
+                  <div className="h-12 w-12 rounded-2xl border border-border-soft overflow-hidden shrink-0 select-none shadow-sm bg-bg-surface">
+                    <img
+                      src={logoPreview}
+                      alt="Preview"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5 grow min-w-0">
+                    <span className="text-xs font-semibold text-text-primary truncate">
+                      Logo Terpilih
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveLogo}
+                        className="h-8 text-xs text-danger hover:bg-danger-soft/50 font-semibold px-2.5"
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" />
+                        Hapus Logo
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </label>
           </div>
 
           {appError && (

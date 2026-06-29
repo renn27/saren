@@ -21,7 +21,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             type={type}
             ref={ref}
             className={twMerge(
-              "w-full h-11 px-4 text-sm bg-bg-surface border border-border-soft rounded-xl text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-all font-sans",
+              "w-full h-11 px-4 text-sm bg-bg-surface border border-border-soft rounded-2xl text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-all font-sans",
               prefixText && "pl-10",
               error && "border-danger focus-visible:ring-danger",
               className

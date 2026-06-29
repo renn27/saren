@@ -24,7 +24,7 @@ export default async function Page({ params }: PageProps) {
   }
 
   return (
-    <main className="flex-1 w-full max-w-7xl mx-auto px-3 py-5 sm:px-6 sm:py-8">
+    <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-5 sm:px-6 sm:py-8">
       <AplikasiDetailClient garapan={garapan} aplikasi={aplikasi} />
     </main>
   );

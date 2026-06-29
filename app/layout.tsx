@@ -70,7 +70,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-bg-page text-text-primary selection:bg-accent-soft selection:text-accent">
         {/* Global Navigation Header with Glassmorphism */}
-        <header className="sticky top-0 z-40 w-full border-b border-border-soft/60 bg-bg-surface/85 backdrop-blur-md transition-all duration-200">
+        <header className="sticky top-0 z-40 w-full border-b border-border-soft/50 bg-bg-surface/80 backdrop-blur-xl transition-all duration-200">
           <div className="max-w-7xl mx-auto w-full px-4 h-16 flex items-center justify-between md:px-8">
             <Link href="/" className="flex items-center gap-2.5 group">
               <img

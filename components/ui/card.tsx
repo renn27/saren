@@ -11,8 +11,15 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={twMerge(
-          "bg-bg-surface border border-border-soft rounded-2xl p-6 shadow-sm font-sans transition-all duration-200",
-          hoverable && "hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md hover:shadow-accent/5 cursor-pointer",
+          "bg-bg-surface border border-border-soft rounded-3xl p-6 font-sans transition-all duration-200 ease-out",
+          // Base shadow using CSS var
+          "[box-shadow:var(--shadow-card)]",
+          hoverable && [
+            "cursor-pointer select-none",
+            "hover:-translate-y-0.5 hover:border-accent/35",
+            "hover:[box-shadow:var(--shadow-card-hover)]",
+            "active:translate-y-0 active:scale-[0.99] active:[box-shadow:var(--shadow-card)]",
+          ].join(" "),
           className
         )}
         {...props}

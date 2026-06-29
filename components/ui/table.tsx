@@ -8,7 +8,7 @@ export const TableContainer = React.forwardRef<
   <div
     ref={ref}
     className={twMerge(
-      "w-full overflow-x-auto rounded-2xl border border-border-soft bg-bg-surface",
+      "w-full overflow-x-auto rounded-3xl border border-border-soft bg-bg-surface [box-shadow:var(--shadow-card)]",
       className
     )}
     {...props}
@@ -35,7 +35,7 @@ export const TableHeader = React.forwardRef<
   <thead
     ref={ref}
     className={twMerge(
-      "bg-bg-page border-b border-border-soft sticky top-0 z-10",
+      "bg-bg-page/80 backdrop-blur-sm border-b border-border-soft sticky top-0 z-10",
       className
     )}
     {...props}
@@ -49,7 +49,7 @@ export const TableBody = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tbody
     ref={ref}
-    className={twMerge("divide-y divide-border-soft", className)}
+    className={twMerge("divide-y divide-border-soft/60", className)}
     {...props}
   />
 ));
@@ -62,7 +62,8 @@ export const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={twMerge(
-      "transition-colors hover:bg-accent/5",
+      "transition-colors duration-100",
+      "hover:bg-accent/[0.04]",
       className
     )}
     {...props}
@@ -77,7 +78,9 @@ export const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={twMerge(
-      "px-3.5 py-3 sm:px-6 sm:py-4 text-xs font-semibold text-text-secondary tracking-wider font-sans select-none align-middle",
+      "px-4 py-3 sm:px-5 sm:py-3.5",
+      "text-[11px] font-semibold uppercase tracking-[0.06em] text-text-secondary",
+      "font-sans select-none align-middle whitespace-nowrap",
       className
     )}
     {...props}
@@ -92,11 +95,10 @@ export const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={twMerge(
-      "px-3.5 py-3 sm:px-6 sm:py-4 text-sm text-text-primary align-middle",
+      "px-4 py-3 sm:px-5 sm:py-3.5 text-[13px] text-text-primary align-middle",
       className
     )}
     {...props}
   />
 ));
 TableCell.displayName = "TableCell";
-
