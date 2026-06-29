@@ -97,7 +97,7 @@ export function DropdownMenu({
         <div
           onClick={() => setIsOpen(false)}
           className={twMerge(
-            "absolute z-30 mt-2 w-48 rounded-xl bg-bg-surface border border-border-soft py-1",
+            "absolute z-30 mt-2 w-36 rounded-xl bg-bg-surface border border-border-soft py-1",
             "[box-shadow:0_8px_32px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)]",
             "transition-all duration-[180ms] ease-out origin-top",
             isAnimating

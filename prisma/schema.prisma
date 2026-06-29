@@ -51,9 +51,10 @@ model Kolom {
   namaKolom  String
   tipeKolom  TipeKolom
   urutan     Int       @default(0) // urutan tampil kolom, isi otomatis = jumlah kolom existing saat dibuat
-  isTarget   Boolean   @default(false)
-  nilaiTarget String?
-  createdAt  DateTime  @default(now())
+  isTarget      Boolean   @default(false)
+  nilaiTarget   String?
+  isAccumulated Boolean   @default(false)
+  createdAt     DateTime  @default(now())
 
   @@unique([aplikasiId, namaKolom]) // nama kolom unik per aplikasi
   @@map("kolom")

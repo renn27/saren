@@ -49,6 +49,15 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Route transition state
+  const [isExiting, setIsExiting] = React.useState(false);
+  const handleNavigate = (url: string) => {
+    setIsExiting(true);
+    setTimeout(() => {
+      router.push(url);
+    }, 250);
+  };
+
   // Modals state
   const [isAddOpen, setIsAddOpen] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<GarapanItem | null>(null);
@@ -125,7 +134,7 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
   };
 
   return (
-    <div key={pathname} className="w-full animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
+    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
       {/* Header Card */}
       <Card className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 p-5 sm:p-6">
         <div className="flex items-center gap-3.5">
@@ -167,20 +176,19 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
             <Card
               key={item.id}
               hoverable
-              onClick={() => router.push(`/garapan/${item.id}`)}
+              onClick={() => handleNavigate(`/garapan/${item.id}`)}
               className="card-stagger relative group pr-12 flex items-center p-4 sm:p-5 gap-4 hover:z-10 focus-within:z-10 min-h-[100px]"
             >
               {/* Month color icon */}
               <div className={`h-11 w-11 rounded-2xl bg-gradient-to-br ${MONTH_ACCENTS[item.bulan - 1]} text-accent flex items-center justify-center shrink-0 border border-accent/10`}>
                 <Calendar className="h-5 w-5 group-hover:scale-110 transition-transform duration-300 ease-out" />
               </div>
-
-              <div className="flex flex-col grow min-w-0">
-                <h3 className="text-[15px] font-semibold text-text-primary font-display truncate leading-tight">
+              {/* Title & Year */}
+              <div className="flex-1 min-w-0 flex flex-row items-center gap-2.5">
+                <h3 className="text-[17px] font-bold text-text-primary font-display truncate">
                   {MONTH_NAMES[item.bulan - 1]}
                 </h3>
-                {/* Year badge */}
-                <span className="mt-1 inline-flex items-center text-[11px] font-semibold text-text-secondary bg-bg-page border border-border-soft rounded-full px-2 py-0.5 w-fit font-mono">
+                <span className="inline-flex items-center rounded-md bg-bg-page px-2 py-0.5 text-[11px] font-medium text-text-secondary border border-border-soft shrink-0">
                   {item.tahun}
                 </span>
               </div>

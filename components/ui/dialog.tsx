@@ -58,7 +58,7 @@ export function Dialog({
       {/* Backdrop */}
       <div
         className={twMerge(
-          "fixed inset-0 bg-text-primary/20 backdrop-blur-sm transition-opacity duration-200 ease-out",
+          "fixed inset-0 bg-text-primary/20 backdrop-blur-sm transition-opacity duration-300 ease-out",
           isAnimating ? "opacity-100" : "opacity-0"
         )}
         onClick={onClose}
@@ -67,10 +67,10 @@ export function Dialog({
       {/* Content */}
       <div
         className={twMerge(
-          "relative w-full max-w-lg bg-bg-surface border border-border-soft rounded-3xl shadow-xl flex flex-col max-h-[85vh] md:max-h-[90vh] overflow-hidden transition-all duration-200 ease-out z-10 font-sans",
+          "relative w-full max-w-lg bg-bg-surface border border-border-soft rounded-3xl shadow-xl flex flex-col max-h-[85vh] md:max-h-[90vh] overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] z-10 font-sans",
           isAnimating
             ? "opacity-100 translate-y-0 scale-100"
-            : "opacity-0 translate-y-4 scale-95"
+            : "opacity-0 translate-y-8 scale-95"
         )}
       >
         <button
@@ -160,7 +160,7 @@ export function AlertDialog({
       {/* Backdrop */}
       <div
         className={twMerge(
-          "fixed inset-0 bg-text-primary/20 backdrop-blur-sm transition-opacity duration-200 ease-out",
+          "fixed inset-0 bg-text-primary/20 backdrop-blur-sm transition-opacity duration-300 ease-out",
           isAnimating ? "opacity-100" : "opacity-0"
         )}
         onClick={onClose}
@@ -169,10 +169,10 @@ export function AlertDialog({
       {/* Content */}
       <div
         className={twMerge(
-          "relative w-full max-w-md bg-bg-surface border border-border-soft rounded-3xl shadow-xl p-6 md:p-8 transition-all duration-200 ease-out z-10 font-sans",
+          "relative w-full max-w-md bg-bg-surface border border-border-soft rounded-3xl shadow-xl p-6 md:p-8 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] z-10 font-sans",
           isAnimating
             ? "opacity-100 translate-y-0 scale-100"
-            : "opacity-0 translate-y-4 scale-95"
+            : "opacity-0 translate-y-8 scale-95"
         )}
       >
         <div className="flex flex-col gap-2 mb-6">

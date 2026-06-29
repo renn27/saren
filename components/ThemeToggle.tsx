@@ -29,13 +29,13 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2.5 rounded-xl border border-border-soft bg-bg-surface text-text-primary hover:bg-accent-soft/40 transition-all cursor-pointer flex items-center justify-center h-10 w-10 shrink-0 shadow-sm group"
+      className="h-9 w-9 flex items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-text-secondary hover:bg-accent-soft hover:text-accent hover:border-accent/30 transition-all duration-200 cursor-pointer group"
       title={theme === "dark" ? "Ubah ke Mode Terang" : "Ubah ke Mode Gelap"}
     >
       {theme === "dark" ? (
-        <Sun className="h-4 w-4 text-accent transition-transform duration-300 group-hover:rotate-45" />
+        <Sun className="h-4 w-4 transition-transform duration-300 group-hover:rotate-45" />
       ) : (
-        <Moon className="h-4 w-4 text-accent transition-transform duration-300 group-hover:-rotate-12" />
+        <Moon className="h-4 w-4 transition-transform duration-300 group-hover:-rotate-12" />
       )}
     </button>
   );

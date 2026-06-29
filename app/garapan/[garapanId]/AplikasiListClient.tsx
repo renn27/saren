@@ -116,6 +116,15 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
   const router = useRouter();
   const pathname = usePathname();
 
+  // Route transition state
+  const [isExiting, setIsExiting] = React.useState(false);
+  const handleNavigate = (url: string) => {
+    setIsExiting(true);
+    setTimeout(() => {
+      router.push(url);
+    }, 250);
+  };
+
   // Modals state
   const [isAddOpen, setIsAddOpen] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<AplikasiItem | null>(null);
@@ -167,7 +176,7 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
     if (res.success) {
       toast.success("Garapan berhasil diduplikat!");
       setIsDuplicateOpen(false);
-      router.push("/");
+      handleNavigate("/");
       router.refresh();
     } else {
       setDuplicateError(res.error || "Gagal menduplikat garapan.");
@@ -300,58 +309,57 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
   const formattedMonthYear = `${MONTH_NAMES[garapan.bulan - 1]} ${garapan.tahun}`;
 
   return (
-    <div key={pathname} className="w-full animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
-      {/* Breadcrumb & Navigation */}
-      <div className="flex flex-col gap-3.5 mb-6">
-        <Link href="/" className="w-fit">
+    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
+      {/* Back Button */}
+      <div className="mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleNavigate("/")}
+          className="h-9 px-3.5 gap-1.5 text-text-secondary w-fit"
+        >
+          <ChevronLeft className="h-4 w-4 shrink-0" />
+          <span>Kembali ke Daftar Garapan</span>
+        </Button>
+      </div>
+
+      <Card className="relative flex flex-col gap-4 p-5 sm:p-6 mb-6">
+        {/* Top Row: Title & Duplicate Button */}
+        <div className="flex items-center justify-between gap-4 w-full">
+          <div className="flex items-center gap-3.5">
+            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/10">
+              <Calendar className="h-5 w-5" />
+            </div>
+            <div className="flex flex-col">
+              <h2 className="text-[19px] sm:text-[21px] font-semibold text-text-primary font-display tracking-tight leading-tight select-none">
+                {formattedMonthYear}
+              </h2>
+              <p className="text-xs text-text-secondary font-sans mt-0.5">
+                {initialList.length} aplikasi
+              </p>
+            </div>
+          </div>
+
           <Button
             variant="outline"
             size="sm"
-            className="h-9 px-3.5 gap-1.5 text-text-secondary"
+            onClick={() => setIsDuplicateOpen(true)}
+            className="flex items-center gap-1.5 h-9 px-3 whitespace-nowrap"
           >
-            <ChevronLeft className="h-4 w-4 shrink-0" />
-            <span>Kembali ke Garapan</span>
+            <Copy className="h-3.5 w-3.5 shrink-0" />
+            <span>Duplikat</span>
           </Button>
-        </Link>
+        </div>
 
-        <Card className="relative flex flex-col gap-4 p-5 sm:p-6">
-          {/* Top Row: Title & Duplicate Button */}
-          <div className="flex items-center justify-between gap-4 w-full">
-            <div className="flex items-center gap-3.5">
-              <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/10">
-                <Calendar className="h-5 w-5" />
-              </div>
-              <div className="flex flex-col">
-                <h2 className="text-[19px] sm:text-[21px] font-semibold text-text-primary font-display tracking-tight leading-tight select-none">
-                  {formattedMonthYear}
-                </h2>
-                <p className="text-xs text-text-secondary font-sans mt-0.5">
-                  {initialList.length} aplikasi
-                </p>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsDuplicateOpen(true)}
-              className="flex items-center gap-1.5 h-9 px-3 whitespace-nowrap"
-            >
-              <Copy className="h-3.5 w-3.5 shrink-0" />
-              <span>Duplikat</span>
-            </Button>
-          </div>
-
-          {/* Bottom Row: Full Width Add Application Button */}
-          <Button
-            onClick={() => setIsAddOpen(true)}
-            className="flex items-center gap-2 justify-center w-full h-11 text-sm font-semibold"
-          >
-            <Plus className="h-4 w-4 shrink-0" />
-            <span>Tambah Aplikasi</span>
-          </Button>
-        </Card>
-      </div>
+        {/* Bottom Row: Full Width Add Application Button */}
+        <Button
+          onClick={() => setIsAddOpen(true)}
+          className="flex items-center gap-2 justify-center w-full h-11 text-sm font-semibold"
+        >
+          <Plus className="h-4 w-4 shrink-0" />
+          <span>Tambah Aplikasi</span>
+        </Button>
+      </Card>
 
       {/* Grid or Empty State */}
       {initialList.length === 0 ? (
@@ -372,7 +380,7 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
               <Card
                 key={item.id}
                 hoverable
-                onClick={() => router.push(`/garapan/${garapan.id}/aplikasi/${item.id}`)}
+                onClick={() => handleNavigate(`/garapan/${garapan.id}/aplikasi/${item.id}`)}
                 className="card-stagger relative group pr-10 sm:pr-11 flex flex-col justify-between min-h-[116px] sm:min-h-[132px] p-4 sm:p-5 hover:z-10 focus-within:z-10"
               >
                 {/* App logo or color placeholder */}

@@ -11,6 +11,7 @@ const kolomSchema = z.object({
   tipeKolom: z.nativeEnum(TipeKolom),
   isTarget: z.boolean().optional(),
   nilaiTarget: z.string().nullable().optional(),
+  isAccumulated: z.boolean().optional(),
 });
 
 export async function createKolom(
@@ -21,6 +22,7 @@ export async function createKolom(
     tipeKolom: TipeKolom;
     isTarget?: boolean;
     nilaiTarget?: string | null;
+    isAccumulated?: boolean;
   }
 ) {
   const validation = kolomSchema.safeParse(formData);
@@ -28,7 +30,7 @@ export async function createKolom(
     return { success: false, error: validation.error.issues[0].message };
   }
 
-  const { aplikasiId, namaKolom, tipeKolom, isTarget, nilaiTarget } = validation.data;
+  const { aplikasiId, namaKolom, tipeKolom, isTarget, nilaiTarget, isAccumulated } = validation.data;
 
   try {
     const existing = await db.kolom.findFirst({
@@ -57,6 +59,7 @@ export async function createKolom(
         urutan: count,
         isTarget: isTarget || false,
         nilaiTarget: nilaiTarget || null,
+        isAccumulated: isAccumulated || false,
       },
     });
 
@@ -104,6 +107,7 @@ export async function updateKolom(
     tipeKolom: TipeKolom;
     isTarget?: boolean;
     nilaiTarget?: string | null;
+    isAccumulated?: boolean;
   }
 ) {
   const validation = kolomSchema.safeParse(formData);
@@ -111,7 +115,7 @@ export async function updateKolom(
     return { success: false, error: validation.error.issues[0].message };
   }
 
-  const { aplikasiId, namaKolom, tipeKolom, isTarget, nilaiTarget } = validation.data;
+  const { aplikasiId, namaKolom, tipeKolom, isTarget, nilaiTarget, isAccumulated } = validation.data;
 
   try {
     const existing = await db.kolom.findFirst({
@@ -138,6 +142,7 @@ export async function updateKolom(
         tipeKolom,
         isTarget: isTarget || false,
         nilaiTarget: nilaiTarget || null,
+        isAccumulated: isAccumulated || false,
       },
     });
 

@@ -44,6 +44,7 @@ import {
   Smartphone,
   Phone,
   Copy,
+  MoreVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -65,6 +66,7 @@ interface KolomItem {
   urutan: number;
   isTarget: boolean;
   nilaiTarget: string | null;
+  isAccumulated: boolean;
 }
 
 interface AkunItem {
@@ -94,9 +96,34 @@ const MONTH_NAMES = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"
 ];
 
+const formatNumberInput = (value: string | number) => {
+  if (value === undefined || value === null || value === "") return "";
+  const strVal = value.toString();
+  const isNegative = strVal.startsWith("-");
+  const digits = strVal.replace(/\D/g, "");
+  if (!digits) return isNegative ? "-" : "";
+  return (isNegative ? "-" : "") + Number(digits).toLocaleString("id-ID");
+};
+
+const parseNumberInput = (value: string) => {
+  const isNegative = value.startsWith("-");
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return isNegative ? "-" : "";
+  return isNegative ? `-${digits}` : digits;
+};
+
 export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClientProps) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // Route transition state
+  const [isExiting, setIsExiting] = React.useState(false);
+  const handleNavigate = (url: string) => {
+    setIsExiting(true);
+    setTimeout(() => {
+      router.push(url);
+    }, 250);
+  };
 
   const [isReorderMode, setIsReorderMode] = React.useState(false);
 
@@ -117,6 +144,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   const [tipeKolom, setTipeKolom] = React.useState<TipeKolom>("TEKS");
   const [isTarget, setIsTarget] = React.useState(false);
   const [nilaiTarget, setNilaiTarget] = React.useState("");
+  const [isAccumulated, setIsAccumulated] = React.useState(false);
   const [columnError, setColumnError] = React.useState<string | null>(null);
   const [isColumnSubmitting, setIsColumnSubmitting] = React.useState(false);
 
@@ -155,23 +183,21 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   }, [isEditAppOpen, aplikasi]);
 
   const existingAccountsWithLabels = React.useMemo(() => {
-    // Find duplicate names
-    const nameCounts: Record<string, number> = {};
+    const seenNames = new Set<string>();
+    const uniqueAccounts: any[] = [];
+    
     allExistingAccounts.forEach((acc) => {
-      const name = acc.nama.toLowerCase().trim();
-      nameCounts[name] = (nameCounts[name] || 0) + 1;
+      const nameLower = acc.nama.toLowerCase().trim();
+      if (!seenNames.has(nameLower)) {
+        seenNames.add(nameLower);
+        uniqueAccounts.push({
+          ...acc,
+          displayName: acc.nama,
+        });
+      }
     });
 
-    return allExistingAccounts.map((acc) => {
-      const nameLower = acc.nama.toLowerCase().trim();
-      const hasDuplicate = nameCounts[nameLower] > 1;
-      return {
-        ...acc,
-        displayName: hasDuplicate
-          ? `${acc.nama} (${acc.aplikasi.namaAplikasi})`
-          : acc.nama,
-      };
-    });
+    return uniqueAccounts;
   }, [allExistingAccounts]);
 
   // Reset forms
@@ -181,6 +207,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       setTipeKolom("TEKS");
       setIsTarget(false);
       setNilaiTarget("");
+      setIsAccumulated(false);
       setColumnError(null);
     }
   }, [isAddColumnOpen]);
@@ -191,6 +218,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       setTipeKolom(editingColumn.tipeKolom);
       setIsTarget(editingColumn.isTarget);
       setNilaiTarget(editingColumn.nilaiTarget || "");
+      setIsAccumulated(editingColumn.isAccumulated || false);
       setColumnError(null);
     }
   }, [editingColumn]);
@@ -275,6 +303,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       tipeKolom,
       isTarget,
       nilaiTarget: isTarget ? nilaiTarget.trim() : null,
+      isAccumulated: (tipeKolom === "NOMOR" || tipeKolom === "NOMINAL") ? isAccumulated : false,
     };
 
     if (editingColumn) {
@@ -652,19 +681,18 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   const formattedMonthYear = `${MONTH_NAMES[garapan.bulan - 1]} ${garapan.tahun}`;
 
   return (
-    <div key={pathname} className="w-full animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
+    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
       {/* Breadcrumbs */}
       <div className="flex flex-col gap-3.5 mb-6">
-        <Link href={`/garapan/${garapan.id}`} className="w-fit">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 px-3.5 gap-1.5 text-text-secondary"
-          >
-            <ChevronLeft className="h-4 w-4 shrink-0" />
-            <span>Kembali ke {formattedMonthYear}</span>
-          </Button>
-        </Link>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleNavigate(`/garapan/${garapan.id}`)}
+          className="h-9 px-3.5 gap-1.5 text-text-secondary w-fit"
+        >
+          <ChevronLeft className="h-4 w-4 shrink-0" />
+          <span>Kembali ke {formattedMonthYear}</span>
+        </Button>
       </div>
 
       <div className="relative flex flex-col gap-4 mb-6 bg-bg-surface border border-border-soft p-5 sm:p-6 rounded-3xl [box-shadow:var(--shadow-card)]">
@@ -749,20 +777,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       {/* Toolbar / Actions Card */}
       <div className="bg-bg-surface border border-border-soft p-4 sm:p-5 rounded-3xl [box-shadow:var(--shadow-card)] mb-6">
         <div className="flex items-center gap-2 w-full">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsAddColumnOpen(true)}
-            className="h-10 px-3 sm:px-4 flex-1 flex items-center justify-center gap-1.5"
-          >
-            <Plus className="h-4 w-4 shrink-0" />
-            <span>
-              <span className="sm:hidden">Kolom</span>
-              <span className="hidden sm:inline">Tambah Kolom</span>
-            </span>
-          </Button>
-
-          {/* Primary CTA: Tambah Akun */}
+          {/* Primary CTA: Tambah Akun (Leftmost) */}
           <Button
             variant="primary"
             size="sm"
@@ -773,6 +788,19 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             <span>
               <span className="sm:hidden">Akun</span>
               <span className="hidden sm:inline">Tambah Akun</span>
+            </span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsAddColumnOpen(true)}
+            className="h-10 px-3 sm:px-4 flex-1 flex items-center justify-center gap-1.5"
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            <span>
+              <span className="sm:hidden">Kolom</span>
+              <span className="hidden sm:inline">Tambah Kolom</span>
             </span>
           </Button>
 
@@ -935,7 +963,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                   );
                 })}
  
-                <TableHead className="w-24 text-center">Aksi</TableHead>
+                <TableHead className="w-14 px-1 text-center">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1020,15 +1048,29 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                           className="p-1 min-w-[110px] sm:min-w-[160px]"
                         >
                           <input
-                            type={col.tipeKolom === "TEKS" ? "text" : "number"}
-                            defaultValue={val !== undefined && val !== null ? val : ""}
+                            type="text"
+                            inputMode={col.tipeKolom === "TEKS" ? "text" : "numeric"}
+                            defaultValue={
+                              val !== undefined && val !== null
+                                ? (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL"
+                                    ? formatNumberInput(val)
+                                    : val)
+                                : ""
+                            }
                             autoFocus
                             className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans"
+                            onChange={(e) => {
+                              if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
+                                const parsed = parseNumberInput(e.target.value);
+                                e.target.value = formatNumberInput(parsed);
+                              }
+                            }}
                             onBlur={(e) => {
                               const rawVal = e.target.value;
                               let finalVal: any = rawVal;
                               if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
-                                finalVal = rawVal === "" ? null : Number(rawVal);
+                                const parsed = parseNumberInput(rawVal);
+                                finalVal = parsed === "" || parsed === "-" ? null : Number(parsed);
                               } else {
                                 finalVal = rawVal === "" ? null : rawVal;
                               }
@@ -1042,7 +1084,8 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                                 const rawVal = (e.target as HTMLInputElement).value;
                                 let finalVal: any = rawVal;
                                 if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
-                                  finalVal = rawVal === "" ? null : Number(rawVal);
+                                  const parsed = parseNumberInput(rawVal);
+                                  finalVal = parsed === "" || parsed === "-" ? null : Number(parsed);
                                 } else {
                                   finalVal = rawVal === "" ? null : rawVal;
                                 }
@@ -1071,27 +1114,62 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                     );
                   })}
 
-                  <TableCell className="text-right py-1">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => setEditingAccount(acc)}
-                        className="h-8 w-8 rounded-lg text-text-secondary hover:bg-accent-soft hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
-                        title="Edit Akun"
+                  <TableCell className="text-center py-1 px-1 w-14">
+                    <div className="flex items-center justify-center">
+                      <DropdownMenu
+                        className="w-32"
+                        align="right"
+                        trigger={
+                          <button
+                            className="h-8 w-8 rounded-lg text-text-secondary hover:bg-accent-soft hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
+                            title="Opsi"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        }
                       >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeletingAccount(acc)}
-                        className="h-8 w-8 rounded-lg text-text-secondary hover:bg-danger-soft hover:text-danger flex items-center justify-center transition-colors cursor-pointer"
-                        title="Hapus Akun"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                        <DropdownMenuItem onClick={() => setEditingAccount(acc)}>
+                          <Edit className="h-4 w-4 text-text-secondary" />
+                          <span>Edit</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setDeletingAccount(acc)}
+                          className="text-danger hover:bg-danger-soft"
+                        >
+                          <Trash2 className="h-4 w-4 text-danger" />
+                          <span>Hapus</span>
+                        </DropdownMenuItem>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>
               );
             })}
+            
+            {/* Accumulation / Footer Row */}
+            {aplikasi.kolom.some((c) => c.isAccumulated) && (
+              <TableRow className="bg-bg-page font-bold text-text-primary hover:bg-bg-page cursor-default">
+                {isReorderMode && <TableCell className="border-r border-border-soft"></TableCell>}
+                <TableCell className="sticky left-0 bg-bg-page z-10 border-r border-border-soft text-right">
+                  Total Akumulasi:
+                </TableCell>
+                {aplikasi.kolom.map((col) => {
+                  if (!col.isAccumulated) return <TableCell key={col.id}></TableCell>;
+                  
+                  const sum = filteredAkun.reduce((acc, curr) => {
+                    const val = curr.customValues[col.id];
+                    return acc + (Number(val) || 0);
+                  }, 0);
+
+                  return (
+                    <TableCell key={col.id} className="text-right">
+                      {formatValue(sum, col.tipeKolom)}
+                    </TableCell>
+                  );
+                })}
+                <TableCell></TableCell>
+              </TableRow>
+            )}
           </TableBody>
           </Table>
         </TableContainer>
@@ -1164,6 +1242,19 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             </label>
           </div>
 
+          {(tipeKolom === "NOMOR" || tipeKolom === "NOMINAL") && (
+            <div className="flex items-center gap-2 py-1">
+              <Checkbox
+                id="isAccumulated"
+                checked={isAccumulated}
+                onCheckedChange={(checked) => setIsAccumulated(Boolean(checked))}
+              />
+              <label htmlFor="isAccumulated" className="text-xs font-semibold text-text-primary cursor-pointer select-none">
+                Tampilkan Akumulasi (Total baris terakhir)
+              </label>
+            </div>
+          )}
+
           {isTarget && (
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-text-secondary">
@@ -1179,10 +1270,11 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                 </Select>
               ) : tipeKolom === "NOMOR" || tipeKolom === "NOMINAL" ? (
                 <Input
-                  type="number"
-                  value={nilaiTarget}
-                  onChange={(e) => setNilaiTarget(e.target.value)}
-                  placeholder="Contoh: 1000000"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatNumberInput(nilaiTarget)}
+                  onChange={(e) => setNilaiTarget(parseNumberInput(e.target.value))}
+                  placeholder="Contoh: 1.000.000"
                   required
                 />
               ) : (
@@ -1359,29 +1451,33 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
 
                     {col.tipeKolom === "NOMOR" && (
                       <Input
-                        type="number"
-                        value={val !== undefined && val !== null ? val : ""}
-                        onChange={(e) =>
+                        type="text"
+                        inputMode="numeric"
+                        value={formatNumberInput(val !== undefined && val !== null ? val : "")}
+                        onChange={(e) => {
+                          const parsed = parseNumberInput(e.target.value);
                           setCustomValues({
                             ...customValues,
-                            [col.id]: e.target.value === "" ? "" : Number(e.target.value),
-                          })
-                        }
+                            [col.id]: parsed === "" || parsed === "-" ? "" : Number(parsed),
+                          });
+                        }}
                         placeholder="Masukkan angka"
                       />
                     )}
 
                     {col.tipeKolom === "NOMINAL" && (
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         prefixText="Rp"
-                        value={val !== undefined && val !== null ? val : ""}
-                        onChange={(e) =>
+                        value={formatNumberInput(val !== undefined && val !== null ? val : "")}
+                        onChange={(e) => {
+                          const parsed = parseNumberInput(e.target.value);
                           setCustomValues({
                             ...customValues,
-                            [col.id]: e.target.value === "" ? "" : Number(e.target.value),
-                          })
-                        }
+                            [col.id]: parsed === "" || parsed === "-" ? "" : Number(parsed),
+                          });
+                        }}
                         placeholder="Masukkan nominal rupiah"
                       />
                     )}
