@@ -316,20 +316,11 @@ export function NomorClient({ initialData }: NomorClientProps) {
         isOpen={deletingItem !== null}
         onClose={() => setDeletingItem(null)}
         title="Hapus Nomor"
-        description={
-          <>
-            Apakah Anda yakin ingin menghapus nomor{" "}
-            <span className="font-semibold text-text-primary">
-              {deletingItem?.nomorKartu}
-            </span>{" "}
-            ({deletingItem?.provider})? Tindakan ini tidak dapat dibatalkan.
-          </>
-        }
-        confirmLabel="Hapus Nomor"
-        cancelLabel="Batal"
+        description={`Apakah Anda yakin ingin menghapus nomor ${deletingItem?.nomorKartu} (${deletingItem?.provider})? Tindakan ini tidak dapat dibatalkan.`}
+        confirmText="Hapus Nomor"
+        cancelText="Batal"
         onConfirm={handleDelete}
-        variant="danger"
-        isLoading={isSubmitting}
+        isDanger={true}
       />
 
       {/* Dialog View */}
