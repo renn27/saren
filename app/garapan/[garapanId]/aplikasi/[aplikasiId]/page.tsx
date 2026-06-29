@@ -10,12 +10,14 @@ interface PageProps {
   }>;
 }
 
-export const dynamic = "force-dynamic";
-
 export default async function Page({ params }: PageProps) {
   const resolvedParams = await params;
-  const garapan = await getGarapan(resolvedParams.garapanId);
-  const aplikasi = await getAplikasi(resolvedParams.aplikasiId);
+
+  // Fetch both in parallel — tidak tunggu satu-satu
+  const [garapan, aplikasi] = await Promise.all([
+    getGarapan(resolvedParams.garapanId),
+    getAplikasi(resolvedParams.aplikasiId),
+  ]);
 
   if (!garapan || !aplikasi || aplikasi.garapanId !== garapan.id) {
     notFound();
