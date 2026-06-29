@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
-import { createKolom, deleteKolom, swapKolomUrutan, updateKolom } from "@/lib/actions/kolom";
+import { createKolom, deleteKolom, swapKolomUrutan, updateKolom, clearKolomData } from "@/lib/actions/kolom";
 import { createAkun, updateAkun, deleteAkun, getAllAccountsForAutofill, swapAkunUrutan } from "@/lib/actions/akun";
 import { updateAplikasi } from "@/lib/actions/aplikasi";
 import { TipeKolom } from "@prisma/client";
@@ -99,6 +99,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   const [isAddColumnOpen, setIsAddColumnOpen] = React.useState(false);
   const [editingColumn, setEditingColumn] = React.useState<KolomItem | null>(null);
   const [deletingColumn, setDeletingColumn] = React.useState<KolomItem | null>(null);
+  const [clearingColumn, setClearingColumn] = React.useState<KolomItem | null>(null);
 
   const [isAddAccountOpen, setIsAddAccountOpen] = React.useState(false);
   const [editingAccount, setEditingAccount] = React.useState<AkunItem | null>(null);
@@ -303,6 +304,18 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       router.refresh();
     } else {
       toast.error(res.error || "Gagal menghapus kolom.");
+    }
+  };
+
+  const handleClearColumn = async () => {
+    if (!clearingColumn) return;
+    const res = await clearKolomData(clearingColumn.id, garapan.id, aplikasi.id);
+    if (res.success) {
+      toast.success(`Data kolom "${clearingColumn.namaKolom}" berhasil dikosongkan`);
+      setClearingColumn(null);
+      router.refresh();
+    } else {
+      toast.error(res.error || "Gagal mengosongkan kolom.");
     }
   };
 
@@ -892,6 +905,13 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                             <Edit className="h-4 w-4 mr-2 text-text-secondary" />
                             <span>Edit</span>
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setClearingColumn(col)}
+                            className="text-amber-600 hover:bg-amber-50 dark:text-amber-500 dark:hover:bg-amber-950/20 hover:text-amber-600"
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            <span>Kosongkan</span>
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setDeletingColumn(col)} className="text-danger hover:bg-danger-soft">
                             <Trash2 className="h-4 w-4 mr-2 text-danger" />
                             <span>Hapus</span>
@@ -1202,6 +1222,16 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         title="Hapus Kolom Kustom?"
         description={`Menghapus kolom "${deletingColumn?.namaKolom}" akan menghilangkan datanya dari tampilan tabel seluruh akun. Tindakan ini tidak bisa dibatalkan.`}
         confirmText="Hapus Kolom"
+      />
+
+      {/* Confirm Clear Column Data Alert */}
+      <AlertDialog
+        isOpen={!!clearingColumn}
+        onClose={() => setClearingColumn(null)}
+        onConfirm={handleClearColumn}
+        title="Kosongkan Data Kolom?"
+        description={`Apakah Anda yakin ingin mengosongkan semua data baris pada kolom "${clearingColumn?.namaKolom}"? Tindakan ini tidak bisa dibatalkan.`}
+        confirmText="Kosongkan Data"
       />
 
       {/* Add / Edit Account Dialog */}

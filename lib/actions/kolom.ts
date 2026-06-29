@@ -206,3 +206,45 @@ export async function swapKolomUrutan(
     return { success: false, error: "Gagal memindahkan kolom." };
   }
 }
+
+export async function clearKolomData(id: string, garapanId: string, aplikasiId: string) {
+  try {
+    const col = await db.kolom.findUnique({
+      where: { id },
+    });
+    if (!col) {
+      return { success: false, error: "Kolom tidak ditemukan." };
+    }
+
+    const akuns = await db.akun.findMany({
+      where: { aplikasiId },
+    });
+
+    const isCentang = col.tipeKolom === "CENTANG";
+
+    // Gunakan transaction untuk memastikan semua data di-update secara konsisten
+    await db.$transaction(
+      akuns.map((acc) => {
+        const updatedCustomValues = { ...(acc.customValues as Record<string, any>) };
+        if (isCentang) {
+          updatedCustomValues[id] = false;
+        } else {
+          updatedCustomValues[id] = null;
+        }
+
+        return db.akun.update({
+          where: { id: acc.id },
+          data: {
+            customValues: updatedCustomValues,
+          },
+        });
+      })
+    );
+
+    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Error clearing kolom data:", error);
+    return { success: false, error: "Gagal mengosongkan data kolom." };
+  }
+}
