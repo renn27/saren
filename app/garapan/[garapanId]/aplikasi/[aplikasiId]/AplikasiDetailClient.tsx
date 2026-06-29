@@ -882,7 +882,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                   return (
                     <TableHead
                       key={col.id}
-                      className={`text-center ${
+                      className={`text-center border-r border-border-soft/50 ${
                         isReorderMode
                           ? `group relative pr-12 sm:pr-14 ${
                               col.tipeKolom === "CENTANG"
@@ -1024,7 +1024,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                       return (
                         <TableCell
                           key={col.id}
-                          className={`align-middle py-2 ${col.tipeKolom === "CENTANG"
+                          className={`align-middle py-2 border-r border-border-soft/50 ${col.tipeKolom === "CENTANG"
                               ? "min-w-[70px] sm:min-w-[100px]"
                               : "min-w-[110px] sm:min-w-[160px]"
                             }`}
@@ -1045,7 +1045,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                       return (
                         <TableCell
                           key={col.id}
-                          className="p-1 min-w-[110px] sm:min-w-[160px]"
+                          className="p-1 min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
                         >
                           <input
                             type="text"
@@ -1105,7 +1105,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                     return (
                       <TableCell
                         key={col.id}
-                        className="cursor-pointer hover:bg-accent-soft/30 transition-colors select-none text-nowrap min-w-[110px] sm:min-w-[160px]"
+                        className="cursor-pointer hover:bg-accent-soft/30 transition-colors select-none text-nowrap min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
                         onClick={() => setEditingCell({ accountId: acc.id, columnId: col.id })}
                         title="Klik untuk mengedit"
                       >

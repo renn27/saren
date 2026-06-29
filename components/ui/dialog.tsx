@@ -21,10 +21,16 @@ export function Dialog({
   const [shouldRender, setShouldRender] = React.useState(isOpen);
   const [isAnimating, setIsAnimating] = React.useState(false);
 
+  const prevContentRef = React.useRef({ title, description, children });
+  if (isOpen) {
+    prevContentRef.current = { title, description, children };
+  }
+  const displayContent = isOpen ? { title, description, children } : prevContentRef.current;
+
   React.useEffect(() => {
     if (isOpen) {
       setShouldRender(true);
-      const timer = setTimeout(() => setIsAnimating(true), 10);
+      const timer = setTimeout(() => setIsAnimating(true), 50);
       return () => clearTimeout(timer);
     } else {
       setIsAnimating(false);
@@ -82,17 +88,17 @@ export function Dialog({
 
         <div className="flex flex-col gap-2 p-6 md:p-8 pb-4 md:pb-4 shrink-0 pr-12">
           <h2 className="text-[18px] sm:text-[20px] font-semibold text-text-primary font-display leading-tight">
-            {title}
+            {displayContent.title}
           </h2>
-          {description && (
+          {displayContent.description && (
             <p className="text-[12px] sm:text-[13px] text-text-secondary leading-relaxed mt-0.5">
-              {description}
+              {displayContent.description}
             </p>
           )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-6 md:pb-8 pt-0 min-h-0">
-          {children}
+          {displayContent.children}
         </div>
       </div>
     </div>
@@ -123,10 +129,16 @@ export function AlertDialog({
   const [shouldRender, setShouldRender] = React.useState(isOpen);
   const [isAnimating, setIsAnimating] = React.useState(false);
 
+  const prevContentRef = React.useRef({ title, description });
+  if (isOpen) {
+    prevContentRef.current = { title, description };
+  }
+  const displayContent = isOpen ? { title, description } : prevContentRef.current;
+
   React.useEffect(() => {
     if (isOpen) {
       setShouldRender(true);
-      const timer = setTimeout(() => setIsAnimating(true), 10);
+      const timer = setTimeout(() => setIsAnimating(true), 50);
       return () => clearTimeout(timer);
     } else {
       setIsAnimating(false);
@@ -177,10 +189,10 @@ export function AlertDialog({
       >
         <div className="flex flex-col gap-2 mb-6">
           <h2 className="text-[18px] font-semibold text-text-primary font-display">
-            {title}
+            {displayContent.title}
           </h2>
           <p className="text-[13px] text-text-secondary leading-relaxed">
-            {description}
+            {displayContent.description}
           </p>
         </div>
 

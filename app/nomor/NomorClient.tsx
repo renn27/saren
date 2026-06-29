@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Nomor } from "@prisma/client";
-import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy } from "lucide-react";
+import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, ArrowUpDown, ArrowDown, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
@@ -44,6 +44,59 @@ export function NomorClient({ initialData }: NomorClientProps) {
 
   // View State
   const [viewingItem, setViewingItem] = useState<Nomor | null>(null);
+
+  // Inline Date Edit State
+  const [editingDateId, setEditingDateId] = useState<string | null>(null);
+
+  // Sort State
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
+  const sortedData = [...data].sort((a, b) => {
+    const dateA = new Date(a.masaAktif).getTime();
+    const dateB = new Date(b.masaAktif).getTime();
+    if (sortOrder === "asc") return dateA - dateB;
+    return dateB - dateA;
+  });
+
+  const getRowHighlight = (masaAktifDate: Date) => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const masa = new Date(masaAktifDate);
+    masa.setHours(0, 0, 0, 0);
+
+    const oneYearFromNow = new Date(now);
+    oneYearFromNow.setFullYear(now.getFullYear() + 1);
+
+    const diffTime = now.getTime() - masa.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (masa > oneYearFromNow) {
+      // Lebih dari setahun -> Hijau Lembut
+      return {
+        row: "bg-target-bg hover:bg-target-hover",
+        sticky: "bg-target-bg group-hover:bg-target-hover text-target-text"
+      };
+    } else if (masa < now && diffDays > 30) {
+      // Lewat dari 30 hari -> Merah Lembut
+      return {
+        row: "bg-danger-bg hover:bg-danger-hover",
+        sticky: "bg-danger-bg group-hover:bg-danger-hover text-danger-text"
+      };
+    } else if (masa < now && diffDays <= 30) {
+      // Lewat masa aktif tapi belum 30 hari -> Kuning Lembut
+      return {
+        row: "bg-warning-bg hover:bg-warning-hover",
+        sticky: "bg-warning-bg group-hover:bg-warning-hover text-warning-text"
+      };
+    }
+    
+    // Default
+    return {
+      row: "hover:bg-accent-soft/30",
+      sticky: "bg-bg-surface group-hover:bg-accent-soft/30 text-text-primary"
+    };
+  };
 
   const resetForm = () => {
     setProvider("");
@@ -111,6 +164,42 @@ export function NomorClient({ initialData }: NomorClientProps) {
       }
     }
     setIsSubmitting(false);
+  };
+
+  const handleSaveInlineDate = async (item: Nomor, newDateVal: string) => {
+    setEditingDateId(null);
+    if (!newDateVal) return;
+    
+    const dateObj = new Date(newDateVal);
+    if (isNaN(dateObj.getTime())) return;
+
+    const currentFormatted = formatDateInput(item.masaAktif);
+    if (newDateVal === currentFormatted) return;
+
+    const toastId = toast.loading("Memperbarui tanggal...");
+
+    const res = await updateNomor(item.id, {
+      provider: item.provider,
+      nomorKartu: item.nomorKartu,
+      masaAktif: dateObj,
+    });
+
+    if (res.success && res.data) {
+      toast.success("Masa aktif berhasil diperbarui", { id: toastId });
+      setData((prev) =>
+        prev.map((n) => (n.id === item.id ? res.data! : n))
+      );
+    } else {
+      toast.error(res.error || "Gagal memperbarui masa aktif", { id: toastId });
+    }
+  };
+
+  const formatDateInput = (dateString: Date) => {
+    const d = new Date(dateString);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
   const handleDelete = async () => {
@@ -181,26 +270,90 @@ export function NomorClient({ initialData }: NomorClientProps) {
                   Kartu
                 </TableHead>
                 <TableHead className="border-r border-border-soft/50 w-0 whitespace-nowrap px-4">Nomor</TableHead>
-                <TableHead className="border-r border-border-soft/50 w-0 whitespace-nowrap px-4">Masa Aktif</TableHead>
+                <TableHead 
+                  className="border-r border-border-soft/50 w-0 whitespace-nowrap px-4 cursor-pointer hover:bg-accent-soft/30 transition-colors select-none group"
+                  onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                  title="Urutkan berdasarkan Masa Aktif"
+                >
+                  <div className="flex items-center gap-2">
+                    Masa Aktif
+                    {sortOrder === "asc" ? (
+                      <ArrowUp className="h-3.5 w-3.5 text-accent" />
+                    ) : (
+                      <ArrowDown className="h-3.5 w-3.5 text-accent" />
+                    )}
+                  </div>
+                </TableHead>
                 <TableHead className="w-14 px-1 text-center whitespace-nowrap">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((item) => (
-                <TableRow 
-                  key={item.id}
-                  className="cursor-pointer"
-                  onClick={() => setViewingItem(item)}
-                >
-                  <TableCell className="font-medium text-text-primary sticky left-0 bg-bg-surface z-10 border-r border-border-soft whitespace-nowrap px-4">
-                    {item.provider}
-                  </TableCell>
-                  <TableCell className="text-text-primary border-r border-border-soft/50 whitespace-nowrap px-4">
-                    {item.nomorKartu}
-                  </TableCell>
-                  <TableCell className="text-text-primary border-r border-border-soft/50 whitespace-nowrap px-4">
-                    {formatDateDisplay(item.masaAktif)}
-                  </TableCell>
+              {sortedData.map((item) => {
+                const highlight = getRowHighlight(item.masaAktif);
+                return (
+                  <TableRow 
+                    key={item.id}
+                    className={`cursor-pointer group transition-colors ${highlight.row}`}
+                    onClick={() => setViewingItem(item)}
+                  >
+                    <TableCell className={`font-medium sticky left-0 z-10 border-r border-border-soft whitespace-nowrap px-4 transition-colors ${highlight.sticky}`}>
+                      {item.provider}
+                    </TableCell>
+                    <TableCell className="text-text-primary border-r border-border-soft/50 whitespace-nowrap px-4">
+                      {item.nomorKartu}
+                    </TableCell>
+                    <TableCell 
+                      className={`border-r border-border-soft/50 whitespace-nowrap px-4 cursor-pointer hover:bg-accent-soft/20 transition-colors ${
+                        editingDateId === item.id ? "p-1 px-4" : "py-3"
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingDateId(item.id);
+                      }}
+                    >
+                      {editingDateId === item.id ? (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="date"
+                            defaultValue={formatDateInput(item.masaAktif)}
+                            autoFocus
+                            className="h-8 px-2 text-xs bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans w-full max-w-[140px]"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                handleSaveInlineDate(item, (e.target as HTMLInputElement).value);
+                              } else if (e.key === "Escape") {
+                                setEditingDateId(null);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              handleSaveInlineDate(item, e.target.value);
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-text-primary">{formatDateDisplay(item.masaAktif)}</span>
+                          {(() => {
+                            const now = new Date();
+                            now.setHours(0, 0, 0, 0);
+                            const masa = new Date(item.masaAktif);
+                            masa.setHours(0, 0, 0, 0);
+                            const diffTime = now.getTime() - masa.getTime();
+                            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            if (masa < now && diffDays <= 30 && diffDays >= 0) {
+                              const daysLeft = 30 - diffDays;
+                              return (
+                                <span className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] font-bold rounded-full bg-warning-hover text-warning-text">
+                                  -{daysLeft}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                      )}
+                    </TableCell>
                   <TableCell className="text-center py-1 px-1 w-14" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center">
                       <DropdownMenu
@@ -229,8 +382,9 @@ export function NomorClient({ initialData }: NomorClientProps) {
                       </DropdownMenu>
                     </div>
                   </TableCell>
-                </TableRow>
-              ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
