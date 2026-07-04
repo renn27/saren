@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Settings, Download, CheckCircle, Smartphone } from "lucide-react";
+import { Settings, Download, CheckCircle, Smartphone, LogOut } from "lucide-react";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown";
+import { logout } from "@/lib/actions/auth";
 
 // Store the prompt globally so it's never lost even if captured before React mounts
 let _cachedPrompt: any = null;
@@ -115,6 +116,13 @@ export function HeaderSettings() {
           </span>
         </DropdownMenuItem>
       )}
+      <DropdownMenuItem
+        onClick={() => logout()}
+        className="text-danger hover:bg-danger-soft/20 focus:text-danger focus:bg-danger-soft/10 cursor-pointer border-t border-border-soft/60 mt-1 pt-2 rounded-t-none"
+      >
+        <LogOut className="h-4 w-4 shrink-0" />
+        <span>Keluar</span>
+      </DropdownMenuItem>
     </DropdownMenu>
   );
 }

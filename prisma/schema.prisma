@@ -85,3 +85,41 @@ model Nomor {
 
   @@map("nomor")
 }
+
+model Note {
+  id          String         @id @default(cuid())
+  title       String?
+  content     String?        @db.Text
+  isPinned    Boolean        @default(false)
+  isArchived  Boolean        @default(false)
+  isTrashed   Boolean        @default(false)
+  color       String         @default("default") // default, red, orange, yellow, green, teal, blue, darkblue, purple, pink, brown, gray
+  isList      Boolean        @default(false)
+  isTable     Boolean        @default(false)
+  listItems   NoteListItem[]
+  labels      Label[]        @relation("NoteLabels")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("note")
+}
+
+model NoteListItem {
+  id          String   @id @default(cuid())
+  noteId      String
+  note        Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  text        String
+  isCompleted Boolean  @default(false)
+  urutan      Int      @default(0)
+
+  @@map("note_list_item")
+}
+
+model Label {
+  id    String @id @default(cuid())
+  name  String @unique
+  notes Note[] @relation("NoteLabels")
+
+  @@map("label")
+}
+

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Hash } from "lucide-react";
+import { Briefcase, Hash, StickyNote } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 
 export function AppNavigation() {
@@ -21,6 +21,12 @@ export function AppNavigation() {
       href: "/nomor",
       icon: Hash,
       isActive: pathname.startsWith("/nomor"),
+    },
+    {
+      name: "Note",
+      href: "/note",
+      icon: StickyNote,
+      isActive: pathname.startsWith("/note"),
     },
   ];
 
