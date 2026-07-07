@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeaderSettings } from "@/components/HeaderSettings";
-import { AppNavigation } from "@/components/AppNavigation";
+import { AppNavigationSidebar, AppNavigationBottom } from "@/components/AppNavigation";
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -18,39 +18,44 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Global Navigation Header with Glassmorphism */}
-      {!isNoteDetailPage && (
-        <header className="sticky top-0 z-40 w-full border-b border-border-soft/50 bg-bg-surface/80 backdrop-blur-xl transition-all duration-200">
-          <div className="max-w-7xl mx-auto w-full px-4 h-16 flex items-center justify-between md:px-8">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <img
-                src="/saren_logo_dark.png"
-                alt="SAREN Logo"
-                className="h-9 w-9 rounded-xl object-cover shadow-sm border border-border-soft/50 bg-bg-surface transition-transform duration-200 group-hover:scale-105 group-active:scale-95"
-              />
-              <span className="font-display font-semibold text-base text-text-primary tracking-tight">
-                SAREN
-              </span>
-            </Link>
-            <div className="flex items-center gap-2.5">
-              <span className="text-[11px] font-semibold text-accent bg-accent-soft px-3 py-1 rounded-full font-sans select-none tracking-wide hidden sm:inline">
-                Super App Rendi
-              </span>
-              <ThemeToggle />
-              <HeaderSettings />
+      {/* Scroll area on mobile, non-scrolling wrapper on desktop */}
+      <div className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden min-h-0">
+        {/* Global Navigation Header with Glassmorphism */}
+        {!isNoteDetailPage && (
+          <header className="relative md:sticky md:top-0 z-40 w-full border-b border-border-soft/50 bg-bg-surface/80 backdrop-blur-xl transition-all duration-200 shrink-0">
+            <div className="max-w-7xl mx-auto w-full px-4 h-16 flex items-center justify-between md:px-8">
+              <Link href="/" className="flex items-center gap-2.5 group">
+                <img
+                  src="/saren_logo_dark.png"
+                  alt="SAREN Logo"
+                  className="h-9 w-9 rounded-xl object-cover shadow-sm border border-border-soft/50 bg-bg-surface transition-transform duration-200 group-hover:scale-105 group-active:scale-95"
+                />
+                <span className="font-display font-semibold text-base text-text-primary tracking-tight">
+                  SAREN
+                </span>
+              </Link>
+              <div className="flex items-center gap-2.5">
+                <span className="text-[11px] font-semibold text-accent bg-accent-soft px-3 py-1 rounded-full font-sans select-none tracking-wide hidden sm:inline">
+                  Super App Rendi
+                </span>
+                <ThemeToggle />
+                <HeaderSettings />
+              </div>
             </div>
-          </div>
-        </header>
-      )}
+          </header>
+        )}
 
-      <div className="flex-1 flex flex-row overflow-hidden">
-        {!isNoteDetailPage && <AppNavigation />}
-        <main className={`flex-1 flex flex-col h-full overflow-y-auto relative ${isNoteDetailPage ? "pb-0" : "pb-20 md:pb-0"}`}>
-          <div key={pathname} className="page-enter flex-1 flex flex-col h-full">
-            {children}
-          </div>
-        </main>
+        <div className="flex-1 flex flex-row overflow-visible md:overflow-hidden min-h-0">
+          {!isNoteDetailPage && <AppNavigationSidebar />}
+          <main className="flex-1 flex flex-col overflow-visible md:overflow-y-auto relative min-h-0">
+            <div key={pathname} className="page-enter flex-1 flex flex-col h-full">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
+
+      {!isNoteDetailPage && <AppNavigationBottom />}
     </div>
   );
 }

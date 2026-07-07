@@ -1049,7 +1049,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
       </aside>
 
       {/* 2. MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 md:px-8 py-4 pb-20 md:pb-6">
+      <main className="flex-1 flex flex-col min-h-0 overflow-visible md:overflow-y-auto px-4 md:px-8 py-4 pb-6">
         
         {/* TOP SEARCH & VIEW HEADER */}
         <div className="flex items-center gap-3 w-full mb-4 shrink-0">

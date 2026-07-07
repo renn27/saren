@@ -122,7 +122,7 @@ Gunakan keluarga font (`font-sans`, `font-display`, `font-mono`) dan rentang uku
 
 ### 3. Jarak Vertikal & Horisontal (Margin & Padding)
 Jaga kerapian antarmuka mobile dengan jarak yang renggang namun proporsional:
-* **Padding Kontainer Halaman Utama**: `px-4 md:px-8 py-4 pb-20 md:pb-6` (padding bawah `pb-20` penting untuk ponsel agar konten tidak tertutup navigasi bawah)
+* **Padding Kontainer Halaman Utama**: `px-4 md:px-8 py-4 pb-6` (pada mobile, area scroll berakhir tepat di atas bottom nav secara otomatis, sehingga tidak memerlukan padding bawah `pb-20` lagi)
 * **Jarak Antar Kartu (Grid/List)**: `gap-2.5 md:gap-3` (untuk Grid) atau `gap-2.5` (untuk List)
 * **Jarak Dalam Kartu (Card Padding)**:
   * Area Header (Judul): `px-4 pt-3.5 pb-1`
