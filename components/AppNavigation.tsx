@@ -72,8 +72,8 @@ export function AppNavigationBottom() {
   const navItems = getNavItems(pathname);
 
   return (
-    <div className="md:hidden border-t border-border-soft bg-bg-surface/90 backdrop-blur-xl pb-safe shrink-0 z-50">
-      <nav className="flex items-center justify-around h-16 px-2">
+    <div className="md:hidden w-full border-t border-border-soft bg-bg-surface shadow-[0_-4px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.2)] shrink-0 z-50 pb-safe">
+      <nav className="flex items-center justify-around h-14 px-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = item.isActive;
@@ -82,27 +82,20 @@ export function AppNavigationBottom() {
               key={item.href}
               href={item.href}
               className={twMerge(
-                "flex flex-col items-center justify-center w-full h-full gap-1 transition-colors",
-                active ? "text-accent" : "text-text-secondary hover:text-text-primary"
+                "flex flex-col items-center justify-center w-20 h-full gap-1 transition-colors select-none cursor-pointer active:scale-95",
+                active ? "text-accent" : "text-text-secondary"
               )}
             >
-              <div
+              <Icon
                 className={twMerge(
-                  "flex items-center justify-center h-8 w-14 rounded-full transition-all duration-300",
-                  active ? "bg-accent-soft" : "bg-transparent"
+                  "h-5 w-5 shrink-0 transition-transform duration-200",
+                  active ? "scale-105 stroke-[2.25]" : "scale-100 stroke-[2]"
                 )}
-              >
-                <Icon
-                  className={twMerge(
-                    "h-5 w-5 shrink-0",
-                    active ? "text-accent" : "text-text-secondary"
-                  )}
-                />
-              </div>
+              />
               <span
                 className={twMerge(
-                  "text-[10px] font-medium leading-none",
-                  active ? "text-accent font-semibold" : "text-text-secondary"
+                  "text-[10px] tracking-wide transition-all font-sans",
+                  active ? "font-semibold text-accent" : "font-medium text-text-secondary/80"
                 )}
               >
                 {item.name}

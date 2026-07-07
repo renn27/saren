@@ -37,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="id"
-      className={`${inter.variable} ${plusJakartaSans.variable} ${ibmPlexMono.variable} h-full antialiased`}
+      className={`preload ${inter.variable} ${plusJakartaSans.variable} ${ibmPlexMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>
@@ -48,6 +48,8 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="SAREN" />
         <link rel="apple-touch-icon" href="/saren_logo.png" />
+      </head>
+      <body className="min-h-full flex flex-col bg-bg-page text-text-primary selection:bg-accent-soft selection:text-accent">
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -66,8 +68,6 @@ export default function RootLayout({
             `,
           }}
         />
-      </head>
-      <body className="min-h-full flex flex-col bg-bg-page text-text-primary selection:bg-accent-soft selection:text-accent">
         <ServiceWorkerRegistrar />
         <LayoutWrapper>{children}</LayoutWrapper>
 

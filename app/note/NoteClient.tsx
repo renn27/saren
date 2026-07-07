@@ -1965,35 +1965,6 @@ function NoteCard({
                 + {activeItems.length - 5} item lainnya...
               </div>
             )}
-
-            {/* Completed Preview (Collapsible indicator) */}
-            {completedItems.length > 0 && (
-              <div className="flex flex-col gap-1 mt-1 border-t border-border-soft/10 pt-1.5">
-                {completedItems.slice(0, 3).map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-2 opacity-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={true}
-                      onChange={() => onToggleListItem(item.id, false)}
-                      onClick={(e) => e.stopPropagation()}
-                      disabled={note.isTrashed}
-                      className="mt-0.5 rounded border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
-                    />
-                    <span className="line-through truncate break-all">
-                      {item.text}
-                    </span>
-                  </div>
-                ))}
-                {completedItems.length > 3 && (
-                  <div className="text-[10px] text-text-secondary font-medium pl-5 opacity-60">
-                    + {completedItems.length - 3} item selesai...
-                  </div>
-                )}
-              </div>
-            )}
             {note.listItems.length === 0 && (
               <em className="opacity-40 text-[11px] font-sans">Kosong</em>
             )}

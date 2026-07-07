@@ -1,7 +1,7 @@
 // SAREN Service Worker - v3
 // Strategi: Cache-First untuk aset statis, Network-First+Cache untuk halaman HTML
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const STATIC_CACHE  = `saren-static-${CACHE_VERSION}`;
 const PAGES_CACHE   = `saren-pages-${CACHE_VERSION}`;
 

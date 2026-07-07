@@ -12,6 +12,11 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/login";
   const isNoteDetailPage = pathname.startsWith("/note/") && pathname !== "/note";
 
+  React.useEffect(() => {
+    // Remove preload class after page hydration to enable transitions
+    document.documentElement.classList.remove("preload");
+  }, []);
+
   if (isLoginPage) {
     return <div className="min-h-screen flex flex-col">{children}</div>;
   }
@@ -19,7 +24,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Scroll area on mobile, non-scrolling wrapper on desktop */}
-      <div className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden min-h-0">
+      <div className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden min-h-0 max-w-full overflow-x-hidden">
         {/* Global Navigation Header with Glassmorphism */}
         {!isNoteDetailPage && (
           <header className="relative md:sticky md:top-0 z-40 w-full border-b border-border-soft/50 bg-bg-surface/80 backdrop-blur-xl transition-all duration-200 shrink-0">
@@ -47,8 +52,8 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
 
         <div className="flex-1 flex flex-row overflow-visible md:overflow-hidden min-h-0">
           {!isNoteDetailPage && <AppNavigationSidebar />}
-          <main className="flex-1 flex flex-col overflow-visible md:overflow-y-auto relative min-h-0">
-            <div key={pathname} className="page-enter flex-1 flex flex-col h-full">
+          <main className="flex-1 flex flex-col overflow-visible md:overflow-y-auto relative min-h-0 min-w-0 w-full">
+            <div key={pathname} className="page-enter flex-1 flex flex-col md:h-full">
               {children}
             </div>
           </main>

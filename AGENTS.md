@@ -79,6 +79,7 @@ Merupakan sub-komponen di dalam `NoteClient.tsx` yang bertanggung jawab merender
 * **Perilaku Klik Checklist Preview**:
   * Pemicu centang (*checkbox*) harus menggunakan `e.stopPropagation()` pada elemen `<input type="checkbox" />` secara langsung.
   * **Dilarang keras meletakkan `e.stopPropagation()` pada pembungkus baris checklist** (kontainer `div` baris teks). Klik pada area teks catatan checklist harus tetap dapat memicu event klik kartu (`onClick={onSelect}`) agar kartu dapat dibuka untuk masuk ke halaman detail catatan.
+* **Penyembunyian Item Selesai di Kartu**: Item checklist yang sudah dicentang (selesai) tidak ditampilkan pada pratinjau kartu (`NoteCard`) di dashboard utama.
 
 ### 4. Komponen Edit & Detail Catatan (`NoteEditClient.tsx`)
 Mengelola alur pengeditan satu catatan secara mendalam, dioptimalkan sepenuhnya untuk kenyamanan ponsel (mobile):
@@ -91,7 +92,9 @@ Mengelola alur pengeditan satu catatan secara mendalam, dioptimalkan sepenuhnya 
   * 📥 **Arsipkan / Pulihkan**
   * 📋 **Duplikat**
   * 🗑️ **Hapus ke Sampah** (berwarna merah `text-danger` secara permanen, dan wajib memicu dialog konfirmasi `confirm()` sebelum menghapus).
-* **Target Sentuh Checklist**: Di dalam `ChecklistEditor`, setiap baris memiliki padding vertikal longgar (`py-1.5`) dengan ukuran checkbox `h-4.5 w-4.5` (18px) dan kelengkungan `rounded-md` untuk kenyamanan jari mobile. Tombol hapus item (`X`) di kanan baris tidak boleh disembunyikan di balik hover dan harus selalu terlihat.
+* **Target Sentuh Checklist**: Di dalam `ChecklistEditor`, setiap baris memiliki padding vertikal longgar (`py-1.5`) dengan ukuran checkbox `h-4.5 w-4.5` (18px) dan kelengkungan `rounded-md` untuk kenyamanan jari mobile. Tombol hapus item (`X`) di kanan baris tidak menggunakan status hover tersembunyi, melainkan hanya dimunculkan secara dinamis saat baris input teks yang bersangkutan sedang berfokus/diedit (menggunakan state focus).
+* **Pengaturan Urutan (Drag and Drop)**: Setiap item aktif pada `ChecklistEditor` dilengkapi dengan tombol drag handle (`GripVertical`) di sebelah kiri untuk melakukan drag and drop guna mengatur urutan item secara interaktif.
+* **Auto-collapse Item Selesai**: Secara default, ketika halaman edit dibuka, daftar tugas yang sudah diselesaikan (`done`) disembunyikan dalam keadaan tertutup/terlipat (*auto-collapse*). Pengguna dapat membukanya kembali dengan menekan tombol toggle *"Selesai (Jumlah)"*.
 * **Mode Pengaturan Tabel (Table Editor)**: Di dalam `TableEditor`, tombol hapus baris, hapus kolom, dan tambah kolom disembunyikan secara default untuk mencegah visual yang terlalu ramai. Semua tombol ini dikendalikan melalui tombol toggle **`Atur Kolom & Baris`** (ikon gerigi `Settings`) di bawah tabel. Ketika dinonaktifkan, tabel terlihat bersih dan hanya menampilkan input teks data.
 
 ---
@@ -211,7 +214,7 @@ SAREN mendukung mode offline menggunakan Service Worker di `public/sw.js` dengan
 
 ### Cara Kerja Offline Data
 * Karena SAREN menggunakan **Server Components + Prisma** (bukan REST API), data tertanam di dalam HTML halaman yang di-render server.
-* Setiap kali halaman dibuka saat online, HTML-nya disimpan otomatis ke `saren-pages-v3` cache.
+* Setiap kali halaman dibuka saat online, HTML-nya disimpan otomatis ke cache.
 * Ketika offline, Service Worker menyajikan HTML tersebut dari cache → data terakhir yang terlihat saat online akan ditampilkan.
 * Jika halaman belum pernah dibuka sebelumnya (tidak ada cache), Service Worker menampilkan `/offline.html`.
 

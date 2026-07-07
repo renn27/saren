@@ -201,3 +201,11 @@ button:active:not(:disabled) {
 .card-stagger, .empty-float, [style*="animation"] {
   transition: none;
 }
+
+/* Disable transitions during page load to prevent theme color flash */
+.preload,
+.preload *,
+.preload *::before,
+.preload *::after {
+  transition: none !important;
+}

@@ -21,6 +21,7 @@ import {
   Copy,
   ChevronDown,
   ChevronRight,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
@@ -660,7 +661,10 @@ function ChecklistEditor({
 }) {
   const active = note.listItems.filter((i) => !i.isCompleted);
   const done = note.listItems.filter((i) => i.isCompleted);
-  const [showCompleted, setShowCompleted] = React.useState(true);
+  const [showCompleted, setShowCompleted] = React.useState(false);
+  const [focusedItemId, setFocusedItemId] = React.useState<string | null>(null);
+  const [isDraggable, setIsDraggable] = React.useState(false);
+  const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
 
   const addItem = () => {
     if (!newItem.trim()) return;
@@ -702,40 +706,166 @@ function ChecklistEditor({
       ),
     }));
 
-  const renderItem = (item: { id: string; text: string; isCompleted: boolean }) => (
-    <div key={item.id} className="flex items-start gap-3 group py-1.5">
+  const moveItem = (fromIndex: number, toIndex: number) => {
+    setNote((p) => {
+      const activeItems = p.listItems.filter((i) => !i.isCompleted);
+      const completedItems = p.listItems.filter((i) => i.isCompleted);
+
+      const updatedActive = [...activeItems];
+      const [movedItem] = updatedActive.splice(fromIndex, 1);
+      updatedActive.splice(toIndex, 0, movedItem);
+
+      const allItems = [...updatedActive, ...completedItems].map((item, idx) => ({
+        ...item,
+        urutan: idx,
+      }));
+
+      return {
+        ...p,
+        listItems: allItems,
+      };
+    });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    setDraggedIndex(index);
+    setIsDraggable(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent, index: number) => {
+    if (draggedIndex === null) return;
+    
+    // Prevent default scroll behavior while dragging
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!element) return;
+
+    const rowEl = element.closest("[data-active-index]");
+    if (rowEl) {
+      const targetIndexAttr = rowEl.getAttribute("data-active-index");
+      if (targetIndexAttr !== null) {
+        const targetIndex = parseInt(targetIndexAttr, 10);
+        if (targetIndex !== draggedIndex) {
+          moveItem(draggedIndex, targetIndex);
+          setDraggedIndex(targetIndex);
+        }
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setDraggedIndex(null);
+    setIsDraggable(false);
+  };
+
+  const renderActiveItem = (item: { id: string; text: string; isCompleted: boolean }, index: number) => (
+    <div
+      key={item.id}
+      data-active-index={index}
+      draggable={isDraggable}
+      onDragStart={() => setDraggedIndex(index)}
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnter={() => {
+        if (draggedIndex !== null && draggedIndex !== index) {
+          moveItem(draggedIndex, index);
+          setDraggedIndex(index);
+        }
+      }}
+      onDragEnd={() => {
+        setDraggedIndex(null);
+        setIsDraggable(false);
+      }}
+      onTouchEnd={handleTouchEnd}
+      className={twMerge(
+        "flex items-center gap-2 group py-1.5 px-2 rounded-xl transition-all duration-150",
+        draggedIndex === index ? "opacity-40 bg-accent-soft/10" : "hover:bg-bg-page/30"
+      )}
+    >
+      <button
+        onMouseEnter={() => setIsDraggable(true)}
+        onMouseLeave={() => setIsDraggable(false)}
+        onTouchStart={(e) => handleTouchStart(e, index)}
+        onTouchMove={(e) => handleTouchMove(e, index)}
+        onTouchEnd={handleTouchEnd}
+        className="p-1 text-text-secondary/30 hover:text-text-secondary cursor-grab active:cursor-grabbing shrink-0 transition-colors touch-none select-none"
+        title="Geser untuk mengurutkan"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+
       <input
         type="checkbox"
         checked={item.isCompleted}
         onChange={() => toggle(item.id)}
-        className="mt-0.5 h-4.5 w-4.5 rounded-md border-border-soft text-accent focus:ring-accent cursor-pointer flex-shrink-0"
+        className="h-4.5 w-4.5 rounded-md border-border-soft text-accent focus:ring-accent cursor-pointer flex-shrink-0"
       />
       <input
         type="text"
         value={item.text}
+        onFocus={() => setFocusedItemId(item.id)}
+        onBlur={() => {
+          setTimeout(() => {
+            setFocusedItemId((curr) => (curr === item.id ? null : curr));
+          }, 150);
+        }}
         onChange={(e) => editText(item.id, e.target.value)}
-        className={twMerge(
-          "flex-1 bg-transparent border-none text-[15px] focus:outline-none p-0 leading-6",
-          item.isCompleted
-            ? "line-through text-text-secondary/50"
-            : "text-text-primary"
-        )}
+        className="flex-1 bg-transparent border-none text-[15px] focus:outline-none p-0 leading-6 text-text-primary"
       />
-      <button
-        onClick={() => remove(item.id)}
-        className="p-0.5 text-text-secondary hover:text-danger cursor-pointer mt-0.5"
-      >
-        <X className="h-3.5 w-3.5" />
-      </button>
+      {focusedItemId === item.id && (
+        <button
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => remove(item.id)}
+          className="p-0.5 text-text-secondary hover:text-danger cursor-pointer shrink-0"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+
+  const renderDoneItem = (item: { id: string; text: string; isCompleted: boolean }) => (
+    <div key={item.id} className="flex items-center gap-3 py-1.5 px-2 opacity-60">
+      <div className="w-6 shrink-0" />
+      <input
+        type="checkbox"
+        checked={item.isCompleted}
+        onChange={() => toggle(item.id)}
+        className="h-4.5 w-4.5 rounded-md border-border-soft text-accent focus:ring-accent cursor-pointer flex-shrink-0"
+      />
+      <input
+        type="text"
+        value={item.text}
+        onFocus={() => setFocusedItemId(item.id)}
+        onBlur={() => {
+          setTimeout(() => {
+            setFocusedItemId((curr) => (curr === item.id ? null : curr));
+          }, 150);
+        }}
+        onChange={(e) => editText(item.id, e.target.value)}
+        className="flex-1 bg-transparent border-none text-[15px] focus:outline-none p-0 leading-6 text-text-secondary/50 line-through"
+      />
+      {focusedItemId === item.id && (
+        <button
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => remove(item.id)}
+          className="p-0.5 text-text-secondary hover:text-danger cursor-pointer shrink-0"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 
   return (
     <div className="flex flex-col gap-0.5">
-      {active.map(renderItem)}
+      {active.map(renderActiveItem)}
 
       {/* New item input */}
-      <div className="relative">
+      <div className="relative pl-8">
         <div className="flex items-center gap-3 py-1.5 mt-1">
           <Plus className="h-4.5 w-4.5 text-text-secondary flex-shrink-0" />
           <input
@@ -790,7 +920,7 @@ function ChecklistEditor({
           </button>
           {showCompleted && (
             <div className="flex flex-col gap-0.5">
-              {done.map(renderItem)}
+              {done.map(renderDoneItem)}
             </div>
           )}
         </div>
