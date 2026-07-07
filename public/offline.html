@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tidak Ada Koneksi - SAREN</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #080D14;
+      color: #F1F5F9;
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 1.5rem;
+    }
+    .card {
+      background: #0F1623;
+      border: 1px solid #1A2438;
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      animation: rise 0.5s cubic-bezier(0.16,1,0.3,1) both;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .icon { font-size: 3.5rem; margin-bottom: 1.25rem; display: block; animation: pulse 2.5s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; }
+    p { font-size: 0.875rem; color: #94A3B8; line-height: 1.6; margin-bottom: 1.75rem; }
+    button { background: #05B6D4; color: #fff; border: none; border-radius: 12px; padding: 0.6rem 1.5rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+    button:hover { opacity: 0.85; }
+    .brand { margin-top: 2rem; font-size: 0.75rem; color: #94A3B8; letter-spacing: 0.05em; font-weight: 600; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="icon">??</span>
+    <h1>Tidak Ada Koneksi</h1>
+    <p>Halaman ini belum tersimpan di cache lokal. Sambungkan perangkat ke internet lalu coba lagi.</p>
+    <button onclick="location.reload()">Coba Lagi</button>
+    <p class="brand">SAREN</p>
+  </div>
+</body>
+</html>

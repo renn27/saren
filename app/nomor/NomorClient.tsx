@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Nomor } from "@prisma/client";
-import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, ArrowUpDown, ArrowDown, ArrowUp } from "lucide-react";
+import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, ArrowUpDown, ArrowDown, ArrowUp, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
@@ -35,6 +35,7 @@ export function NomorClient({ initialData }: NomorClientProps) {
   const [provider, setProvider] = useState("");
   const [nomorKartu, setNomorKartu] = useState("");
   const [masaAktif, setMasaAktif] = useState("");
+  const [pulsa, setPulsa] = useState<number | string>("");
 
   // Edit State
   const [editingItem, setEditingItem] = useState<Nomor | null>(null);
@@ -47,6 +48,9 @@ export function NomorClient({ initialData }: NomorClientProps) {
 
   // Inline Date Edit State
   const [editingDateId, setEditingDateId] = useState<string | null>(null);
+
+  // Inline Pulsa Edit State
+  const [editingPulsaId, setEditingPulsaId] = useState<string | null>(null);
 
   // Sort State
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -98,10 +102,20 @@ export function NomorClient({ initialData }: NomorClientProps) {
     };
   };
 
+  const formatRupiah = (value: number) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
   const resetForm = () => {
     setProvider("");
     setNomorKartu("");
     setMasaAktif("");
+    setPulsa("");
     setEditingItem(null);
   };
 
@@ -113,6 +127,7 @@ export function NomorClient({ initialData }: NomorClientProps) {
   const handleOpenEdit = (item: Nomor) => {
     setProvider(item.provider);
     setNomorKartu(item.nomorKartu);
+    setPulsa(item.pulsa ?? 0);
     // Format date to YYYY-MM-DD for input type="date"
     const dateObj = new Date(item.masaAktif);
     const yyyy = dateObj.getFullYear();
@@ -129,12 +144,14 @@ export function NomorClient({ initialData }: NomorClientProps) {
 
     setIsSubmitting(true);
     const dateObj = new Date(masaAktif);
+    const parsedPulsa = pulsa ? parseInt(String(pulsa).replace(/\D/g, "")) || 0 : 0;
 
     if (editingItem) {
       const res = await updateNomor(editingItem.id, {
         provider,
         nomorKartu,
         masaAktif: dateObj,
+        pulsa: parsedPulsa,
       });
 
       if (res.success && res.data) {
@@ -152,6 +169,7 @@ export function NomorClient({ initialData }: NomorClientProps) {
         provider,
         nomorKartu,
         masaAktif: dateObj,
+        pulsa: parsedPulsa,
       });
 
       if (res.success && res.data) {
@@ -182,6 +200,7 @@ export function NomorClient({ initialData }: NomorClientProps) {
       provider: item.provider,
       nomorKartu: item.nomorKartu,
       masaAktif: dateObj,
+      pulsa: item.pulsa,
     });
 
     if (res.success && res.data) {
@@ -191,6 +210,31 @@ export function NomorClient({ initialData }: NomorClientProps) {
       );
     } else {
       toast.error(res.error || "Gagal memperbarui masa aktif", { id: toastId });
+    }
+  };
+
+  const handleSaveInlinePulsa = async (item: Nomor, newPulsaVal: string) => {
+    setEditingPulsaId(null);
+    const numericVal = newPulsaVal ? parseInt(newPulsaVal.replace(/\D/g, "")) || 0 : 0;
+    
+    if (numericVal === item.pulsa) return;
+
+    const toastId = toast.loading("Memperbarui pulsa...");
+
+    const res = await updateNomor(item.id, {
+      provider: item.provider,
+      nomorKartu: item.nomorKartu,
+      masaAktif: new Date(item.masaAktif),
+      pulsa: numericVal,
+    });
+
+    if (res.success && res.data) {
+      toast.success("Pulsa berhasil diperbarui", { id: toastId });
+      setData((prev) =>
+        prev.map((n) => (n.id === item.id ? res.data! : n))
+      );
+    } else {
+      toast.error(res.error || "Gagal memperbarui pulsa", { id: toastId });
     }
   };
 
@@ -228,7 +272,7 @@ export function NomorClient({ initialData }: NomorClientProps) {
   };
 
   return (
-    <div className="flex-1 w-full max-w-5xl mx-auto p-4 md:p-8 flex flex-col gap-6 relative">
+    <div className="w-full max-w-5xl mx-auto p-4 md:p-6 flex flex-col gap-4 relative">
       {/* Header section matching Garapan page */}
       <Card className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5">
         <div className="flex items-center gap-3 sm:gap-4">
@@ -262,132 +306,180 @@ export function NomorClient({ initialData }: NomorClientProps) {
           onAction={handleOpenAdd}
         />
       ) : (
-        <TableContainer>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="sticky left-0 bg-bg-page/95 backdrop-blur z-20 border-r border-border-soft w-0 whitespace-nowrap px-4">
-                  Kartu
-                </TableHead>
-                <TableHead className="border-r border-border-soft/50 w-0 whitespace-nowrap px-4">Nomor</TableHead>
-                <TableHead 
-                  className="border-r border-border-soft/50 w-0 whitespace-nowrap px-4 cursor-pointer hover:bg-accent-soft/30 transition-colors select-none group"
-                  onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
-                  title="Urutkan berdasarkan Masa Aktif"
-                >
-                  <div className="flex items-center gap-2">
-                    Masa Aktif
-                    {sortOrder === "asc" ? (
-                      <ArrowUp className="h-3.5 w-3.5 text-accent" />
-                    ) : (
-                      <ArrowDown className="h-3.5 w-3.5 text-accent" />
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead className="w-14 px-1 text-center whitespace-nowrap">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedData.map((item) => {
-                const highlight = getRowHighlight(item.masaAktif);
-                return (
-                  <TableRow 
-                    key={item.id}
-                    className={`cursor-pointer group transition-colors ${highlight.row}`}
-                    onClick={() => setViewingItem(item)}
+        <Card className="p-0 overflow-hidden border border-border-soft/60">
+          <TableContainer className="border-none shadow-none rounded-none">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="sticky left-0 bg-bg-surface z-20 border-r border-border-soft w-0 whitespace-nowrap px-4">
+                    Kartu
+                  </TableHead>
+                  <TableHead className="border-r border-border-soft/50 w-0 whitespace-nowrap px-4">Nomor</TableHead>
+                  <TableHead className="border-r border-border-soft/50 w-0 whitespace-nowrap px-4">Pulsa</TableHead>
+                  <TableHead 
+                    className="border-r border-border-soft/50 w-0 whitespace-nowrap px-4 cursor-pointer hover:bg-accent-soft/30 transition-colors select-none group"
+                    onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                    title="Urutkan berdasarkan Masa Aktif"
                   >
-                    <TableCell className={`font-medium sticky left-0 z-10 border-r border-border-soft whitespace-nowrap px-4 transition-colors ${highlight.sticky}`}>
-                      {item.provider}
-                    </TableCell>
-                    <TableCell className="text-text-primary border-r border-border-soft/50 whitespace-nowrap px-4">
-                      {item.nomorKartu}
-                    </TableCell>
-                    <TableCell 
-                      className={`border-r border-border-soft/50 whitespace-nowrap px-4 cursor-pointer hover:bg-accent-soft/20 transition-colors ${
-                        editingDateId === item.id ? "p-1 px-4" : "py-3"
-                      }`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingDateId(item.id);
-                      }}
-                    >
-                      {editingDateId === item.id ? (
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="date"
-                            defaultValue={formatDateInput(item.masaAktif)}
-                            autoFocus
-                            className="h-8 px-2 text-xs bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans w-full max-w-[140px]"
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                handleSaveInlineDate(item, (e.target as HTMLInputElement).value);
-                              } else if (e.key === "Escape") {
-                                setEditingDateId(null);
-                              }
-                            }}
-                            onBlur={(e) => {
-                              handleSaveInlineDate(item, e.target.value);
-                            }}
-                          />
-                        </div>
+                    <div className="flex items-center gap-2">
+                      Masa Aktif
+                      {sortOrder === "asc" ? (
+                        <ArrowUp className="h-3.5 w-3.5 text-accent" />
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-text-primary">{formatDateDisplay(item.masaAktif)}</span>
-                          {(() => {
-                            const now = new Date();
-                            now.setHours(0, 0, 0, 0);
-                            const masa = new Date(item.masaAktif);
-                            masa.setHours(0, 0, 0, 0);
-                            const diffTime = now.getTime() - masa.getTime();
-                            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                            
-                            if (masa < now && diffDays <= 30 && diffDays >= 0) {
-                              const daysLeft = 30 - diffDays;
-                              return (
-                                <span className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] font-bold rounded-full bg-warning-hover text-warning-text">
-                                  -{daysLeft}
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
+                        <ArrowDown className="h-3.5 w-3.5 text-accent" />
                       )}
-                    </TableCell>
-                  <TableCell className="text-center py-1 px-1 w-14" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-center">
-                      <DropdownMenu
-                        className="w-32"
-                        align="right"
-                        trigger={
-                          <button
-                            className="h-8 w-8 rounded-lg text-text-secondary hover:bg-accent-soft hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
-                            title="Opsi"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-                        }
-                      >
-                        <DropdownMenuItem onClick={() => handleOpenEdit(item)}>
-                          <Edit className="h-4 w-4 text-text-secondary" />
-                          <span>Edit</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setDeletingItem(item)}
-                          className="text-danger hover:bg-danger-soft"
-                        >
-                          <Trash2 className="h-4 w-4 text-danger" />
-                          <span>Hapus</span>
-                        </DropdownMenuItem>
-                      </DropdownMenu>
                     </div>
-                  </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                  </TableHead>
+                  <TableHead className="w-14 px-1 text-center whitespace-nowrap">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedData.map((item) => {
+                  const highlight = getRowHighlight(item.masaAktif);
+                  return (
+                    <TableRow 
+                      key={item.id}
+                      className={`cursor-pointer group transition-colors ${highlight.row}`}
+                      onClick={() => setViewingItem(item)}
+                    >
+                      <TableCell className={`font-medium sticky left-0 z-10 border-r border-border-soft whitespace-nowrap px-4 transition-colors ${highlight.sticky}`}>
+                        {item.provider}
+                      </TableCell>
+                      <TableCell 
+                        className="text-text-primary border-r border-border-soft/50 whitespace-nowrap px-4 cursor-copy hover:bg-accent-soft/30 hover:text-accent transition-colors font-mono select-all"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(item.nomorKartu);
+                          toast.success(`${item.provider} berhasil disalin!`, {
+                            icon: "📋",
+                            duration: 2000,
+                          });
+                        }}
+                        title="Klik untuk menyalin nomor"
+                      >
+                        {item.nomorKartu}
+                      </TableCell>
+                      <TableCell 
+                        className={`text-text-primary border-r border-border-soft/50 whitespace-nowrap px-4 font-mono font-medium ${
+                          editingPulsaId === item.id ? "p-1 px-4" : "py-3"
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingPulsaId(item.id);
+                        }}
+                      >
+                        {editingPulsaId === item.id ? (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              defaultValue={item.pulsa || ""}
+                              autoFocus
+                              className="h-8 px-2 text-xs bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-mono w-full max-w-[120px]"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleSaveInlinePulsa(item, (e.target as HTMLInputElement).value);
+                                } else if (e.key === "Escape") {
+                                  setEditingPulsaId(null);
+                                }
+                              }}
+                              onBlur={(e) => {
+                                handleSaveInlinePulsa(item, e.target.value);
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <span>
+                            {item.pulsa && item.pulsa > 0 ? formatRupiah(item.pulsa) : "-"}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell 
+                        className={`border-r border-border-soft/50 whitespace-nowrap px-4 cursor-pointer hover:bg-accent-soft/20 transition-colors ${
+                          editingDateId === item.id ? "p-1 px-4" : "py-3"
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingDateId(item.id);
+                        }}
+                      >
+                        {editingDateId === item.id ? (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="date"
+                              defaultValue={formatDateInput(item.masaAktif)}
+                              autoFocus
+                              className="h-8 px-2 text-xs bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans w-full max-w-[140px]"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleSaveInlineDate(item, (e.target as HTMLInputElement).value);
+                                } else if (e.key === "Escape") {
+                                  setEditingDateId(null);
+                                }
+                              }}
+                              onBlur={(e) => {
+                                handleSaveInlineDate(item, e.target.value);
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-text-primary">{formatDateDisplay(item.masaAktif)}</span>
+                            {(() => {
+                              const now = new Date();
+                              now.setHours(0, 0, 0, 0);
+                              const masa = new Date(item.masaAktif);
+                              masa.setHours(0, 0, 0, 0);
+                              const diffTime = now.getTime() - masa.getTime();
+                              const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                              
+                              if (masa < now && diffDays <= 30 && diffDays >= 0) {
+                                const daysLeft = 30 - diffDays;
+                                return (
+                                  <span className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] font-bold rounded-full bg-warning-hover text-warning-text">
+                                    -{daysLeft}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        )}
+                      </TableCell>
+                    <TableCell className="text-center py-1 px-1 w-14" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center">
+                        <DropdownMenu
+                          className="w-32"
+                          align="right"
+                          trigger={
+                            <button
+                              className="h-8 w-8 rounded-lg text-text-secondary hover:bg-accent-soft hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
+                              title="Opsi"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          }
+                        >
+                          <DropdownMenuItem onClick={() => handleOpenEdit(item)}>
+                            <Edit className="h-4 w-4 text-text-secondary" />
+                            <span>Edit</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setDeletingItem(item)}
+                            className="text-danger hover:bg-danger-soft"
+                          >
+                            <Trash2 className="h-4 w-4 text-danger" />
+                            <span>Hapus</span>
+                          </DropdownMenuItem>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Card>
       )}
 
       {/* Dialog Form */}
@@ -436,6 +528,19 @@ export function NomorClient({ initialData }: NomorClientProps) {
               value={masaAktif}
               onChange={(e) => setMasaAktif(e.target.value)}
               required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text-primary">Pulsa</label>
+            <Input
+              type="text"
+              placeholder="Contoh: 50000"
+              value={pulsa}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "");
+                setPulsa(val);
+              }}
             />
           </div>
 
@@ -519,6 +624,19 @@ export function NomorClient({ initialData }: NomorClientProps) {
                 >
                   <Copy className="w-5 h-5" />
                 </button>
+              </div>
+
+              {/* Pulsa */}
+              <div className="flex items-center justify-between py-3.5 border-b border-border-soft">
+                <div className="flex items-center gap-3.5">
+                  <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center border border-accent/10 shrink-0">
+                    <Coins className="h-5 w-5" />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Pulsa</span>
+                    <span className="text-[16px] font-bold font-mono text-text-primary">{formatRupiah(viewingItem.pulsa)}</span>
+                  </div>
+                </div>
               </div>
 
               {/* Masa Aktif */}

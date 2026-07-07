@@ -683,7 +683,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   return (
     <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
       {/* Breadcrumbs */}
-      <div className="flex flex-col gap-3.5 mb-6">
+      <div className="flex flex-col gap-2 mb-3">
         <Button
           variant="outline"
           size="sm"
@@ -695,7 +695,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         </Button>
       </div>
 
-      <div className="relative flex flex-col gap-4 mb-6 bg-bg-surface border border-border-soft p-5 sm:p-6 rounded-3xl [box-shadow:var(--shadow-card)]">
+      <div className="relative flex flex-col gap-3 mb-4 bg-bg-surface border border-border-soft p-4 sm:p-5 rounded-3xl [box-shadow:var(--shadow-card)]">
         {/* Edit Button in Top-Right Corner */}
         <button
           onClick={() => setIsEditAppOpen(true)}
@@ -775,7 +775,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       </div>
 
       {/* Toolbar / Actions Card */}
-      <div className="bg-bg-surface border border-border-soft p-4 sm:p-5 rounded-3xl [box-shadow:var(--shadow-card)] mb-6">
+      <div className="bg-bg-surface border border-border-soft p-3 sm:p-4 rounded-3xl [box-shadow:var(--shadow-card)] mb-4">
         <div className="flex items-center gap-2 w-full">
           {/* Primary CTA: Tambah Akun (Leftmost) */}
           <Button
@@ -873,9 +873,9 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             <TableHeader>
               <TableRow>
                 {isReorderMode && (
-                  <TableHead className="w-20 text-center select-none bg-bg-page font-semibold text-text-secondary">Urutan</TableHead>
+                  <TableHead className="w-20 text-center select-none bg-bg-surface font-semibold text-text-secondary">Urutan</TableHead>
                 )}
-                <TableHead className="sticky left-0 bg-bg-page z-20 border-r border-border-soft min-w-[90px] sm:min-w-[150px] text-center">Akun</TableHead>
+                <TableHead className="sticky left-0 bg-bg-surface z-20 border-r border-border-soft min-w-[90px] sm:min-w-[150px] text-center">Akun</TableHead>
  
                 {/* Render Dynamic Custom Column Headers */}
                 {aplikasi.kolom.map((col, colIndex) => {
@@ -981,7 +981,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                     {isReorderMode && (
                       <TableCell className={`align-middle py-2 px-1 text-center w-20 z-10 border-r border-border-soft transition-colors ${
                         meetsTarget
-                          ? "bg-bg-surface dark:bg-target-bg group-hover:bg-target-hover/20 dark:group-hover:bg-target-hover"
+                          ? "bg-target-bg group-hover:bg-target-hover"
                           : "bg-bg-surface"
                       }`}>
                         <div className="flex items-center justify-center gap-0.5">
@@ -1007,7 +1007,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                     <TableCell
                       className={`sticky left-0 z-10 border-r border-border-soft font-medium text-nowrap cursor-pointer hover:underline transition-all min-w-[90px] sm:min-w-[150px] ${
                         meetsTarget
-                          ? "bg-bg-surface dark:bg-target-bg group-hover:bg-target-hover/20 dark:group-hover:bg-target-hover text-target-text"
+                          ? "bg-target-bg group-hover:bg-target-hover text-target-text"
                           : "bg-bg-surface group-hover:bg-accent/5 hover:text-accent text-text-primary"
                       }`}
                       onClick={() => setSelectedDetailAccount(acc)}
@@ -1148,9 +1148,9 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             
             {/* Accumulation / Footer Row */}
             {aplikasi.kolom.some((c) => c.isAccumulated) && (
-              <TableRow className="bg-bg-page font-bold text-text-primary hover:bg-bg-page cursor-default">
+              <TableRow className="bg-bg-surface font-bold text-text-primary hover:bg-bg-surface cursor-default">
                 {isReorderMode && <TableCell className="border-r border-border-soft"></TableCell>}
-                <TableCell className="sticky left-0 bg-bg-page z-10 border-r border-border-soft text-right">
+                <TableCell className="sticky left-0 bg-bg-surface z-10 border-r border-border-soft text-right">
                   Total Akumulasi:
                 </TableCell>
                 {aplikasi.kolom.map((col) => {

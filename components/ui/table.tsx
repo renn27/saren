@@ -35,7 +35,7 @@ export const TableHeader = React.forwardRef<
   <thead
     ref={ref}
     className={twMerge(
-      "bg-bg-page/80 backdrop-blur-sm border-b border-border-soft sticky top-0 z-10",
+      "bg-bg-surface border-b-2 border-accent/30 sticky top-0 z-10 shadow-sm",
       className
     )}
     {...props}
@@ -78,8 +78,8 @@ export const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={twMerge(
-      "px-4 py-3 sm:px-5 sm:py-3.5",
-      "text-[11px] font-semibold uppercase tracking-[0.06em] text-text-secondary",
+      "px-3.5 py-2.5 sm:px-4.5 sm:py-3",
+      "text-[11px] font-bold uppercase tracking-[0.07em] text-accent",
       "font-sans select-none align-middle whitespace-nowrap",
       className
     )}
@@ -95,7 +95,7 @@ export const TableCell = React.forwardRef<
   <td
     ref={ref}
     className={twMerge(
-      "px-4 py-3 sm:px-5 sm:py-3.5 text-[13px] text-text-primary align-middle",
+      "px-3.5 py-2.5 sm:px-4.5 sm:py-3 text-[13px] text-text-primary align-middle",
       className
     )}
     {...props}

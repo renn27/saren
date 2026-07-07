@@ -136,7 +136,7 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
   return (
     <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
       {/* Header Card */}
-      <Card className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 p-5 sm:p-6">
+      <Card className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 p-4 sm:p-5">
         <div className="flex items-center gap-3.5">
           <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/10">
             <List className="h-5 w-5" />
@@ -171,7 +171,7 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5">
           {initialList.map((item) => (
             <Card
               key={item.id}

@@ -6,19 +6,20 @@ export const metadata = {
 };
 
 export default async function NotePage() {
-  const notes = await db.note.findMany({
-    include: {
-      listItems: {
-        orderBy: { urutan: "asc" },
+  const [notes, labels] = await Promise.all([
+    db.note.findMany({
+      include: {
+        listItems: {
+          orderBy: { urutan: "asc" },
+        },
+        labels: true,
       },
-      labels: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const labels = await db.label.findMany({
-    orderBy: { name: "asc" },
-  });
+      orderBy: { createdAt: "desc" },
+    }),
+    db.label.findMany({
+      orderBy: { name: "asc" },
+    })
+  ]);
 
   return <NoteClient initialNotes={notes} initialLabels={labels} />;
 }

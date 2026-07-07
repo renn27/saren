@@ -311,7 +311,7 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
   return (
     <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
       {/* Back Button */}
-      <div className="mb-4">
+      <div className="mb-3">
         <Button
           variant="outline"
           size="sm"
@@ -323,7 +323,7 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
         </Button>
       </div>
 
-      <Card className="relative flex flex-col gap-4 p-5 sm:p-6 mb-6">
+      <Card className="relative flex flex-col gap-4 p-4 sm:p-5 mb-4">
         {/* Top Row: Title & Duplicate Button */}
         <div className="flex items-center justify-between gap-4 w-full">
           <div className="flex items-center gap-3.5">
@@ -373,7 +373,7 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
           />
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {initialList.map((item) => {
             const colorClass = getAppColor(item.namaAplikasi);
             return (

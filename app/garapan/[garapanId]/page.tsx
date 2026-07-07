@@ -23,8 +23,8 @@ export default async function Page({ params }: PageProps) {
   }
 
   return (
-    <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-5 sm:px-6 sm:py-8">
+    <div className="max-w-5xl w-full mx-auto px-4 py-5 sm:px-6 sm:py-8">
       <AplikasiListClient garapan={garapan} initialList={list} />
-    </main>
+    </div>
   );
 }

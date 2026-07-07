@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter, IBM_Plex_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { LayoutWrapper } from "@/components/LayoutWrapper";
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -67,6 +68,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-bg-page text-text-primary selection:bg-accent-soft selection:text-accent">
+        <ServiceWorkerRegistrar />
         <LayoutWrapper>{children}</LayoutWrapper>
 
         <Toaster 

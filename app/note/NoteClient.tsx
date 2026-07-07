@@ -22,7 +22,9 @@ import {
   FileText,
   CheckSquare,
   Table,
-  Menu
+  Menu,
+  ArrowUpDown,
+  Copy
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -39,7 +41,8 @@ import {
   updateNoteColor,
   createLabel,
   updateLabel,
-  deleteLabel
+  deleteLabel,
+  duplicateNote
 } from "@/lib/actions/note";
 
 // Palet warna Google Keep Premium
@@ -174,9 +177,9 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isGridView, setIsGridView] = React.useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [sortBy, setSortBy] = React.useState<"updated" | "created" | "title">("updated");
 
   // Modals / Overlays
-  const [editingNote, setEditingNote] = React.useState<Note | null>(null);
   const [isLabelManagerOpen, setIsLabelManagerOpen] = React.useState(false);
   const [newLabelInput, setNewLabelInput] = React.useState("");
   const [renamingLabelId, setRenamingLabelId] = React.useState<string | null>(null);
@@ -196,8 +199,8 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
   const [inputLabels, setInputLabels] = React.useState<string[]>([]); // label IDs
   const [inputPinned, setInputPinned] = React.useState(false);
 
-  // Active Dropdowns state (Color / Labels)
-  const [activeDropdownType, setActiveDropdownType] = React.useState<"color" | "label" | null>(null);
+  // Active Dropdowns state (Color / Labels / Sort / More)
+  const [activeDropdownType, setActiveDropdownType] = React.useState<"color" | "label" | "sort" | "more" | null>(null);
   const [activeDropdownNoteId, setActiveDropdownNoteId] = React.useState<string | null>(null); // "new" for create input
 
   const createContainerRef = React.useRef<HTMLDivElement>(null);
@@ -457,6 +460,23 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
     }
   };
 
+  // Duplicate Note
+  const handleDuplicateNote = async (noteId: string, event?: React.MouseEvent) => {
+    if (event) event.stopPropagation();
+
+    const toastId = toast.loading("Menduplikasi catatan...");
+    const res = await duplicateNote(noteId);
+    
+    if (res.success && res.data) {
+      // Add duplicated note locally
+      setNotes((prev) => [res.data as Note, ...prev]);
+      toast.success("Salinan berhasil dibuat", { id: toastId });
+    } else {
+      toast.error(res.error || "Gagal menduplikasi catatan", { id: toastId });
+      router.refresh();
+    }
+  };
+
   // Empty Trash
   const handleEmptyTrash = async () => {
     if (!confirm("Kosongkan semua catatan di tempat sampah? Tindakan ini permanen.")) {
@@ -495,9 +515,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
       })
     );
 
-    if (editingNote && editingNote.id === noteId) {
-      setEditingNote((prev) => (prev ? { ...prev, color: colorId } : null));
-    }
+
 
     const res = await updateNoteColor(noteId, colorId);
     if (!res.success) {
@@ -598,9 +616,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
       })
     );
 
-    if (editingNote && editingNote.id === noteId) {
-      setEditingNote((prev) => (prev ? { ...prev, labels: updatedLabels } : null));
-    }
+
 
     const res = await updateNote(noteId, {
       labelIds: updatedLabels.map((l) => l.id),
@@ -629,17 +645,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
       })
     );
 
-    if (editingNote && editingNote.id === noteId) {
-      setEditingNote((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          listItems: prev.listItems.map((item) =>
-            item.id === itemId ? { ...item, isCompleted } : item
-          ),
-        };
-      });
-    }
+
 
     const note = notes.find((n) => n.id === noteId);
     if (!note) return;
@@ -829,9 +835,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
 
     if (res.success && res.data) {
       setNotes((prev) => prev.map((n) => (n.id === noteId ? (res.data as Note) : n)));
-      if (editingNote && editingNote.id === noteId) {
-        setEditingNote(res.data as Note);
-      }
+
       toast.success("Tipe catatan berhasil diubah");
     } else {
       toast.error(res.error || "Gagal mengubah tipe catatan");
@@ -862,102 +866,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
     }
   };
 
-  // Table editing helpers for modal
-  const getEditingNoteTableData = () => {
-    let headers = ["Kolom 1", "Kolom 2"];
-    let rows = [["", ""]];
-    if (editingNote && editingNote.isTable) {
-      try {
-        const parsed = JSON.parse(editingNote.content || "{}");
-        if (parsed.headers && parsed.rows) {
-          headers = parsed.headers;
-          rows = parsed.rows;
-        }
-      } catch (e) {}
-    }
-    return { headers, rows };
-  };
 
-  const handleUpdateTableCell = (rowIdx: number, colIdx: number, value: string) => {
-    if (!editingNote) return;
-    const { headers, rows } = getEditingNoteTableData();
-    const nextRows = [...rows];
-    nextRows[rowIdx] = [...nextRows[rowIdx]];
-    nextRows[rowIdx][colIdx] = value;
-    const nextContent = JSON.stringify({ headers, rows: nextRows });
-    setEditingNote((prev) => prev ? { ...prev, content: nextContent } : null);
-  };
-
-  const handleUpdateTableHeader = (colIdx: number, value: string) => {
-    if (!editingNote) return;
-    const { headers, rows } = getEditingNoteTableData();
-    const nextHeaders = [...headers];
-    nextHeaders[colIdx] = value;
-    const nextContent = JSON.stringify({ headers: nextHeaders, rows });
-    setEditingNote((prev) => prev ? { ...prev, content: nextContent } : null);
-  };
-
-  const handleAddTableNoteRow = () => {
-    if (!editingNote) return;
-    const { headers, rows } = getEditingNoteTableData();
-    const nextRows = [...rows, new Array(headers.length).fill("")];
-    const nextContent = JSON.stringify({ headers, rows: nextRows });
-    setEditingNote((prev) => prev ? { ...prev, content: nextContent } : null);
-  };
-
-  const handleAddTableNoteCol = () => {
-    if (!editingNote) return;
-    const { headers, rows } = getEditingNoteTableData();
-    const nextHeaders = [...headers, `Kolom ${headers.length + 1}`];
-    const nextRows = rows.map((r) => [...r, ""]);
-    const nextContent = JSON.stringify({ headers: nextHeaders, rows: nextRows });
-    setEditingNote((prev) => prev ? { ...prev, content: nextContent } : null);
-  };
-
-  const handleDeleteTableNoteRow = (rowIdx: number) => {
-    if (!editingNote) return;
-    const { headers, rows } = getEditingNoteTableData();
-    if (rows.length <= 1) return;
-    const nextRows = rows.filter((_, idx) => idx !== rowIdx);
-    const nextContent = JSON.stringify({ headers, rows: nextRows });
-    setEditingNote((prev) => prev ? { ...prev, content: nextContent } : null);
-  };
-
-  const handleDeleteTableNoteCol = (colIdx: number) => {
-    if (!editingNote) return;
-    const { headers, rows } = getEditingNoteTableData();
-    if (headers.length <= 1) return;
-    const nextHeaders = headers.filter((_, idx) => idx !== colIdx);
-    const nextRows = rows.map((r) => r.filter((_, idx) => idx !== colIdx));
-    const nextContent = JSON.stringify({ headers: nextHeaders, rows: nextRows });
-    setEditingNote((prev) => prev ? { ...prev, content: nextContent } : null);
-  };
-
-  // Edit Modal Auto Save Handler
-  const handleCloseEditModal = async () => {
-    if (!editingNote) return;
-
-    const res = await updateNote(editingNote.id, {
-      title: editingNote.title || "",
-      content: editingNote.isList ? "" : editingNote.content || "",
-      listItems: editingNote.isList
-        ? editingNote.listItems.map((item, idx) => ({
-            text: item.text,
-            isCompleted: item.isCompleted,
-            urutan: idx,
-          }))
-        : [],
-      labelIds: editingNote.labels.map((l) => l.id),
-      color: editingNote.color,
-    });
-
-    if (res.success && res.data) {
-      setNotes((prev) => prev.map((n) => (n.id === editingNote.id ? (res.data as Note) : n)));
-    } else {
-      toast.error("Gagal menyimpan perubahan catatan");
-    }
-    setEditingNote(null);
-  };
 
   // Filter notes in memory
   const getFilteredNotes = () => {
@@ -985,6 +894,19 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
           n.listItems.some((item) => item.text.toLowerCase().includes(q)) ||
           n.labels.some((l) => l.name.toLowerCase().includes(q))
       );
+    }
+
+    // Apply sorting
+    if (sortBy === "updated") {
+      filtered = [...filtered].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    } else if (sortBy === "created") {
+      filtered = [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortBy === "title") {
+      filtered = [...filtered].sort((a, b) => {
+        const tA = a.title || "";
+        const tB = b.title || "";
+        return tA.localeCompare(tB, "id");
+      });
     }
 
     return filtered;
@@ -1127,10 +1049,10 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
       </aside>
 
       {/* 2. MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 md:px-8 py-6 pb-24 md:pb-8">
+      <main className="flex-1 flex flex-col min-h-0 overflow-y-auto px-4 md:px-8 py-4 pb-20 md:pb-6">
         
         {/* TOP SEARCH & VIEW HEADER */}
-        <div className="flex items-center gap-3 w-full mb-6 shrink-0">
+        <div className="flex items-center gap-3 w-full mb-4 shrink-0">
           {/* Hamburger Menu Toggle (Mobile only) */}
           <button
             onClick={() => setIsSidebarOpen(true)}
@@ -1173,6 +1095,77 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
             </Button>
           )}
 
+          {/* Sort Option Popover */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setActiveDropdownType(activeDropdownType === "sort" ? null : "sort");
+                setActiveDropdownNoteId("sort");
+              }}
+              className={twMerge(
+                "h-10 w-10 shrink-0 flex items-center justify-center border rounded-xl cursor-pointer hover:bg-accent-soft/40 shadow-sm transition-all duration-150",
+                activeDropdownType === "sort"
+                  ? "border-accent bg-accent-soft/20 text-accent"
+                  : "border-border-soft bg-bg-surface text-text-secondary hover:text-text-primary"
+              )}
+              title="Urutkan Catatan"
+            >
+              <ArrowUpDown className="h-4.5 w-4.5" />
+            </button>
+            {activeDropdownType === "sort" && activeDropdownNoteId === "sort" && (
+              <div
+                ref={dropdownRef}
+                className="absolute right-0 top-11 z-50 bg-bg-surface border border-border-soft p-1.5 rounded-xl shadow-xl flex flex-col gap-1 w-36"
+              >
+                <button
+                  onClick={() => {
+                    setSortBy("updated");
+                    setActiveDropdownType(null);
+                    setActiveDropdownNoteId(null);
+                  }}
+                  className={twMerge(
+                    "px-3 py-1.5 text-left text-xs rounded-lg transition-colors cursor-pointer w-full font-sans",
+                    sortBy === "updated"
+                      ? "bg-accent-soft text-accent font-semibold"
+                      : "text-text-secondary hover:bg-accent-soft/30 hover:text-text-primary"
+                  )}
+                >
+                  Terakhir Diedit
+                </button>
+                <button
+                  onClick={() => {
+                    setSortBy("created");
+                    setActiveDropdownType(null);
+                    setActiveDropdownNoteId(null);
+                  }}
+                  className={twMerge(
+                    "px-3 py-1.5 text-left text-xs rounded-lg transition-colors cursor-pointer w-full font-sans",
+                    sortBy === "created"
+                      ? "bg-accent-soft text-accent font-semibold"
+                      : "text-text-secondary hover:bg-accent-soft/30 hover:text-text-primary"
+                  )}
+                >
+                  Terakhir Dibuat
+                </button>
+                <button
+                  onClick={() => {
+                    setSortBy("title");
+                    setActiveDropdownType(null);
+                    setActiveDropdownNoteId(null);
+                  }}
+                  className={twMerge(
+                    "px-3 py-1.5 text-left text-xs rounded-lg transition-colors cursor-pointer w-full font-sans",
+                    sortBy === "title"
+                      ? "bg-accent-soft text-accent font-semibold"
+                      : "text-text-secondary hover:bg-accent-soft/30 hover:text-text-primary"
+                  )}
+                >
+                  Judul (A-Z)
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Grid/List Toggle Button */}
           <button
             onClick={toggleView}
@@ -1200,7 +1193,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
 
         {/* INPUT TAKE A NOTE (Only shown on non-trash/non-archive view or label view) */}
         {activeFilter !== "trash" && activeFilter !== "archive" && (
-          <div ref={createContainerRef} className="w-full max-w-xl mx-auto mb-10 transition-all">
+          <div ref={createContainerRef} className="w-full max-w-xl mx-auto mb-6 transition-all">
             <div
               className={twMerge(
                 "w-full rounded-2xl border bg-bg-surface shadow-md transition-all duration-300 overflow-hidden",
@@ -1606,7 +1599,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-5">
             
             {/* PINNED NOTES SECTION */}
             {pinnedNotes.length > 0 && (
@@ -1617,8 +1610,8 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                 <div
                   className={twMerge(
                     isGridView
-                      ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4"
-                      : "flex flex-col gap-3 max-w-2xl mx-auto w-full"
+                      ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-3"
+                      : "flex flex-col gap-2.5 max-w-2xl mx-auto w-full"
                   )}
                 >
                   {pinnedNotes.map((note) => (
@@ -1626,7 +1619,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                       key={note.id}
                       note={note}
                       isGridView={isGridView}
-                      onSelect={() => note.isTrashed ? null : setEditingNote(note)}
+                      onSelect={() => note.isTrashed ? null : router.push(`/note/${note.id}`)}
                       onPin={(e) => handleTogglePin(note.id, e)}
                       onArchive={(e) => handleToggleArchive(note.id, e)}
                       onTrash={(e) => handleTrashNote(note.id, e)}
@@ -1642,6 +1635,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                       }}
                       onUpdateColor={(colorId, e) => handleUpdateColor(note.id, colorId, e)}
                       onToggleLabel={(labelId) => handleToggleNoteLabel(note.id, labelId)}
+                      onDuplicate={(e) => handleDuplicateNote(note.id, e)}
                       dropdownRef={dropdownRef}
                     />
                   ))}
@@ -1660,8 +1654,8 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                 <div
                   className={twMerge(
                     isGridView
-                      ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4"
-                      : "flex flex-col gap-3 max-w-2xl mx-auto w-full"
+                      ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-3"
+                      : "flex flex-col gap-2.5 max-w-2xl mx-auto w-full"
                   )}
                 >
                   {otherNotes.map((note) => (
@@ -1669,7 +1663,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                       key={note.id}
                       note={note}
                       isGridView={isGridView}
-                      onSelect={() => note.isTrashed ? null : setEditingNote(note)}
+                      onSelect={() => note.isTrashed ? null : router.push(`/note/${note.id}`)}
                       onPin={(e) => handleTogglePin(note.id, e)}
                       onArchive={(e) => handleToggleArchive(note.id, e)}
                       onTrash={(e) => handleTrashNote(note.id, e)}
@@ -1685,6 +1679,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                       }}
                       onUpdateColor={(colorId, e) => handleUpdateColor(note.id, colorId, e)}
                       onToggleLabel={(labelId) => handleToggleNoteLabel(note.id, labelId)}
+                      onDuplicate={(e) => handleDuplicateNote(note.id, e)}
                       dropdownRef={dropdownRef}
                     />
                   ))}
@@ -1695,384 +1690,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
         )}
       </main>
 
-      {/* 3. EDIT NOTE MODAL */}
-      {editingNote && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          
-          {/* Backdrop */}
-          <div
-            onClick={handleCloseEditModal}
-            className="fixed inset-0 bg-[#000000]/40 backdrop-blur-sm transition-opacity duration-300"
-          />
 
-          {/* Modal Container */}
-          <div
-            className={twMerge(
-              "relative w-full max-w-xl bg-bg-surface border border-border-soft rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden transition-all duration-300 z-10",
-              editingNote.color !== "default" && colorMap[editingNote.color]?.bgClass,
-              editingNote.color !== "default" && colorMap[editingNote.color]?.borderClass
-            )}
-          >
-            {/* Header: Title & Pin */}
-            <div className="flex items-center justify-between px-6 pt-5 shrink-0">
-              <input
-                type="text"
-                value={editingNote.title || ""}
-                placeholder="Judul"
-                onChange={(e) => setEditingNote((prev) => prev ? { ...prev, title: e.target.value } : null)}
-                className={twMerge(
-                  "w-full bg-transparent border-none text-[16px] font-semibold text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-secondary/70",
-                  editingNote.color !== "default" && colorMap[editingNote.color]?.textClass
-                )}
-              />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditingNote((prev) => {
-                    if (!prev) return null;
-                    return { ...prev, isPinned: !prev.isPinned, isArchived: false };
-                  });
-                  handleTogglePin(editingNote.id);
-                }}
-                className={twMerge(
-                  "p-2 rounded-xl transition-colors cursor-pointer",
-                  editingNote.isPinned
-                    ? "text-accent bg-accent-soft"
-                    : "text-text-secondary hover:text-text-primary hover:bg-accent-soft/50"
-                )}
-              >
-                <Pin className="h-4.5 w-4.5" />
-              </button>
-            </div>
-
-            {/* Scrollable Content Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
-              {editingNote.isTable ? (
-                /* Table Mode in Modal */
-                (() => {
-                  const { headers: tableHeaders, rows: tableRows } = getEditingNoteTableData();
-                  return (
-                    <div className="flex flex-col gap-3 overflow-x-auto pb-6">
-                      <table className="min-w-full border-collapse text-xs text-text-primary">
-                        <thead>
-                          <tr className="border-b border-border-soft">
-                            {tableHeaders.map((header, colIdx) => (
-                              <th key={colIdx} className="p-1.5 relative border border-border-soft/60 bg-bg-surface/30 min-w-[120px] sm:min-w-[150px]">
-                                <input
-                                  type="text"
-                                  value={header}
-                                  onChange={(e) => handleUpdateTableHeader(colIdx, e.target.value)}
-                                  className="w-full bg-transparent border-none p-0 text-center font-semibold focus:outline-none focus:ring-0"
-                                />
-                                {tableHeaders.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteTableNoteCol(colIdx)}
-                                    className="absolute top-0 right-0 p-0.5 text-text-secondary hover:text-danger hover:bg-danger-soft/20 rounded cursor-pointer"
-                                    title="Hapus Kolom"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                )}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {tableRows.map((row, rowIdx) => (
-                            <tr key={rowIdx} className="hover:bg-accent-soft/10">
-                              {row.map((cell, colIdx) => (
-                                <td key={colIdx} className="p-1 border border-border-soft min-w-[120px] sm:min-w-[150px]">
-                                  <input
-                                    type="text"
-                                    value={cell}
-                                    onChange={(e) => handleUpdateTableCell(rowIdx, colIdx, e.target.value)}
-                                    className="w-full bg-transparent border-none p-0 focus:outline-none focus:ring-0"
-                                  />
-                                </td>
-                              ))}
-                              {tableRows.length > 1 && (
-                                <td className="p-1 border-none flex items-center justify-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteTableNoteRow(rowIdx)}
-                                    className="p-1 text-text-secondary hover:text-danger hover:bg-danger-soft/20 rounded cursor-pointer"
-                                    title="Hapus Baris"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          type="button"
-                          onClick={handleAddTableNoteRow}
-                          className="text-[11px] font-semibold text-accent hover:bg-accent-soft/30 px-2.5 py-1 rounded-lg border border-accent/20 cursor-pointer flex items-center gap-1"
-                        >
-                          <Plus className="h-3 w-3" /> Baris
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleAddTableNoteCol}
-                          className="text-[11px] font-semibold text-accent hover:bg-accent-soft/30 px-2.5 py-1 rounded-lg border border-accent/20 cursor-pointer flex items-center gap-1"
-                        >
-                          <Plus className="h-3 w-3" /> Kolom
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : !editingNote.isList ? (
-                <textarea
-                  value={editingNote.content || ""}
-                  placeholder="Catatan..."
-                  onChange={(e) => setEditingNote((prev) => prev ? { ...prev, content: e.target.value } : null)}
-                  rows={6}
-                  className={twMerge(
-                    "w-full bg-transparent border-none text-[13.5px] text-text-primary focus:outline-none focus:ring-0 resize-none leading-relaxed placeholder:text-text-secondary/70",
-                    editingNote.color !== "default" && colorMap[editingNote.color]?.textClass
-                  )}
-                />
-              ) : (
-                /* Checklist mode in Modal */
-                <div className="flex flex-col gap-2">
-                  {editingNote.listItems.map((item, idx) => (
-                    <div key={item.id || idx} className="flex items-center gap-2 group">
-                      <input
-                        type="checkbox"
-                        checked={item.isCompleted}
-                        onChange={() => handleToggleListItem(editingNote.id, item.id, !item.isCompleted)}
-                        className="rounded border-border-soft text-accent focus:ring-accent"
-                      />
-                      <input
-                        type="text"
-                        value={item.text}
-                        onChange={(e) => {
-                          setEditingNote((prev) => {
-                            if (!prev) return null;
-                            return {
-                              ...prev,
-                              listItems: prev.listItems.map((it) =>
-                                it.id === item.id ? { ...it, text: e.target.value } : it
-                              ),
-                            };
-                          });
-                        }}
-                        className={twMerge(
-                          "flex-1 bg-transparent border-none text-[13px] text-text-primary focus:outline-none p-0 focus:ring-0",
-                          item.isCompleted && "line-through text-text-secondary/50",
-                          editingNote.color !== "default" && colorMap[editingNote.color]?.textClass
-                        )}
-                      />
-                      <button
-                        onClick={() => {
-                          setEditingNote((prev) => {
-                            if (!prev) return null;
-                            return {
-                              ...prev,
-                              listItems: prev.listItems.filter((it) => it.id !== item.id),
-                            };
-                          });
-                        }}
-                        className="p-1 opacity-0 group-hover:opacity-100 text-text-secondary hover:text-danger rounded-md transition-opacity cursor-pointer"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-
-                  {/* Add New checklist Item */}
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!newListItemText.trim()) return;
-                      const newItem = {
-                        id: `temp-${Date.now()}`,
-                        noteId: editingNote.id,
-                        text: newListItemText.trim(),
-                        isCompleted: false,
-                        urutan: editingNote.listItems.length,
-                      };
-                      setEditingNote((prev) => prev ? { ...prev, listItems: [...prev.listItems, newItem] } : null);
-                      setNewListItemText("");
-                    }}
-                    className="flex items-center gap-2 border-t border-border-soft/20 pt-2 mt-2"
-                  >
-                    <Plus className="h-4 w-4 text-text-secondary" />
-                    <input
-                      type="text"
-                      placeholder="Item daftar"
-                      value={newListItemText}
-                      onChange={(e) => setNewListItemText(e.target.value)}
-                      className="flex-1 bg-transparent border-none text-[13px] text-text-primary focus:outline-none p-0 focus:ring-0 placeholder:text-text-secondary/50"
-                    />
-                  </form>
-                </div>
-              )}
-
-              {/* Labels pills inside modal */}
-              {editingNote.labels.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-6">
-                  {editingNote.labels.map((label) => (
-                    <span
-                      key={label.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-semibold bg-accent-soft/40 text-accent border border-accent/15"
-                    >
-                      {label.name}
-                      <button
-                        onClick={() => handleToggleNoteLabel(editingNote.id, label.id)}
-                        className="hover:bg-accent-soft rounded-full p-0.5"
-                      >
-                        <X className="h-2 w-2" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Bottom Modal Actions */}
-            <div className="flex items-center justify-between px-4 sm:px-6 pt-4 pb-6 bg-bg-surface/50 dark:bg-[#000000]/10 border-t border-border-soft/30 shrink-0">
-              <div className="flex items-center gap-1 sm:gap-1.5">
-                
-                {/* Color Trigger inside Modal */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setActiveDropdownType(activeDropdownType === "color" ? null : "color");
-                      setActiveDropdownNoteId(editingNote.id);
-                    }}
-                    className="p-2 text-text-secondary hover:text-text-primary hover:bg-accent-soft/50 rounded-xl cursor-pointer"
-                  >
-                    <Palette className="h-4 w-4" />
-                  </button>
-                  {activeDropdownType === "color" && activeDropdownNoteId === editingNote.id && (
-                    <div
-                      ref={dropdownRef}
-                      className="absolute left-0 bottom-12 z-50 bg-bg-surface border border-border-soft p-2 rounded-2xl shadow-xl flex gap-1 flex-wrap w-44"
-                    >
-                      {Object.entries(colorMap).map(([colorId, colorOpt]) => (
-                        <button
-                          key={colorId}
-                          onClick={(e) => handleUpdateColor(editingNote.id, colorId, e)}
-                          style={{
-                            backgroundColor: colorOpt.hex !== "transparent" ? colorOpt.hex : undefined
-                          }}
-                          className={twMerge(
-                            "h-6 w-6 rounded-full border border-border-soft cursor-pointer transition-transform hover:scale-110",
-                            editingNote.color === colorId ? "ring-2 ring-accent" : "",
-                            colorOpt.hex === "transparent" && "bg-white dark:bg-slate-800"
-                          )}
-                          title={colorOpt.name}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Labels trigger inside Modal */}
-                <div className="relative">
-                  <button
-                    onClick={() => {
-                      setActiveDropdownType(activeDropdownType === "label" ? null : "label");
-                      setActiveDropdownNoteId(editingNote.id);
-                    }}
-                    className="p-2 text-text-secondary hover:text-text-primary hover:bg-accent-soft/50 rounded-xl cursor-pointer"
-                  >
-                    <Tag className="h-4 w-4" />
-                  </button>
-                  {activeDropdownType === "label" && activeDropdownNoteId === editingNote.id && (
-                    <div
-                      ref={dropdownRef}
-                      className="absolute left-0 bottom-12 z-50 bg-bg-surface border border-border-soft p-3 rounded-2xl shadow-xl flex flex-col gap-2 w-48 max-h-48 overflow-y-auto"
-                    >
-                      <span className="text-[11px] font-semibold text-text-secondary mb-1">Pilih Label</span>
-                      {labels.map((label) => (
-                        <label key={label.id} className="flex items-center gap-2 text-[12px] font-medium text-text-primary hover:bg-accent-soft/30 p-1.5 rounded-lg cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={editingNote.labels.some((l) => l.id === label.id)}
-                            onChange={() => handleToggleNoteLabel(editingNote.id, label.id)}
-                            className="rounded border-border-soft text-accent focus:ring-accent"
-                          />
-                          <span>{label.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Convert inside modal */}
-                {(editingNote.isList || editingNote.isTable) && (
-                  <button
-                    onClick={(e) => handleConvertToType(editingNote.id, "text", e)}
-                    className="p-2 text-text-secondary hover:text-text-primary hover:bg-accent-soft/50 rounded-xl cursor-pointer"
-                    title="Ubah ke Catatan Teks"
-                  >
-                    <FileText className="h-4 w-4" />
-                  </button>
-                )}
-                {!editingNote.isList && (
-                  <button
-                    onClick={(e) => handleConvertToType(editingNote.id, "list", e)}
-                    className="p-2 text-text-secondary hover:text-text-primary hover:bg-accent-soft/50 rounded-xl cursor-pointer"
-                    title="Ubah ke Checklist"
-                  >
-                    <CheckSquare className="h-4 w-4" />
-                  </button>
-                )}
-                {!editingNote.isTable && (
-                  <button
-                    onClick={(e) => handleConvertToType(editingNote.id, "table", e)}
-                    className="p-2 text-text-secondary hover:text-text-primary hover:bg-accent-soft/50 rounded-xl cursor-pointer"
-                    title="Ubah ke Tabel"
-                  >
-                    <Table className="h-4 w-4" />
-                  </button>
-                )}
-
-                {/* Archive inside modal */}
-                <button
-                  onClick={(e) => {
-                    handleToggleArchive(editingNote.id, e);
-                    setEditingNote(null);
-                  }}
-                  className="p-2 text-text-secondary hover:text-text-primary hover:bg-accent-soft/50 rounded-xl cursor-pointer"
-                  title={editingNote.isArchived ? "Kembalikan dari Arsip" : "Arsipkan"}
-                >
-                  <Archive className="h-4 w-4" />
-                </button>
-
-                {/* Delete/Trash inside modal */}
-                <button
-                  onClick={(e) => {
-                    handleTrashNote(editingNote.id, e);
-                    setEditingNote(null);
-                  }}
-                  className="p-2 text-text-secondary hover:text-text-primary hover:bg-accent-soft/50 rounded-xl cursor-pointer"
-                  title="Buang ke Sampah"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleCloseEditModal}
-                className="px-4 sm:px-6 font-semibold"
-              >
-                Selesai
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 4. LABEL MANAGER MODAL */}
       {isLabelManagerOpen && (
@@ -2182,9 +1800,10 @@ interface NoteCardProps {
   onDeletePermanently: (e: React.MouseEvent) => void;
   onToggleListItem: (itemId: string, isCompleted: boolean) => void;
   onToggleType: (e: React.MouseEvent) => void;
+  onDuplicate: (e: React.MouseEvent) => void;
   labels: Label[];
-  activeDropdownType: "color" | "label" | null;
-  onOpenDropdown: (type: "color" | "label" | null) => void;
+  activeDropdownType: "color" | "label" | "sort" | "more" | null;
+  onOpenDropdown: (type: "color" | "label" | "sort" | "more" | null) => void;
   onUpdateColor: (colorId: string, e: React.MouseEvent) => void;
   onToggleLabel: (labelId: string) => void;
   dropdownRef: React.RefObject<HTMLDivElement | null>;
@@ -2201,6 +1820,7 @@ function NoteCard({
   onDeletePermanently,
   onToggleListItem,
   onToggleType,
+  onDuplicate,
   labels,
   activeDropdownType,
   onOpenDropdown,
@@ -2208,21 +1828,15 @@ function NoteCard({
   onToggleLabel,
   dropdownRef
 }: NoteCardProps) {
-  const [isHovered, setIsHovered] = React.useState(false);
-
   // Group checklist items
   const activeItems = note.listItems.filter((i) => !i.isCompleted);
   const completedItems = note.listItems.filter((i) => i.isCompleted);
 
   return (
     <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-      }}
       onClick={onSelect}
       className={twMerge(
-        "card-stagger group/card relative flex flex-col rounded-2xl border text-text-primary overflow-hidden transition-all duration-300 select-none",
+        "card-stagger group/card relative flex flex-col rounded-2xl border text-text-primary transition-all duration-300 select-none",
         isGridView ? "w-full min-h-[120px]" : "w-full",
         note.isTrashed ? "opacity-75" : "hover:shadow-md hover:border-text-secondary/20",
         note.color === "default" ? "bg-bg-surface border-border-soft/60 dark:bg-[#0F1623] dark:border-border-soft/20" : colorMap[note.color]?.bgClass,
@@ -2232,21 +1846,28 @@ function NoteCard({
       
       {/* 1. Header (Title & Pin) */}
       <div className="flex items-start justify-between px-4 pt-3.5 pb-1 gap-2 shrink-0">
-        <h4 className={twMerge(
-          "text-[13.5px] font-semibold tracking-tight line-clamp-2 leading-tight flex-1",
-          note.color !== "default" && colorMap[note.color]?.textClass
-        )}>
-          {note.title || (note.isList ? "Daftar Tanpa Judul" : "Catatan Tanpa Judul")}
-        </h4>
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <h4 className={twMerge(
+            "text-[13.5px] font-semibold tracking-tight line-clamp-2 leading-tight truncate",
+            note.color !== "default" && colorMap[note.color]?.textClass
+          )}>
+            {note.title || (note.isList ? "Daftar Tanpa Judul" : "Catatan Tanpa Judul")}
+          </h4>
+          {note.isList && note.listItems.length > 0 && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black/5 dark:bg-white/10 text-text-secondary select-none shrink-0 font-sans">
+              {completedItems.length}/{note.listItems.length}
+            </span>
+          )}
+        </div>
 
         {!note.isTrashed && (
           <button
             onClick={onPin}
             className={twMerge(
-              "p-1.5 rounded-lg transition-all cursor-pointer opacity-0 group-hover/card:opacity-100 active:scale-95 shrink-0",
+              "p-1.5 rounded-lg transition-all cursor-pointer active:scale-95 shrink-0",
               note.isPinned
-                ? "text-accent bg-accent-soft opacity-100"
-                : "text-text-secondary hover:text-text-primary hover:bg-accent-soft/30"
+                ? "text-accent bg-accent-soft"
+                : "text-text-secondary hover:bg-accent-soft/30"
             )}
             title={note.isPinned ? "Lepas Sematan" : "Sematkan Catatan"}
           >
@@ -2322,13 +1943,13 @@ function NoteCard({
             {activeItems.slice(0, 5).map((item) => (
               <div
                 key={item.id}
-                onClick={(e) => e.stopPropagation()}
                 className="flex items-start gap-2"
               >
                 <input
                   type="checkbox"
                   checked={false}
                   onChange={() => onToggleListItem(item.id, true)}
+                  onClick={(e) => e.stopPropagation()}
                   disabled={note.isTrashed}
                   className="mt-0.5 rounded border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
                 />
@@ -2351,13 +1972,13 @@ function NoteCard({
                 {completedItems.slice(0, 3).map((item) => (
                   <div
                     key={item.id}
-                    onClick={(e) => e.stopPropagation()}
                     className="flex items-start gap-2 opacity-50"
                   >
                     <input
                       type="checkbox"
                       checked={true}
                       onChange={() => onToggleListItem(item.id, false)}
+                      onClick={(e) => e.stopPropagation()}
                       disabled={note.isTrashed}
                       className="mt-0.5 rounded border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
                     />
@@ -2394,15 +2015,11 @@ function NoteCard({
         )}
       </div>
 
-      {/* Spacer to push actions to bottom */}
-      <div className="h-10 shrink-0" />
-
-      {/* 3. Hover Toolbar Action Bar */}
+      {/* 3. Toolbar Action Bar */}
       <div
         onClick={(e) => e.stopPropagation()}
         className={twMerge(
-          "absolute bottom-0 left-0 right-0 h-9 flex items-center justify-between px-3 py-1 bg-bg-surface/90 dark:bg-bg-surface/95 border-t border-border-soft/40 backdrop-blur-sm transition-all duration-300",
-          isHovered || activeDropdownType ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none",
+          "mt-auto h-9 flex items-center justify-between px-3 py-1 bg-bg-surface/30 dark:bg-bg-surface/50 border-t border-border-soft/40 backdrop-blur-sm transition-all duration-300 rounded-b-2xl",
           note.color !== "default" && colorMap[note.color]?.bgClass,
           note.color !== "default" && "bg-opacity-95 backdrop-blur-md"
         )}
@@ -2411,52 +2028,81 @@ function NoteCard({
           /* REGULAR ACTIONS */
           <div className="flex items-center gap-1.5 w-full">
             
-            {/* Color Palette Popover */}
-            <div className="relative">
+            {/* Archive Button */}
+            <button
+              onClick={onArchive}
+              className="p-1 text-text-secondary hover:text-text-primary hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-colors"
+              title={note.isArchived ? "Kembalikan dari Arsip" : "Arsipkan"}
+            >
+              <Archive className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Copy Button (Duplicate) */}
+            <button
+              onClick={onDuplicate}
+              className="p-1 text-text-secondary hover:text-text-primary hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-colors"
+              title="Buat Salinan (Duplikat)"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Trash Button */}
+            <button
+              onClick={onTrash}
+              className="p-1 text-text-secondary hover:text-danger hover:bg-danger-soft/30 rounded-lg cursor-pointer transition-colors"
+              title="Buang ke Sampah"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+
+            {/* More Actions Popover */}
+            <div className="relative ml-auto">
               <button
-                onClick={() => onOpenDropdown(activeDropdownType === "color" ? null : "color")}
+                onClick={() => onOpenDropdown(activeDropdownType === "more" ? null : "more")}
                 className="p-1 text-text-secondary hover:text-text-primary hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-colors"
-                title="Ubah Warna"
+                title="Opsi Lainnya"
               >
-                <Palette className="h-3.5 w-3.5" />
+                <MoreVertical className="h-3.5 w-3.5" />
               </button>
-              {activeDropdownType === "color" && (
+
+              {activeDropdownType === "more" && (
                 <div
                   ref={dropdownRef}
-                  className="absolute left-0 bottom-8 z-50 bg-bg-surface border border-border-soft p-1.5 rounded-xl shadow-xl flex gap-1 flex-wrap w-40"
+                  className="absolute right-0 bottom-8 z-50 bg-bg-surface border border-border-soft p-1.5 rounded-xl shadow-xl flex flex-col gap-1 w-40"
                 >
-                  {Object.entries(colorMap).map(([colorId, colorOpt]) => (
-                    <button
-                      key={colorId}
-                      onClick={(e) => onUpdateColor(colorId, e)}
-                      style={{
-                        backgroundColor: colorOpt.hex !== "transparent" ? colorOpt.hex : undefined
-                      }}
-                      className={twMerge(
-                        "h-5.5 w-5.5 rounded-full border border-border-soft cursor-pointer transition-transform hover:scale-110",
-                        note.color === colorId ? "ring-2 ring-accent" : "",
-                        colorOpt.hex === "transparent" && "bg-white dark:bg-slate-800"
-                      )}
-                      title={colorOpt.name}
-                    />
-                  ))}
+                  <button
+                    onClick={() => onOpenDropdown("color")}
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full"
+                  >
+                    <Palette className="h-3.5 w-3.5" />
+                    <span>Ubah Warna</span>
+                  </button>
+
+                  <button
+                    onClick={() => onOpenDropdown("label")}
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full"
+                  >
+                    <Tag className="h-3.5 w-3.5" />
+                    <span>Ubah Label</span>
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      onToggleType(e);
+                      onOpenDropdown(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full"
+                  >
+                    {note.isList ? <FileText className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
+                    <span>{note.isList ? "Ubah ke Teks" : "Ubah ke Checklist"}</span>
+                  </button>
                 </div>
               )}
-            </div>
 
-            {/* Label Manager Popover */}
-            <div className="relative">
-              <button
-                onClick={() => onOpenDropdown(activeDropdownType === "label" ? null : "label")}
-                className="p-1 text-text-secondary hover:text-text-primary hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-colors"
-                title="Ubah Label"
-              >
-                <Tag className="h-3.5 w-3.5" />
-              </button>
               {activeDropdownType === "label" && (
                 <div
                   ref={dropdownRef}
-                  className="absolute left-0 bottom-8 z-50 bg-bg-surface border border-border-soft p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 w-44 max-h-44 overflow-y-auto"
+                  className="absolute right-0 bottom-8 z-50 bg-bg-surface border border-border-soft p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 w-44 max-h-44 overflow-y-auto"
                 >
                   <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Label</span>
                   {labels.length === 0 ? (
@@ -2476,34 +2122,34 @@ function NoteCard({
                   )}
                 </div>
               )}
+
+              {activeDropdownType === "color" && (
+                <div
+                  ref={dropdownRef}
+                  className="absolute right-0 bottom-8 z-50 bg-bg-surface border border-border-soft p-1.5 rounded-xl shadow-xl flex gap-1 flex-wrap w-40"
+                >
+                  {Object.entries(colorMap).map(([colorId, colorOpt]) => (
+                    <button
+                      key={colorId}
+                      onClick={(e) => {
+                        onUpdateColor(colorId, e);
+                        onOpenDropdown(null);
+                      }}
+                      style={{
+                        backgroundColor: colorOpt.hex !== "transparent" ? colorOpt.hex : undefined
+                      }}
+                      className={twMerge(
+                        "h-5.5 w-5.5 rounded-full border border-border-soft cursor-pointer transition-transform hover:scale-110",
+                        note.color === colorId ? "ring-2 ring-accent" : "",
+                        colorOpt.hex === "transparent" && "bg-white dark:bg-slate-800"
+                      )}
+                      title={colorOpt.name}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Convert Note Type */}
-            <button
-              onClick={onToggleType}
-              className="p-1 text-text-secondary hover:text-text-primary hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-colors"
-              title={note.isList ? "Ubah ke Catatan Teks" : "Ubah ke Checklist"}
-            >
-              {note.isList ? <FileText className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
-            </button>
-
-            {/* Archive Button */}
-            <button
-              onClick={onArchive}
-              className="p-1 text-text-secondary hover:text-text-primary hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-colors"
-              title={note.isArchived ? "Kembalikan dari Arsip" : "Arsipkan"}
-            >
-              <Archive className="h-3.5 w-3.5" />
-            </button>
-
-            {/* Trash Button */}
-            <button
-              onClick={onTrash}
-              className="p-1 ml-auto text-text-secondary hover:text-danger hover:bg-danger-soft/30 rounded-lg cursor-pointer transition-colors"
-              title="Buang ke Sampah"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
           </div>
         ) : (
           /* TRASHED ACTIONS */

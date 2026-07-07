@@ -298,3 +298,58 @@ export async function deleteLabel(id: string) {
     return { success: false, error: "Gagal menghapus label" };
   }
 }
+
+export async function duplicateNote(id: string) {
+  try {
+    const sourceNote = await db.note.findUnique({
+      where: { id },
+      include: {
+        listItems: true,
+        labels: true,
+      },
+    });
+
+    if (!sourceNote) {
+      return { success: false, error: "Catatan tidak ditemukan" };
+    }
+
+    const newNote = await db.note.create({
+      data: {
+        title: sourceNote.title ? `${sourceNote.title} (Salinan)` : "Catatan Salinan",
+        content: sourceNote.content,
+        color: sourceNote.color,
+        isPinned: false, // Default copy is not pinned
+        isArchived: false,
+        isTrashed: false,
+        isList: sourceNote.isList,
+        isTable: sourceNote.isTable,
+        listItems: sourceNote.listItems.length > 0
+          ? {
+              createMany: {
+                data: sourceNote.listItems.map((item) => ({
+                  text: item.text,
+                  isCompleted: item.isCompleted,
+                  urutan: item.urutan,
+                })),
+              },
+            }
+          : undefined,
+        labels: sourceNote.labels.length > 0
+          ? {
+              connect: sourceNote.labels.map((l) => ({ id: l.id })),
+            }
+          : undefined,
+      },
+      include: {
+        listItems: true,
+        labels: true,
+      },
+    });
+
+    revalidatePath("/note");
+    return { success: true, data: newNote };
+  } catch (error) {
+    console.error("Failed to duplicate note:", error);
+    return { success: false, error: "Gagal menduplikasi catatan" };
+  }
+}
