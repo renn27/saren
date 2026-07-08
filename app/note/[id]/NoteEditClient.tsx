@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -1483,8 +1484,8 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
       </div>
 
       {/* Custom Confirmation Modal for Deleting Image */}
-      {showDeleteImageConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {showDeleteImageConfirm && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           {/* Backdrop */}
           <div
             onClick={() => setShowDeleteImageConfirm(false)}
@@ -1524,7 +1525,8 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

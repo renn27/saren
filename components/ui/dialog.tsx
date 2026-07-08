@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
 import { X } from "lucide-react";
 import { Button } from "./button";
@@ -28,15 +29,22 @@ export function Dialog({
   const displayContent = isOpen ? { title, description, children } : prevContentRef.current;
 
   React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
     if (isOpen) {
       setShouldRender(true);
-      const timer = setTimeout(() => setIsAnimating(true), 50);
-      return () => clearTimeout(timer);
+      // Small delay to allow element mounting before triggering transition
+      timeoutId = setTimeout(() => {
+        setIsAnimating(true);
+      }, 10);
     } else {
       setIsAnimating(false);
-      const timer = setTimeout(() => setShouldRender(false), 200);
-      return () => clearTimeout(timer);
+      timeoutId = setTimeout(() => {
+        setShouldRender(false);
+      }, 500); // match transition duration
     }
+
+    return () => clearTimeout(timeoutId);
   }, [isOpen]);
 
   React.useEffect(() => {
@@ -58,9 +66,10 @@ export function Dialog({
   }, [isOpen, onClose]);
 
   if (!shouldRender) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className={twMerge(
@@ -101,7 +110,8 @@ export function Dialog({
           {displayContent.children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -136,15 +146,21 @@ export function AlertDialog({
   const displayContent = isOpen ? { title, description } : prevContentRef.current;
 
   React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
     if (isOpen) {
       setShouldRender(true);
-      const timer = setTimeout(() => setIsAnimating(true), 50);
-      return () => clearTimeout(timer);
+      timeoutId = setTimeout(() => {
+        setIsAnimating(true);
+      }, 10);
     } else {
       setIsAnimating(false);
-      const timer = setTimeout(() => setShouldRender(false), 200);
-      return () => clearTimeout(timer);
+      timeoutId = setTimeout(() => {
+        setShouldRender(false);
+      }, 500);
     }
+
+    return () => clearTimeout(timeoutId);
   }, [isOpen]);
 
   React.useEffect(() => {
@@ -166,9 +182,10 @@ export function AlertDialog({
   }, [isOpen, onClose]);
 
   if (!shouldRender) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className={twMerge(
@@ -212,6 +229,7 @@ export function AlertDialog({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

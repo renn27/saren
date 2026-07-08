@@ -16,7 +16,7 @@ import {
   X,
   RotateCcw,
   Check,
-  Folder,
+  Folder as FolderIcon,
   FolderOpen,
   Settings,
   MoreVertical,
@@ -1340,7 +1340,7 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                       : "text-text-secondary hover:bg-bg-surface/80 hover:text-text-primary border border-transparent"
                   )}
                 >
-                  <Folder className="h-4.5 w-4.5 shrink-0" />
+                  <FolderIcon className="h-4.5 w-4.5 shrink-0" />
                   <span className="truncate flex-1">{f.name}</span>
                   {f._count && f._count.notes > 0 && (
                     <span className="text-[10px] font-semibold text-text-secondary bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded-full shrink-0">
@@ -1499,16 +1499,16 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
         </div>
 
         {/* HORIZONTAL FOLDER FILTER BAR */}
-        <div className="flex items-center gap-2 mb-4 shrink-0 overflow-x-auto pb-1.5 scrollbar-thin select-none max-w-full -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex items-center gap-2 mb-4 shrink-0 overflow-x-auto pb-1.5 scrollbar-thin select-none w-full">
           <div className="flex items-center gap-1 shrink-0 text-text-secondary pr-1 text-[11px] font-bold uppercase tracking-wider">
-            <Folder className="h-3.5 w-3.5" />
+            <FolderIcon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Folder:</span>
           </div>
           
           <button
             onClick={() => setSelectedFolderId(null)}
             className={twMerge(
-              "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border",
+              "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border shrink-0",
               !selectedFolderId
                 ? "bg-accent border-accent text-white shadow-sm"
                 : "bg-bg-surface border-border-soft text-text-secondary hover:text-text-primary hover:border-text-secondary/25"
@@ -1522,7 +1522,7 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
               key={f.id}
               onClick={() => setSelectedFolderId(f.id)}
               className={twMerge(
-                "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-1.5",
+                "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-1.5 shrink-0",
                 selectedFolderId === f.id
                   ? "bg-accent border-accent text-white shadow-sm"
                   : "bg-bg-surface border-border-soft text-text-secondary hover:text-text-primary hover:border-text-secondary/25"
@@ -1544,7 +1544,7 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
 
           <button
             onClick={() => setIsFolderManagerOpen(true)}
-            className="px-2.5 py-1 rounded-full text-xs font-medium bg-bg-surface border border-dashed border-border-soft text-text-secondary hover:text-accent hover:border-accent/40 whitespace-nowrap cursor-pointer transition-all flex items-center gap-1"
+            className="px-2.5 py-1 rounded-full text-xs font-medium bg-bg-surface border border-dashed border-border-soft text-text-secondary hover:text-accent hover:border-accent/40 whitespace-nowrap cursor-pointer transition-all flex items-center gap-1 shrink-0"
             title="Kelola Folder"
           >
             <Plus className="h-3 w-3" />
@@ -2062,17 +2062,17 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
 
 
       {/* 4. LABEL MANAGER MODAL */}
-      {isLabelManagerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {isLabelManagerOpen && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div
             onClick={() => setIsLabelManagerOpen(false)}
-            className="fixed inset-0 bg-[#000000]/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-[#000000]/40 backdrop-blur-sm transition-opacity"
           />
 
-          <div className="relative w-full max-w-sm bg-bg-surface border border-border-soft rounded-3xl shadow-2xl p-6 flex flex-col max-h-[70vh] z-10">
+          <div className="relative w-full max-w-sm bg-bg-surface border border-border-soft rounded-3xl shadow-2xl p-6 flex flex-col max-h-[70vh] z-10 animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsLabelManagerOpen(false)}
-              className="absolute right-4 top-4 p-1.5 rounded-lg text-text-secondary hover:bg-accent-soft/50"
+              className="absolute right-4 top-4 p-1.5 rounded-lg text-text-secondary hover:bg-accent-soft/50 cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
@@ -2088,7 +2088,7 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                 onChange={(e) => setNewLabelInput(e.target.value)}
                 className="flex-1 h-9 px-3 bg-bg-page border border-border-soft rounded-xl text-[12px] text-text-primary focus:outline-none focus:border-accent/40"
               />
-              <Button type="submit" variant="secondary" size="sm" className="h-9 px-3 rounded-xl shrink-0">
+              <Button type="submit" variant="secondary" size="sm" className="h-9 px-3 rounded-xl shrink-0 cursor-pointer">
                 <Plus className="h-4 w-4" />
               </Button>
             </form>
@@ -2107,13 +2107,13 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                       />
                       <button
                         onClick={() => handleRenameLabel(label.id)}
-                        className="p-1.5 text-success hover:bg-accent-soft rounded-md"
+                        className="p-1.5 text-success hover:bg-accent-soft rounded-md cursor-pointer"
                       >
                         <Check className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => setRenamingLabelId(null)}
-                        className="p-1.5 text-text-secondary hover:bg-accent-soft rounded-md"
+                        className="p-1.5 text-text-secondary hover:bg-accent-soft rounded-md cursor-pointer"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -2151,18 +2151,19 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 5. FOLDER MANAGER MODAL */}
-      {isFolderManagerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {isFolderManagerOpen && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div
             onClick={() => setIsFolderManagerOpen(false)}
-            className="fixed inset-0 bg-[#000000]/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-[#000000]/40 backdrop-blur-sm transition-opacity"
           />
 
-          <div className="relative w-full max-w-sm bg-bg-surface border border-border-soft rounded-3xl shadow-2xl p-6 flex flex-col max-h-[70vh] z-10 animate-page-enter">
+          <div className="relative w-full max-w-sm bg-bg-surface border border-border-soft rounded-3xl shadow-2xl p-6 flex flex-col max-h-[70vh] z-10 animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsFolderManagerOpen(false)}
               className="absolute right-4 top-4 p-1.5 rounded-lg text-text-secondary hover:bg-accent-soft/50 cursor-pointer"
@@ -2253,7 +2254,8 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -2314,7 +2316,7 @@ function NoteCard({
   const moreButtonRef = React.useRef<HTMLButtonElement>(null);
   const portalRef = React.useRef<HTMLDivElement>(null);
   const [activeDropdown, setActiveDropdown] = React.useState<"more" | "color" | "label" | "folder" | null>(null);
-  const [dropdownPos, setDropdownPos] = React.useState<{ top: number; right: number } | null>(null);
+  const [dropdownPos, setDropdownPos] = React.useState<{ top: number; right: number; left?: number; alignLeft: boolean } | null>(null);
 
   // Close on outside click or scroll
   React.useEffect(() => {
@@ -2339,9 +2341,12 @@ function NoteCard({
   const openDropdown = (type: "more" | "color" | "label" | "folder" | null) => {
     if (type && moreButtonRef.current) {
       const rect = moreButtonRef.current.getBoundingClientRect();
+      const alignLeft = rect.left < 200;
       setDropdownPos({
         top: rect.top,
         right: window.innerWidth - rect.right,
+        left: rect.left,
+        alignLeft,
       });
     } else {
       setDropdownPos(null);
@@ -2441,7 +2446,7 @@ function NoteCard({
           </div>
           {note.folder && (
             <span className="text-[9px] font-bold text-accent uppercase tracking-wider mt-0.5 inline-flex items-center gap-1">
-              <Folder className="h-2.5 w-2.5" /> {note.folder.name}
+              <FolderIcon className="h-2.5 w-2.5" /> {note.folder.name}
             </span>
           )}
         </div>
@@ -2706,7 +2711,9 @@ function NoteCard({
             {activeDropdown && dropdownPos && typeof document !== "undefined" && ReactDOM.createPortal(
               <div
                 ref={portalRef}
-                style={{ top: dropdownPos.top, right: dropdownPos.right }}
+                style={dropdownPos.alignLeft 
+                  ? { top: dropdownPos.top, left: dropdownPos.left } 
+                  : { top: dropdownPos.top, right: dropdownPos.right }}
                 className="fixed z-[500] -translate-y-full"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -2722,7 +2729,7 @@ function NoteCard({
                       <span>Ubah Label</span>
                     </button>
                     <button onClick={() => openDropdown("folder")} className="flex items-center gap-2 px-2.5 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full">
-                      <Folder className="h-3.5 w-3.5 shrink-0" />
+                      <FolderIcon className="h-3.5 w-3.5 shrink-0" />
                       <span>Ubah Folder</span>
                     </button>
                     <button

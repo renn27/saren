@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Nomor } from "@prisma/client";
-import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, ArrowUpDown, ArrowDown, ArrowUp, Coins } from "lucide-react";
+import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, ArrowUpDown, ArrowDown, ArrowUp, Coins, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
@@ -269,6 +269,21 @@ export function NomorClient({ initialData }: NomorClientProps) {
       month: "short",
       year: "numeric",
     });
+  };
+
+  const formatDateTimeDisplay = (dateString: Date) => {
+    const d = new Date(dateString);
+    const dateFormatted = d.toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    const timeFormatted = d.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    return `${dateFormatted}, ${timeFormatted}`;
   };
 
   return (
@@ -640,7 +655,7 @@ export function NomorClient({ initialData }: NomorClientProps) {
               </div>
 
               {/* Masa Aktif */}
-              <div className="flex items-center gap-3.5 py-3.5">
+              <div className="flex items-center gap-3.5 py-3.5 border-b border-border-soft">
                 <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center border border-accent/10 shrink-0">
                   <Calendar className="h-5 w-5" />
                 </div>
@@ -648,6 +663,19 @@ export function NomorClient({ initialData }: NomorClientProps) {
                   <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Masa Aktif</span>
                   <span className="text-[15px] font-bold text-text-primary">
                     {formatDateDisplay(viewingItem.masaAktif)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Update Terakhir */}
+              <div className="flex items-center gap-3.5 py-3.5">
+                <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center border border-accent/10 shrink-0">
+                  <Clock className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider">Update Terakhir</span>
+                  <span className="text-[14px] font-semibold text-text-primary">
+                    {formatDateTimeDisplay(viewingItem.updatedAt)}
                   </span>
                 </div>
               </div>
