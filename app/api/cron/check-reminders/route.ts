@@ -2,13 +2,6 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import webpush from "web-push";
 
-// Configure Web Push VAPID keys
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || "mailto:mrendi@example.com",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
-  process.env.VAPID_PRIVATE_KEY || ""
-);
-
 export async function GET(request: Request) {
   // Simple check for authorization
   const authHeader = request.headers.get("authorization");
@@ -19,7 +12,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Configure Web Push VAPID keys lazily at runtime
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT || "mailto:mrendi@example.com";
+
+  if (!publicKey || !privateKey) {
+    console.error("[Push] VAPID keys not configured in environment variables!");
+    return NextResponse.json({ error: "Push notification config is missing on server" }, { status: 500 });
+  }
+
   try {
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+
     const now = new Date();
     // Prune set: get notes whose reminders are scheduled in the next hour or already passed,
     // and have not been sent yet.
