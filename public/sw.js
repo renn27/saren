@@ -45,6 +45,11 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
 
+  // Di mode development, abaikan intercept fetch agar tidak merusak HMR
+  if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1' || self.location.hostname === '0.0.0.0') {
+    return;
+  }
+
   // Aset statis Next.js (_next/static): Cache-First
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(cacheFirst(request, STATIC_CACHE));
@@ -124,3 +129,44 @@ async function networkFirstWithCache(request, cacheName) {
     return cached || new Response('', { status: 503 });
   }
 }
+
+// ── Push Notification: web push event listeners ────────────────────────────────
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (err) {
+    data = { title: 'SAREN Info', body: event.data ? event.data.text() : '' };
+  }
+
+  const title = data.title || 'SAREN Info';
+  const options = {
+    body: data.body || '',
+    icon: '/saren_logo.png',
+    badge: '/saren_logo.png',
+    data: { url: data.url || '/' }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      const targetUrl = event.notification.data.url || '/';
+      // Coba cari tab yang sudah terbuka dengan URL yang sama dan fokuskan
+      for (const client of clientList) {
+        const clientUrl = new URL(client.url).pathname;
+        const targetPath = new URL(targetUrl, self.location.origin).pathname;
+        if (clientUrl === targetPath && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Jika tidak ada tab terbuka, buka tab baru
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

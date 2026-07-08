@@ -27,6 +27,7 @@ import {
   Image as ImageIcon,
   Share2,
   Folder,
+  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
@@ -87,6 +88,9 @@ type Note = {
   folder?: { id: string; name: string } | null;
   listItems: NoteListItem[];
   labels: Label[];
+  reminderAt: Date | string | null;
+  reminderMinutesBefore: number;
+  reminderSent: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -197,6 +201,14 @@ function parseTable(content: string | null) {
   };
 }
 
+function formatToDateTimeLocal(dateInput: Date | string | null | undefined): string {
+  if (!dateInput) return "";
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return "";
+  const pad = (num: number) => String(num).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function serializeNote(n: Note) {
   return JSON.stringify({
     title: n.title || "",
@@ -206,6 +218,8 @@ function serializeNote(n: Note) {
     isTable: n.isTable,
     imageUrl: n.imageUrl,
     folderId: n.folderId,
+    reminderAt: n.reminderAt ? new Date(n.reminderAt).toISOString() : null,
+    reminderMinutesBefore: n.reminderMinutesBefore,
     listItems: n.listItems.map((it) => ({ text: it.text, isCompleted: it.isCompleted })),
     labelIds: n.labels.map((l) => l.id),
   });
@@ -274,7 +288,20 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
   const [isSaving, setIsSaving] = React.useState(false);
   const [isUploadingImage, setIsUploadingImage] = React.useState(false);
   const [showDeleteImageConfirm, setShowDeleteImageConfirm] = React.useState(false);
-  const [openMenu, setOpenMenu] = React.useState<"color" | "label" | "type" | "share" | "folder" | null>(null);
+  const [openMenu, setOpenMenu] = React.useState<"color" | "label" | "type" | "share" | "folder" | "reminder" | "more" | null>(null);
+  const [activeSubMenu, setActiveSubMenu] = React.useState<"label" | "folder" | "type" | "share" | null>(null);
+  const [tempReminderAt, setTempReminderAt] = React.useState(
+    initialNote.reminderAt ? formatToDateTimeLocal(initialNote.reminderAt) : ""
+  );
+  const [tempReminderBefore, setTempReminderBefore] = React.useState(
+    initialNote.reminderMinutesBefore || 0
+  );
+
+  React.useEffect(() => {
+    if (openMenu !== "more") {
+      setActiveSubMenu(null);
+    }
+  }, [openMenu]);
 
   const isFirstRender = React.useRef(true);
   const menuRef = React.useRef<HTMLDivElement>(null);
@@ -411,6 +438,8 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
         color: n.color,
         imageUrl: n.imageUrl,
         folderId: n.folderId,
+        reminderAt: n.reminderAt,
+        reminderMinutesBefore: n.reminderMinutesBefore,
       });
 
       if (res.success && res.data) {
@@ -426,7 +455,7 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     const t = setTimeout(() => save(note), 1200);
     return () => clearTimeout(t);
-  }, [note.title, note.content, note.color, note.isList, note.isTable, note.listItems, note.labels, note.imageUrl, note.folderId, save]);
+  }, [note.title, note.content, note.color, note.isList, note.isTable, note.listItems, note.labels, note.imageUrl, note.folderId, note.reminderAt, note.reminderMinutesBefore, save]);
 
   // Save on unmount (e.g. if user navigates away via sidebar)
   const noteRef = React.useRef(note);
@@ -451,6 +480,9 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
           labelIds: noteRef.current.labels.map((l) => l.id),
           color: noteRef.current.color,
           imageUrl: noteRef.current.imageUrl,
+          folderId: noteRef.current.folderId,
+          reminderAt: noteRef.current.reminderAt,
+          reminderMinutesBefore: noteRef.current.reminderMinutesBefore,
         });
       }
     };
@@ -1003,6 +1035,39 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
     }));
   };
 
+  const handleSaveReminder = () => {
+    if (!tempReminderAt) {
+      toast.error("Pilih tanggal dan waktu terlebih dahulu");
+      return;
+    }
+    const dateVal = new Date(tempReminderAt);
+    if (isNaN(dateVal.getTime())) {
+      toast.error("Format tanggal tidak valid");
+      return;
+    }
+    setNote((prev) => ({
+      ...prev,
+      reminderAt: dateVal,
+      reminderMinutesBefore: tempReminderBefore,
+      reminderSent: false,
+    }));
+    setOpenMenu(null);
+    toast.success("Pengingat berhasil disimpan!");
+  };
+
+  const handleDeleteReminder = () => {
+    setNote((prev) => ({
+      ...prev,
+      reminderAt: null,
+      reminderMinutesBefore: 0,
+      reminderSent: false,
+    }));
+    setTempReminderAt("");
+    setTempReminderBefore(0);
+    setOpenMenu(null);
+    toast.success("Pengingat dihapus");
+  };
+
   // ── Type conversion ───────────────────────────────────────────────────────
   const convertTo = (type: "text" | "list" | "table") => {
     setNote((p) => {
@@ -1094,16 +1159,11 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
           <ArrowLeft className="h-5 w-5" />
         </button>
 
-        {/* Centered Status Edit Text & Folder Badge */}
+        {/* Centered Status Edit Text */}
         <div className="flex flex-col items-center absolute left-1/2 -translate-x-1/2 pointer-events-none select-none">
           {statusText && (
             <span className="text-[11px] font-semibold text-text-secondary/70">
               {statusText}
-            </span>
-          )}
-          {note.folder && (
-            <span className="text-[9.5px] font-bold text-accent uppercase tracking-wider mt-0.5 flex items-center gap-1">
-              <Folder className="h-2.5 w-2.5" /> {note.folder.name}
             </span>
           )}
         </div>
@@ -1221,9 +1281,29 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
             </div>
           )}
 
-          {/* Label pills */}
-          {note.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-6">
+          {/* Metadata pills (Folder, Reminder, Labels) */}
+          {(note.folder || note.reminderAt || note.labels.length > 0) && (
+            <div className="flex flex-wrap gap-1.5 mt-6 items-center border-t border-black/5 dark:border-white/5 pt-4">
+              {note.folder && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-accent-soft text-accent border border-accent/15">
+                  <Folder className="h-3 w-3 shrink-0" />
+                  <span>{note.folder.name}</span>
+                  <button onClick={() => handleAssignFolder(null)} className="hover:text-danger cursor-pointer ml-0.5" title="Hapus Folder">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {note.reminderAt && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20">
+                  <Bell className="h-3 w-3 shrink-0" />
+                  <span>
+                    {new Date(note.reminderAt).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <button onClick={handleDeleteReminder} className="hover:text-danger cursor-pointer ml-0.5" title="Hapus Pengingat">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
               {note.labels.map((label) => (
                 <span key={label.id} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-black/8 dark:bg-white/10 text-text-secondary">
                   {label.name}
@@ -1244,7 +1324,8 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
         className="h-12 shrink-0 border-t border-black/5 dark:border-white/5 backdrop-blur-md bg-white/85 dark:bg-[#0F1623]/85 transition-colors duration-300 flex items-center justify-between px-4 z-30"
         style={note.color !== "default" ? { backgroundColor: `${color.bg}cc` } : undefined}
       >
-        <div className="flex items-center gap-1">
+        {/* Left Side: Quick/Primary Actions */}
+        <div className="flex items-center gap-1.5">
           {/* Color Palette Popover Trigger */}
           <div className="relative">
             <ToolbarBtn
@@ -1278,120 +1359,58 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
             )}
           </div>
 
-          {/* Label manager Popover Trigger */}
+          {/* Reminder Selector Popover Trigger */}
           <div className="relative">
             <ToolbarBtn
-              icon={<Tag className="h-[18px] w-[18px]" />}
-              label="Label Catatan"
-              active={openMenu === "label"}
-              onClick={() => setOpenMenu(openMenu === "label" ? null : "label")}
+              icon={<Bell className="h-[18px] w-[18px]" />}
+              label="Pengingat Catatan"
+              active={openMenu === "reminder"}
+              onClick={() => setOpenMenu(openMenu === "reminder" ? null : "reminder")}
             />
-            {openMenu === "label" && (
-              <Popover className="bottom-14 left-0 w-48 p-2.5 flex flex-col gap-1.5 max-h-48 overflow-y-auto">
-                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 px-1">Kelola Label</span>
-                <div className="flex flex-col gap-0.5">
-                  {(initialLabels as Label[]).length === 0 ? (
-                    <p className="text-[12px] text-text-secondary px-2 py-1">Belum ada label.</p>
-                  ) : (
-                    (initialLabels as Label[]).map((label) => (
-                      <label key={label.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-white/8 select-none">
-                        <input
-                          type="checkbox"
-                          checked={note.labels.some((l) => l.id === label.id)}
-                          onChange={() => handleToggleLabel(label.id)}
-                          className="rounded border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
-                        />
-                        <span className="text-[13px] text-text-primary truncate">{label.name}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </Popover>
-            )}
-          </div>
-
-          {/* Folder Selector Popover Trigger */}
-          <div className="relative">
-            <ToolbarBtn
-              icon={<Folder className="h-[18px] w-[18px]" />}
-              label="Pilih Folder"
-              active={openMenu === "folder"}
-              onClick={() => setOpenMenu(openMenu === "folder" ? null : "folder")}
-            />
-            {openMenu === "folder" && (
-              <Popover className="bottom-14 left-0 w-48 p-2.5 flex flex-col gap-1.5 max-h-48 overflow-y-auto">
-                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 px-1">Pilih Folder</span>
-                <div className="flex flex-col gap-0.5">
-                  <label
-                    onClick={() => {
-                      handleAssignFolder(null);
-                      setOpenMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-white/8 select-none"
-                  >
+            {openMenu === "reminder" && (
+              <Popover className="bottom-14 left-0 w-64 p-3 flex flex-col gap-2">
+                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 px-1">Setel Pengingat</span>
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[11px] text-text-secondary">Pilih Tanggal & Waktu:</span>
                     <input
-                      type="radio"
-                      name="note-folder"
-                      checked={!note.folderId}
-                      readOnly
-                      className="rounded-full border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
+                      type="datetime-local"
+                      value={tempReminderAt}
+                      onChange={(e) => setTempReminderAt(e.target.value)}
+                      className="w-full text-xs p-1.5 border border-border-soft rounded-lg bg-bg-surface text-text-primary focus:outline-none focus:border-accent"
                     />
-                    <span className="text-[13px] text-text-primary italic truncate">Tanpa Folder</span>
-                  </label>
-                  {initialFolders.length === 0 ? (
-                    <p className="text-[11px] text-text-secondary px-2 py-1 italic">Belum ada folder.</p>
-                  ) : (
-                    initialFolders.map((f) => (
-                      <label
-                        key={f.id}
-                        onClick={() => {
-                          handleAssignFolder(f.id);
-                          setOpenMenu(null);
-                        }}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-white/8 select-none"
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[11px] text-text-secondary">Ingatkan Sebelum:</span>
+                    <select
+                      value={tempReminderBefore}
+                      onChange={(e) => setTempReminderBefore(Number(e.target.value))}
+                      className="w-full text-xs p-1.5 border border-border-soft rounded-lg bg-bg-surface text-text-primary focus:outline-none focus:border-accent"
+                    >
+                      <option value={0}>Tepat Waktu</option>
+                      <option value={5}>5 Menit Sebelum</option>
+                      <option value={15}>15 Menit Sebelum</option>
+                      <option value={30}>30 Menit Sebelum</option>
+                      <option value={60}>1 Jam Sebelum</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={handleSaveReminder}
+                      className="flex-1 py-1.5 px-2.5 bg-accent text-[11px] font-bold text-white rounded-lg hover:bg-accent/90 active:scale-95 transition-all cursor-pointer"
+                    >
+                      Simpan
+                    </button>
+                    {note.reminderAt && (
+                      <button
+                        onClick={handleDeleteReminder}
+                        className="py-1.5 px-2.5 bg-danger-soft/20 text-danger hover:bg-danger-soft/30 rounded-lg text-[11px] font-bold active:scale-95 transition-all cursor-pointer"
                       >
-                        <input
-                          type="radio"
-                          name="note-folder"
-                          checked={note.folderId === f.id}
-                          readOnly
-                          className="rounded-full border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
-                        />
-                        <span className="text-[13px] text-text-primary truncate">{f.name}</span>
-                      </label>
-                    ))
-                  )}
+                        Hapus
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </Popover>
-            )}
-          </div>
-
-          {/* Type Toggle Popover Trigger */}
-          <div className="relative">
-            <ToolbarBtn
-              icon={
-                note.isList ? <FileText className="h-[18px] w-[18px]" />
-                : note.isTable ? <CheckSquare className="h-[18px] w-[18px]" />
-                : <CheckSquare className="h-[18px] w-[18px]" />
-              }
-              label="Ubah tipe"
-              active={openMenu === "type"}
-              onClick={() => setOpenMenu(openMenu === "type" ? null : "type")}
-            />
-            {openMenu === "type" && (
-              <Popover className="bottom-14 left-0 w-48 p-1.5 flex flex-col gap-0.5">
-                {!note.isList && !note.isTable && (<>
-                  <MenuOption icon={<CheckSquare className="h-4 w-4" />} label="Ubah ke Checklist" onClick={() => convertTo("list")} />
-                  <MenuOption icon={<Table className="h-4 w-4" />} label="Ubah ke Tabel" onClick={() => convertTo("table")} />
-                </>)}
-                {note.isList && (<>
-                  <MenuOption icon={<FileText className="h-4 w-4" />} label="Ubah ke Teks" onClick={() => convertTo("text")} />
-                  <MenuOption icon={<Table className="h-4 w-4" />} label="Ubah ke Tabel" onClick={() => convertTo("table")} />
-                </>)}
-                {note.isTable && (<>
-                  <MenuOption icon={<FileText className="h-4 w-4" />} label="Ubah ke Teks" onClick={() => convertTo("text")} />
-                  <MenuOption icon={<CheckSquare className="h-4 w-4" />} label="Ubah ke Checklist" onClick={() => convertTo("list")} />
-                </>)}
               </Popover>
             )}
           </div>
@@ -1408,78 +1427,243 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
             />
             <ToolbarBtn
               icon={<ImageIcon className="h-[18px] w-[18px]" />}
-              label="Tambah Gambar"
+              label={isUploadingImage ? "Mengunggah..." : "Tambah Gambar"}
               active={isUploadingImage}
               onClick={() => {
                 if (!isUploadingImage) fileInputRef.current?.click();
               }}
             />
           </div>
-
-          {/* Archive / Restore Button */}
-          <ToolbarBtn
-            icon={note.isArchived ? <ArchiveRestore className="h-[18px] w-[18px]" /> : <Archive className="h-[18px] w-[18px]" />}
-            label={note.isArchived ? "Pulihkan dari arsip" : "Arsipkan"}
-            onClick={handleArchive}
-          />
         </div>
 
-        <div className="flex items-center gap-1">
-          {/* Share & Export Popover Trigger */}
-          <div className="relative">
-            <ToolbarBtn
-              icon={<Share2 className="h-[18px] w-[18px]" />}
-              label="Ekspor & Bagikan"
-              active={openMenu === "share"}
-              onClick={() => setOpenMenu(openMenu === "share" ? null : "share")}
-            />
-            {openMenu === "share" && (
-              <Popover className="bottom-14 right-0 w-52 p-1.5 flex flex-col gap-0.5">
-                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 px-2.5 pt-1">Ekspor & Bagikan</span>
-                <MenuOption
-                  icon={<Copy className="h-4 w-4" />}
-                  label="Salin Teks Bersih"
-                  onClick={() => {
-                    handleCopyCleanText();
-                    setOpenMenu(null);
-                  }}
-                />
-                {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
+        {/* Right Side: Secondary Actions Dropdown */}
+        <div className="relative">
+          <ToolbarBtn
+            icon={<MoreHorizontal className="h-[18px] w-[18px]" />}
+            label="Opsi Lainnya"
+            active={openMenu === "more"}
+            onClick={() => {
+              setOpenMenu(openMenu === "more" ? null : "more");
+              setActiveSubMenu(null);
+            }}
+          />
+
+          {openMenu === "more" && (
+            <Popover className="bottom-14 right-0 w-52 p-1.5 flex flex-col gap-0.5 max-h-[75vh] overflow-y-auto z-40">
+              {/* SUBMENU: Labels Manager */}
+              {activeSubMenu === "label" && (
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setActiveSubMenu(null)}
+                    className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold text-text-secondary hover:text-text-primary hover:bg-black/5 dark:hover:bg-white/8 rounded-lg cursor-pointer text-left w-full border-b border-border-soft/40 pb-1.5 mb-1"
+                  >
+                    <ArrowLeft className="h-3 w-3" /> Kembali
+                  </button>
+                  <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 px-2">Kelola Label</span>
+                  <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto">
+                    {initialLabels.length === 0 ? (
+                      <p className="text-[12px] text-text-secondary px-2 py-1">Belum ada label.</p>
+                    ) : (
+                      initialLabels.map((label) => (
+                        <label key={label.id} className="flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-white/8 select-none">
+                          <input
+                            type="checkbox"
+                            checked={note.labels.some((l) => l.id === label.id)}
+                            onChange={() => handleToggleLabel(label.id)}
+                            className="rounded border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
+                          />
+                          <span className="text-[13px] text-text-primary truncate">{label.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SUBMENU: Folder Selector */}
+              {activeSubMenu === "folder" && (
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setActiveSubMenu(null)}
+                    className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold text-text-secondary hover:text-text-primary hover:bg-black/5 dark:hover:bg-white/8 rounded-lg cursor-pointer text-left w-full border-b border-border-soft/40 pb-1.5 mb-1"
+                  >
+                    <ArrowLeft className="h-3 w-3" /> Kembali
+                  </button>
+                  <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 px-2">Pilih Folder</span>
+                  <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto">
+                    <label
+                      onClick={() => {
+                        handleAssignFolder(null);
+                        setOpenMenu(null);
+                      }}
+                      className="flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-white/8 select-none"
+                    >
+                      <input
+                        type="radio"
+                        name="note-folder"
+                        checked={!note.folderId}
+                        readOnly
+                        className="rounded-full border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
+                      />
+                      <span className="text-[13px] text-text-primary italic truncate">Tanpa Folder</span>
+                    </label>
+                    {initialFolders.length === 0 ? (
+                      <p className="text-[11px] text-text-secondary px-2 py-1 italic">Belum ada folder.</p>
+                    ) : (
+                      initialFolders.map((f) => (
+                        <label
+                          key={f.id}
+                          onClick={() => {
+                            handleAssignFolder(f.id);
+                            setOpenMenu(null);
+                          }}
+                          className="flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-white/8 select-none"
+                        >
+                          <input
+                            type="radio"
+                            name="note-folder"
+                            checked={note.folderId === f.id}
+                            readOnly
+                            className="rounded-full border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
+                          />
+                          <span className="text-[13px] text-text-primary truncate">{f.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SUBMENU: Type Conversion */}
+              {activeSubMenu === "type" && (
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setActiveSubMenu(null)}
+                    className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold text-text-secondary hover:text-text-primary hover:bg-black/5 dark:hover:bg-white/8 rounded-lg cursor-pointer text-left w-full border-b border-border-soft/40 pb-1.5 mb-1"
+                  >
+                    <ArrowLeft className="h-3 w-3" /> Kembali
+                  </button>
+                  <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 px-2">Ubah Tipe Catatan</span>
+                  <div className="flex flex-col gap-0.5">
+                    {!note.isList && !note.isTable && (
+                      <>
+                        <MenuOption icon={<CheckSquare className="h-4 w-4" />} label="Ubah ke Checklist" onClick={() => { convertTo("list"); setOpenMenu(null); }} />
+                        <MenuOption icon={<Table className="h-4 w-4" />} label="Ubah ke Tabel" onClick={() => { convertTo("table"); setOpenMenu(null); }} />
+                      </>
+                    )}
+                    {note.isList && (
+                      <>
+                        <MenuOption icon={<FileText className="h-4 w-4" />} label="Ubah ke Teks" onClick={() => { convertTo("text"); setOpenMenu(null); }} />
+                        <MenuOption icon={<Table className="h-4 w-4" />} label="Ubah ke Tabel" onClick={() => { convertTo("table"); setOpenMenu(null); }} />
+                      </>
+                    )}
+                    {note.isTable && (
+                      <>
+                        <MenuOption icon={<FileText className="h-4 w-4" />} label="Ubah ke Teks" onClick={() => { convertTo("text"); setOpenMenu(null); }} />
+                        <MenuOption icon={<CheckSquare className="h-4 w-4" />} label="Ubah ke Checklist" onClick={() => { convertTo("list"); setOpenMenu(null); }} />
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SUBMENU: Export & Share */}
+              {activeSubMenu === "share" && (
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setActiveSubMenu(null)}
+                    className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold text-text-secondary hover:text-text-primary hover:bg-black/5 dark:hover:bg-white/8 rounded-lg cursor-pointer text-left w-full border-b border-border-soft/40 pb-1.5 mb-1"
+                  >
+                    <ArrowLeft className="h-3 w-3" /> Kembali
+                  </button>
+                  <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1 px-2">Ekspor & Bagikan</span>
+                  <div className="flex flex-col gap-0.5">
+                    <MenuOption
+                      icon={<Copy className="h-4 w-4" />}
+                      label="Salin Teks Bersih"
+                      onClick={() => {
+                        handleCopyCleanText();
+                        setOpenMenu(null);
+                      }}
+                    />
+                    {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
+                      <MenuOption
+                        icon={<Share2 className="h-4 w-4" />}
+                        label="Bagikan Teks (Sistem)"
+                        onClick={() => {
+                          handleNativeShare();
+                          setOpenMenu(null);
+                        }}
+                      />
+                    )}
+                    <MenuOption
+                      icon={<ImageIcon className="h-4 w-4" />}
+                      label="Unduh Gambar PNG"
+                      onClick={() => {
+                        handleExportAsPNG();
+                        setOpenMenu(null);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* MAIN MENU */}
+              {!activeSubMenu && (
+                <>
                   <MenuOption
-                    icon={<Share2 className="h-4 w-4" />}
-                    label="Bagikan Teks (Sistem)"
+                    icon={<Tag className="h-4 w-4" />}
+                    label="Ubah Label"
+                    onClick={() => setActiveSubMenu("label")}
+                  />
+                  <MenuOption
+                    icon={<Folder className="h-4 w-4" />}
+                    label="Ubah Folder"
+                    onClick={() => setActiveSubMenu("folder")}
+                  />
+                  <MenuOption
+                    icon={
+                      note.isList ? <FileText className="h-4 w-4" />
+                      : note.isTable ? <CheckSquare className="h-4 w-4" />
+                      : <CheckSquare className="h-4 w-4" />
+                    }
+                    label="Ubah Tipe Catatan"
+                    onClick={() => setActiveSubMenu("type")}
+                  />
+                  <MenuOption
+                    icon={<Copy className="h-4 w-4" />}
+                    label="Buat Salinan"
                     onClick={() => {
-                      handleNativeShare();
+                      handleDuplicate();
                       setOpenMenu(null);
                     }}
                   />
-                )}
-                <MenuOption
-                  icon={<ImageIcon className="h-4 w-4" />}
-                  label="Unduh Gambar PNG"
-                  onClick={() => {
-                    handleExportAsPNG();
-                    setOpenMenu(null);
-                  }}
-                />
-              </Popover>
-            )}
-          </div>
-
-          {/* Copy (Duplicate) Button */}
-          <ToolbarBtn
-            icon={<Copy className="h-[18px] w-[18px]" />}
-            label="Buat salinan"
-            onClick={handleDuplicate}
-          />
-
-          {/* Trash (Delete) Button */}
-          <ToolbarBtn
-            icon={<Trash2 className="h-[18px] w-[18px]" />}
-            label="Hapus ke sampah"
-            onClick={handleTrash}
-            danger
-          />
+                  <MenuOption
+                    icon={note.isArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                    label={note.isArchived ? "Pulihkan dari Arsip" : "Arsipkan Catatan"}
+                    onClick={() => {
+                      handleArchive();
+                      setOpenMenu(null);
+                    }}
+                  />
+                  <MenuOption
+                    icon={<Share2 className="h-4 w-4" />}
+                    label="Ekspor & Bagikan"
+                    onClick={() => setActiveSubMenu("share")}
+                  />
+                  <MenuOption
+                    icon={<Trash2 className="h-4 w-4" />}
+                    label="Hapus ke Sampah"
+                    onClick={() => {
+                      handleTrash();
+                      setOpenMenu(null);
+                    }}
+                    danger
+                  />
+                </>
+              )}
+            </Popover>
+          )}
         </div>
       </div>
 
@@ -1588,17 +1772,22 @@ function MenuOption({
   icon,
   label,
   onClick,
+  danger,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
+  danger?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-[13px] text-text-primary hover:bg-black/5 dark:hover:bg-white/8 cursor-pointer transition-colors"
+      className={twMerge(
+        "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-[13px] text-text-primary hover:bg-black/5 dark:hover:bg-white/8 cursor-pointer transition-colors",
+        danger && "text-danger hover:bg-danger-soft/20 focus:text-danger focus:bg-danger-soft/10 border-t border-border-soft/40 mt-1 pt-1.5 rounded-t-none"
+      )}
     >
-      <span className="text-text-secondary">{icon}</span>
+      <span className={danger ? "text-danger" : "text-text-secondary"}>{icon}</span>
       {label}
     </button>
   );

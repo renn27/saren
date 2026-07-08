@@ -22,6 +22,8 @@ interface CreateNoteInput {
   labelIds?: string[];
   imageUrl?: string | null;
   folderId?: string | null;
+  reminderAt?: Date | string | null;
+  reminderMinutesBefore?: number;
 }
 
 interface UpdateNoteInput {
@@ -37,6 +39,8 @@ interface UpdateNoteInput {
   labelIds?: string[];
   imageUrl?: string | null;
   folderId?: string | null;
+  reminderAt?: Date | string | null;
+  reminderMinutesBefore?: number;
 }
 
 export async function createNote(data: CreateNoteInput) {
@@ -54,6 +58,9 @@ export async function createNote(data: CreateNoteInput) {
           isTable: data.isTable ?? false,
           imageUrl: data.imageUrl || null,
           folderId: data.folderId || null,
+          reminderAt: data.reminderAt ? new Date(data.reminderAt) : null,
+          reminderMinutesBefore: data.reminderMinutesBefore ?? 0,
+          reminderSent: false,
           listItems: data.listItems && data.listItems.length > 0
             ? {
                 createMany: {
@@ -110,6 +117,9 @@ export async function updateNote(id: string, data: UpdateNoteInput) {
           isTable: data.isTable !== undefined ? data.isTable : undefined,
           imageUrl: data.imageUrl !== undefined ? data.imageUrl : undefined,
           folderId: data.folderId !== undefined ? data.folderId : undefined,
+          reminderAt: data.reminderAt !== undefined ? (data.reminderAt ? new Date(data.reminderAt) : null) : undefined,
+          reminderMinutesBefore: data.reminderMinutesBefore !== undefined ? data.reminderMinutesBefore : undefined,
+          reminderSent: data.reminderAt !== undefined ? false : undefined,
           listItems: data.listItems !== undefined && data.listItems.length > 0
             ? {
                 createMany: {

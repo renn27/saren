@@ -88,25 +88,29 @@ model Nomor {
 }
 
 model Note {
-  id          String         @id @default(cuid())
-  title       String?
-  content     String?        @db.Text
-  isPinned    Boolean        @default(false)
-  isArchived  Boolean        @default(false)
-  isTrashed   Boolean        @default(false)
-  color       String         @default("default") // default, red, orange, yellow, green, teal, blue, darkblue, purple, pink, brown, gray
-  isList      Boolean        @default(false)
-  isTable     Boolean        @default(false)
-  imageUrl    String?
-  listItems   NoteListItem[]
-  labels      Label[]        @relation("NoteLabels")
-  folderId    String?
-  folder      Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id                    String         @id @default(cuid())
+  title                 String?
+  content               String?        @db.Text
+  isPinned              Boolean        @default(false)
+  isArchived            Boolean        @default(false)
+  isTrashed             Boolean        @default(false)
+  color                 String         @default("default") // default, red, orange, yellow, green, teal, blue, darkblue, purple, pink, brown, gray
+  isList                Boolean        @default(false)
+  isTable               Boolean        @default(false)
+  imageUrl              String?
+  listItems             NoteListItem[]
+  labels                Label[]        @relation("NoteLabels")
+  folderId              String?
+  folder                Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  reminderAt            DateTime?
+  reminderMinutesBefore Int            @default(0)
+  reminderSent          Boolean        @default(false)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
   @@index([isTrashed, isArchived, isPinned])
   @@index([updatedAt])
+  @@index([reminderSent, reminderAt])
   @@map("note")
 }
 
@@ -137,5 +141,16 @@ model Folder {
   updatedAt DateTime @updatedAt
 
   @@map("folder")
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("push_subscription")
 }
 

@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Check,
   Folder as FolderIcon,
+  Bell,
   FolderOpen,
   Settings,
   MoreVertical,
@@ -170,6 +171,9 @@ type Note = {
   folder?: { id: string; name: string } | null;
   listItems: NoteListItem[];
   labels: Label[];
+  reminderAt: Date | string | null;
+  reminderMinutesBefore: number;
+  reminderSent: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -269,7 +273,7 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isGridView, setIsGridView] = React.useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
-  const [sortBy, setSortBy] = React.useState<"updated" | "created" | "title">("updated");
+  const [sortBy, setSortBy] = React.useState<"updated" | "created" | "title" | "reminder">("updated");
 
   // Modals / Overlays
   const [isLabelManagerOpen, setIsLabelManagerOpen] = React.useState(false);
@@ -1177,6 +1181,15 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
         const tB = b.title || "";
         return tA.localeCompare(tB, "id");
       });
+    } else if (sortBy === "reminder") {
+      filtered = [...filtered].sort((a, b) => {
+        const timeA = a.reminderAt && !a.reminderSent ? new Date(a.reminderAt).getTime() : Infinity;
+        const timeB = b.reminderAt && !b.reminderSent ? new Date(b.reminderAt).getTime() : Infinity;
+        if (timeA === Infinity && timeB === Infinity) {
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        }
+        return timeA - timeB;
+      });
     }
 
     return filtered;
@@ -1483,6 +1496,21 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                   )}
                 >
                   Judul (A-Z)
+                </button>
+                <button
+                  onClick={() => {
+                    setSortBy("reminder");
+                    setActiveDropdownType(null);
+                    setActiveDropdownNoteId(null);
+                  }}
+                  className={twMerge(
+                    "px-3 py-1.5 text-left text-xs rounded-lg transition-colors cursor-pointer w-full font-sans",
+                    sortBy === "reminder"
+                      ? "bg-accent-soft text-accent font-semibold"
+                      : "text-text-secondary hover:bg-accent-soft/30 hover:text-text-primary"
+                  )}
+                >
+                  Jadwal Pengingat
                 </button>
               </div>
             )}
@@ -2637,9 +2665,16 @@ function NoteCard({
           </div>
         )}
 
-        {/* Labels tag pills */}
-        {note.labels.length > 0 && (
+        {/* Labels tag pills & Reminder Badge */}
+        {(note.labels.length > 0 || (note.reminderAt && !note.reminderSent)) && (
           <div className="flex flex-wrap gap-1 mt-3">
+            {note.reminderAt && !note.reminderSent && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20 whitespace-nowrap"
+              >
+                <Bell className="h-2.5 w-2.5 shrink-0" /> {new Date(note.reminderAt).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
             {note.labels.map((label) => (
               <span
                 key={label.id}
