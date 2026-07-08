@@ -97,8 +97,11 @@ model Note {
   color       String         @default("default") // default, red, orange, yellow, green, teal, blue, darkblue, purple, pink, brown, gray
   isList      Boolean        @default(false)
   isTable     Boolean        @default(false)
+  imageUrl    String?
   listItems   NoteListItem[]
   labels      Label[]        @relation("NoteLabels")
+  folderId    String?
+  folder      Folder?        @relation(fields: [folderId], references: [id], onDelete: SetNull)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -124,5 +127,15 @@ model Label {
   notes Note[] @relation("NoteLabels")
 
   @@map("label")
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  notes     Note[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("folder")
 }
 

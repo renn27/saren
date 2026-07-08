@@ -15,7 +15,7 @@ interface PageProps {
 export default async function NoteDetailPage({ params }: PageProps) {
   const resolvedParams = await params;
 
-  const [note, labels] = await Promise.all([
+  const [note, labels, folders] = await Promise.all([
     db.note.findUnique({
       where: { id: resolvedParams.id },
       include: {
@@ -23,9 +23,13 @@ export default async function NoteDetailPage({ params }: PageProps) {
           orderBy: { urutan: "asc" },
         },
         labels: true,
+        folder: true,
       },
     }),
     db.label.findMany({
+      orderBy: { name: "asc" },
+    }),
+    db.folder.findMany({
       orderBy: { name: "asc" },
     })
   ]);
@@ -34,5 +38,5 @@ export default async function NoteDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  return <NoteEditClient initialNote={note} initialLabels={labels} />;
+  return <NoteEditClient initialNote={note} initialLabels={labels} initialFolders={folders} />;
 }

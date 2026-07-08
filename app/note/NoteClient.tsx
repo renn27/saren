@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Pin,
@@ -15,6 +16,7 @@ import {
   X,
   RotateCcw,
   Check,
+  Folder,
   FolderOpen,
   Settings,
   MoreVertical,
@@ -24,7 +26,9 @@ import {
   Table,
   Menu,
   ArrowUpDown,
-  Copy
+  Copy,
+  Sigma,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,7 +46,12 @@ import {
   createLabel,
   updateLabel,
   deleteLabel,
-  duplicateNote
+  duplicateNote,
+  fetchLinkMetadata,
+  createFolder,
+  renameFolder,
+  deleteFolder,
+  assignNoteToFolder,
 } from "@/lib/actions/note";
 
 // Palet warna Google Keep Premium
@@ -156,24 +165,107 @@ type Note = {
   color: string;
   isList: boolean;
   isTable: boolean;
+  imageUrl: string | null;
+  folderId: string | null;
+  folder?: { id: string; name: string } | null;
   listItems: NoteListItem[];
   labels: Label[];
   createdAt: Date;
   updatedAt: Date;
 };
 
+function parseNumericValue(val: string): number {
+  if (!val) return NaN;
+  
+  // Remove spaces, currency notation like Rp, $, and other non-numeric characters except negative sign, period, and comma
+  const cleanVal = val.replace(/[^\d\-\,\.]/g, "");
+  if (!cleanVal) return NaN;
+  
+  // If both dot and comma exist, e.g. "1.250,5" -> "1250.5"
+  if (cleanVal.includes(".") && cleanVal.includes(",")) {
+    const cleaned = cleanVal.replace(/\./g, "").replace(/,/g, ".");
+    return parseFloat(cleaned);
+  }
+  
+  // If multiple dots exist (thousands separator)
+  if ((cleanVal.match(/\./g) || []).length > 1) {
+    return parseFloat(cleanVal.replace(/\./g, ""));
+  }
+  
+  // If multiple commas exist (thousands separator)
+  if ((cleanVal.match(/,/g) || []).length > 1) {
+    return parseFloat(cleanVal.replace(/,/g, ""));
+  }
+  
+  // If single dot exists
+  if (cleanVal.includes(".")) {
+    const parts = cleanVal.split(".");
+    if (parts[1].length === 3 && parts[0] !== "0") {
+      return parseFloat(cleanVal.replace(/\./g, ""));
+    }
+    return parseFloat(cleanVal);
+  }
+  
+  // If single comma exists
+  if (cleanVal.includes(",")) {
+    const parts = cleanVal.split(",");
+    if (parts[1].length === 3 && parts[0] !== "0") {
+      return parseFloat(cleanVal.replace(/,/g, ""));
+    }
+    return parseFloat(cleanVal.replace(/,/g, "."));
+  }
+  
+  return parseFloat(cleanVal);
+}
+
+function calculateColumnTotal(rows: string[][], colIndex: number): string {
+  let total = 0;
+  let hasNumber = false;
+  
+  for (const row of rows) {
+    const val = row[colIndex];
+    if (!val) continue;
+    
+    const num = parseNumericValue(val);
+    if (!isNaN(num)) {
+      total += num;
+      hasNumber = true;
+    }
+  }
+  
+  if (!hasNumber) return "";
+  
+  if (Number.isInteger(total)) {
+    return new Intl.NumberFormat("id-ID").format(total);
+  } else {
+    // Format float with up to 3 decimal places
+    return new Intl.NumberFormat("id-ID", {
+      maximumFractionDigits: 3
+    }).format(total);
+  }
+}
+
+type FolderItem = {
+  id: string;
+  name: string;
+  _count?: { notes: number };
+};
+
 interface NoteClientProps {
   initialNotes: Note[];
   initialLabels: Label[];
+  initialFolders: FolderItem[];
 }
 
-export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
+export function NoteClient({ initialNotes, initialLabels, initialFolders }: NoteClientProps) {
   const router = useRouter();
 
   // State
   const [notes, setNotes] = React.useState<Note[]>(initialNotes);
   const [labels, setLabels] = React.useState<Label[]>(initialLabels);
-  const [activeFilter, setActiveFilter] = React.useState<"notes" | "archive" | "trash" | string>("notes"); // string represents labelId
+  const [folders, setFolders] = React.useState<FolderItem[]>(initialFolders);
+  const [selectedFolderId, setSelectedFolderId] = React.useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = React.useState<"notes" | "archive" | "trash" | string>("notes");
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isGridView, setIsGridView] = React.useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
@@ -184,6 +276,12 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
   const [newLabelInput, setNewLabelInput] = React.useState("");
   const [renamingLabelId, setRenamingLabelId] = React.useState<string | null>(null);
   const [renamingLabelName, setRenamingLabelName] = React.useState("");
+
+  // Folder Modals / Overlays
+  const [isFolderManagerOpen, setIsFolderManagerOpen] = React.useState(false);
+  const [newFolderInput, setNewFolderInput] = React.useState("");
+  const [renamingFolderId, setRenamingFolderId] = React.useState<string | null>(null);
+  const [renamingFolderName, setRenamingFolderName] = React.useState("");
 
   // Create Note Input state
   const [isInputExpanded, setIsInputExpanded] = React.useState(false);
@@ -199,8 +297,8 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
   const [inputLabels, setInputLabels] = React.useState<string[]>([]); // label IDs
   const [inputPinned, setInputPinned] = React.useState(false);
 
-  // Active Dropdowns state (Color / Labels / Sort / More)
-  const [activeDropdownType, setActiveDropdownType] = React.useState<"color" | "label" | "sort" | "more" | null>(null);
+  // Active Dropdowns state (Color / Labels / Sort / More / Folder)
+  const [activeDropdownType, setActiveDropdownType] = React.useState<"color" | "label" | "sort" | "more" | "folder" | null>(null);
   const [activeDropdownNoteId, setActiveDropdownNoteId] = React.useState<string | null>(null); // "new" for create input
 
   const createContainerRef = React.useRef<HTMLDivElement>(null);
@@ -213,6 +311,10 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
       setIsGridView(savedView === "true");
     }
   }, []);
+
+  // isMounted flag — prevents SSR/client hydration mismatch for dynamic sections
+  const [isMounted, setIsMounted] = React.useState(false);
+  React.useEffect(() => { setIsMounted(true); }, []);
 
   // Sync state if initial props change
   React.useEffect(() => {
@@ -263,6 +365,77 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
     inputTableRows
   ]);
 
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      const textarea = e.currentTarget;
+      const val = textarea.value;
+      const selStart = textarea.selectionStart;
+      const selEnd = textarea.selectionEnd;
+
+      if (selStart !== selEnd) return;
+
+      const lastNewline = val.lastIndexOf("\n", selStart - 1);
+      const lineStart = lastNewline === -1 ? 0 : lastNewline + 1;
+      const currentLine = val.substring(lineStart, selStart);
+
+      // Match numbered list: e.g., "1. " or "  12. "
+      const numMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.+)$/);
+      // Match bullet list: e.g., "- " or "* " or "• "
+      const bulletMatch = currentLine.match(/^(\s*)([\-\*\u2022])\s+(.+)$/);
+
+      // Match empty list items: e.g., just "1. " or "- " to end the list
+      const emptyNumMatch = currentLine.match(/^(\s*)(\d+)\.\s*$/);
+      const emptyBulletMatch = currentLine.match(/^(\s*)([\-\*\u2022])\s*$/);
+
+      if (emptyNumMatch || emptyBulletMatch) {
+        e.preventDefault();
+        const before = val.substring(0, lineStart);
+        const after = val.substring(selStart);
+        const newValue = before + after;
+
+        textarea.value = newValue;
+        textarea.selectionStart = textarea.selectionEnd = lineStart;
+        setInputContent(newValue);
+        return;
+      }
+
+      if (numMatch) {
+        e.preventDefault();
+        const indent = numMatch[1];
+        const num = parseInt(numMatch[2], 10);
+        const nextNum = num + 1;
+        const prefix = `\n${indent}${nextNum}. `;
+
+        const before = val.substring(0, selStart);
+        const after = val.substring(selStart);
+        const newValue = before + prefix + after;
+
+        textarea.value = newValue;
+        const newCursorPos = selStart + prefix.length;
+        textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+        setInputContent(newValue);
+        return;
+      }
+
+      if (bulletMatch) {
+        e.preventDefault();
+        const indent = bulletMatch[1];
+        const bulletSymbol = bulletMatch[2];
+        const prefix = `\n${indent}${bulletSymbol} `;
+
+        const before = val.substring(0, selStart);
+        const after = val.substring(selStart);
+        const newValue = before + prefix + after;
+
+        textarea.value = newValue;
+        const newCursorPos = selStart + prefix.length;
+        textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+        setInputContent(newValue);
+        return;
+      }
+    }
+  };
+
   // Create Note handler
   const handleSaveNewNote = async () => {
     const hasText = inputContent.trim() !== "";
@@ -294,9 +467,11 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
     if (isInputList) {
       content = "";
     } else if (isInputTable) {
+      const accumulatedCols = new Array(inputTableHeaders.length).fill(false);
       content = JSON.stringify({
         headers: inputTableHeaders,
         rows: inputTableRows,
+        accumulatedCols,
       });
     }
 
@@ -310,6 +485,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
       isTable: isInputTable,
       listItems,
       labelIds: inputLabels,
+      folderId: selectedFolderId,
     };
 
     resetInputForm();
@@ -582,6 +758,94 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
     }
   };
 
+  // Folder manager handlers
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFolderInput.trim()) return;
+
+    const res = await createFolder(newFolderInput);
+    if (res.success && res.data) {
+      setFolders((prev) => [...prev, res.data as FolderItem]);
+      setNewFolderInput("");
+      toast.success("Folder dibuat");
+    } else {
+      toast.error(res.error || "Gagal membuat folder");
+    }
+  };
+
+  const handleRenameFolder = async (id: string) => {
+    if (!renamingFolderName.trim()) return;
+
+    const res = await renameFolder(id, renamingFolderName);
+    if (res.success && res.data) {
+      const updated = res.data as FolderItem;
+      setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name: updated.name } : f)));
+      setNotes((prev) =>
+        prev.map((n) => {
+          if (n.folderId === id) {
+            return {
+              ...n,
+              folder: { id, name: updated.name },
+            };
+          }
+          return n;
+        })
+      );
+      setRenamingFolderId(null);
+      toast.success("Folder diubah");
+    } else {
+      toast.error(res.error || "Gagal mengubah folder");
+    }
+  };
+
+  const handleDeleteFolder = async (id: string) => {
+    if (!confirm("Hapus folder ini? Catatan di dalamnya akan tetap disimpan (menjadi tanpa folder).")) return;
+
+    const res = await deleteFolder(id);
+    if (res.success) {
+      setFolders((prev) => prev.filter((f) => f.id !== id));
+      setNotes((prev) =>
+        prev.map((n) => {
+          if (n.folderId === id) {
+            return { ...n, folderId: null, folder: null };
+          }
+          return n;
+        })
+      );
+      toast.success("Folder dihapus");
+      if (selectedFolderId === id) {
+        setSelectedFolderId(null);
+      }
+    } else {
+      toast.error(res.error || "Gagal menghapus folder");
+    }
+  };
+
+  const handleAssignNoteFolder = async (noteId: string, folderId: string | null) => {
+    const folder = folders.find((f) => f.id === folderId);
+    
+    setNotes((prev) =>
+      prev.map((n) => {
+        if (n.id === noteId) {
+          return {
+            ...n,
+            folderId,
+            folder: folder ? { id: folder.id, name: folder.name } : null,
+          };
+        }
+        return n;
+      })
+    );
+
+    const res = await assignNoteToFolder(noteId, folderId);
+    if (!res.success) {
+      toast.error(res.error || "Gagal memindahkan catatan");
+      router.refresh();
+    } else {
+      toast.success(folder ? `Dipindahkan ke folder ${folder.name}` : "Dikeluarkan dari folder");
+    }
+  };
+
   // Toggle label on a note
   const handleToggleNoteLabel = async (noteId: string, labelId: string) => {
     if (noteId === "new") {
@@ -796,7 +1060,8 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
           item.isCompleted ? "Selesai" : "Belum Selesai",
         ]);
       }
-      nextContent = JSON.stringify({ headers, rows });
+      const accumulatedCols = new Array(headers.length).fill(false);
+      nextContent = JSON.stringify({ headers, rows, accumulatedCols });
       nextListItems = [];
     }
 
@@ -882,6 +1147,11 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
     } else {
       // it is a labelId
       filtered = notes.filter((n) => !n.isTrashed && !n.isArchived && n.labels.some((l) => l.id === activeFilter));
+    }
+
+    // Filter by folder if selected
+    if (selectedFolderId) {
+      filtered = filtered.filter((n) => n.folderId === selectedFolderId);
     }
 
     // Then filter by search query
@@ -1036,6 +1306,58 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
           ))}
         </div>
 
+        {/* Folders Section — rendered only on client to avoid SSR hydration mismatch */}
+        {isMounted && (
+          <>
+            <div className="border-t border-border-soft/60 my-2 pt-2 shrink-0">
+              <div className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider mb-2 px-3 flex items-center justify-between">
+                <span>Folder</span>
+                <button
+                  onClick={() => {
+                    setIsFolderManagerOpen(true);
+                    setIsSidebarOpen(false);
+                  }}
+                  className="p-1 hover:bg-accent-soft hover:text-accent rounded-lg cursor-pointer"
+                  title="Kelola Folder"
+                >
+                  <Settings className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1 overflow-y-auto max-h-[30vh] md:max-h-none scrollbar-none pr-1">
+              {folders.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => {
+                    setSelectedFolderId(selectedFolderId === f.id ? null : f.id);
+                    setIsSidebarOpen(false);
+                  }}
+                  className={twMerge(
+                    "flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-[13px] font-medium transition-all duration-200 cursor-pointer whitespace-nowrap shrink-0 w-full text-left",
+                    selectedFolderId === f.id
+                      ? "bg-accent-soft text-accent border border-accent/20 font-semibold shadow-sm"
+                      : "text-text-secondary hover:bg-bg-surface/80 hover:text-text-primary border border-transparent"
+                  )}
+                >
+                  <Folder className="h-4.5 w-4.5 shrink-0" />
+                  <span className="truncate flex-1">{f.name}</span>
+                  {f._count && f._count.notes > 0 && (
+                    <span className="text-[10px] font-semibold text-text-secondary bg-black/5 dark:bg-white/10 px-1.5 py-0.5 rounded-full shrink-0">
+                      {f._count.notes}
+                    </span>
+                  )}
+                </button>
+              ))}
+              {folders.length === 0 && (
+                <div className="text-[11px] text-text-secondary text-center py-2 italic">
+                  Belum ada folder.
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
         <button
           onClick={() => {
             setIsLabelManagerOpen(true);
@@ -1173,6 +1495,60 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
             title={isGridView ? "Tampilan List" : "Tampilan Grid"}
           >
             {isGridView ? <List className="h-4.5 w-4.5" /> : <Grid className="h-4.5 w-4.5" />}
+          </button>
+        </div>
+
+        {/* HORIZONTAL FOLDER FILTER BAR */}
+        <div className="flex items-center gap-2 mb-4 shrink-0 overflow-x-auto pb-1.5 scrollbar-thin select-none max-w-full -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="flex items-center gap-1 shrink-0 text-text-secondary pr-1 text-[11px] font-bold uppercase tracking-wider">
+            <Folder className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Folder:</span>
+          </div>
+          
+          <button
+            onClick={() => setSelectedFolderId(null)}
+            className={twMerge(
+              "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border",
+              !selectedFolderId
+                ? "bg-accent border-accent text-white shadow-sm"
+                : "bg-bg-surface border-border-soft text-text-secondary hover:text-text-primary hover:border-text-secondary/25"
+            )}
+          >
+            Semua
+          </button>
+          
+          {folders.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setSelectedFolderId(f.id)}
+              className={twMerge(
+                "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-1.5",
+                selectedFolderId === f.id
+                  ? "bg-accent border-accent text-white shadow-sm"
+                  : "bg-bg-surface border-border-soft text-text-secondary hover:text-text-primary hover:border-text-secondary/25"
+              )}
+            >
+              <span>{f.name}</span>
+              {f._count && f._count.notes > 0 && (
+                <span className={twMerge(
+                  "text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0",
+                  selectedFolderId === f.id
+                    ? "bg-white/20 text-white"
+                    : "bg-black/5 dark:bg-white/10 text-text-secondary"
+                )}>
+                  {f._count.notes}
+                </span>
+              )}
+            </button>
+          ))}
+
+          <button
+            onClick={() => setIsFolderManagerOpen(true)}
+            className="px-2.5 py-1 rounded-full text-xs font-medium bg-bg-surface border border-dashed border-border-soft text-text-secondary hover:text-accent hover:border-accent/40 whitespace-nowrap cursor-pointer transition-all flex items-center gap-1"
+            title="Kelola Folder"
+          >
+            <Plus className="h-3 w-3" />
+            <span>Kelola</span>
           </button>
         </div>
 
@@ -1365,6 +1741,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                         placeholder="Buat catatan..."
                         value={inputContent}
                         onChange={(e) => setInputContent(e.target.value)}
+                        onKeyDown={handleTextareaKeyDown}
                         rows={3}
                         className={twMerge(
                           "w-full bg-transparent border-none text-[13.5px] text-text-primary focus:outline-none focus:ring-0 resize-none leading-relaxed placeholder:text-text-secondary/70",
@@ -1628,15 +2005,11 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                       onToggleListItem={(itemId, isCompleted) => handleToggleListItem(note.id, itemId, isCompleted)}
                       onToggleType={(e) => handleToggleNoteType(note.id, e)}
                       labels={labels}
-                      activeDropdownType={activeDropdownNoteId === note.id ? activeDropdownType : null}
-                      onOpenDropdown={(type) => {
-                        setActiveDropdownType(type);
-                        setActiveDropdownNoteId(note.id);
-                      }}
+                      folders={folders}
                       onUpdateColor={(colorId, e) => handleUpdateColor(note.id, colorId, e)}
                       onToggleLabel={(labelId) => handleToggleNoteLabel(note.id, labelId)}
+                      onAssignNoteFolder={handleAssignNoteFolder}
                       onDuplicate={(e) => handleDuplicateNote(note.id, e)}
-                      dropdownRef={dropdownRef}
                     />
                   ))}
                 </div>
@@ -1672,15 +2045,11 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                       onToggleListItem={(itemId, isCompleted) => handleToggleListItem(note.id, itemId, isCompleted)}
                       onToggleType={(e) => handleToggleNoteType(note.id, e)}
                       labels={labels}
-                      activeDropdownType={activeDropdownNoteId === note.id ? activeDropdownType : null}
-                      onOpenDropdown={(type) => {
-                        setActiveDropdownType(type);
-                        setActiveDropdownNoteId(note.id);
-                      }}
+                      folders={folders}
                       onUpdateColor={(colorId, e) => handleUpdateColor(note.id, colorId, e)}
                       onToggleLabel={(labelId) => handleToggleNoteLabel(note.id, labelId)}
+                      onAssignNoteFolder={handleAssignNoteFolder}
                       onDuplicate={(e) => handleDuplicateNote(note.id, e)}
-                      dropdownRef={dropdownRef}
                     />
                   ))}
                 </div>
@@ -1754,7 +2123,7 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
                       <span className="text-[12.5px] text-text-primary font-medium pl-1 truncate">
                         {label.name}
                       </span>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() => {
                             setRenamingLabelId(label.id);
@@ -1784,9 +2153,120 @@ export function NoteClient({ initialNotes, initialLabels }: NoteClientProps) {
           </div>
         </div>
       )}
+
+      {/* 5. FOLDER MANAGER MODAL */}
+      {isFolderManagerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            onClick={() => setIsFolderManagerOpen(false)}
+            className="fixed inset-0 bg-[#000000]/40 backdrop-blur-sm"
+          />
+
+          <div className="relative w-full max-w-sm bg-bg-surface border border-border-soft rounded-3xl shadow-2xl p-6 flex flex-col max-h-[70vh] z-10 animate-page-enter">
+            <button
+              onClick={() => setIsFolderManagerOpen(false)}
+              className="absolute right-4 top-4 p-1.5 rounded-lg text-text-secondary hover:bg-accent-soft/50 cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <h3 className="text-base font-semibold text-text-primary font-display mb-4">Kelola Folder</h3>
+
+            {/* Create Folder Input */}
+            <form onSubmit={handleCreateFolder} className="flex items-center gap-2 mb-4 shrink-0">
+              <input
+                type="text"
+                placeholder="Buat folder baru..."
+                value={newFolderInput}
+                onChange={(e) => setNewFolderInput(e.target.value)}
+                className="flex-1 h-9 px-3 bg-bg-page border border-border-soft rounded-xl text-[12px] text-text-primary focus:outline-none focus:border-accent/40"
+              />
+              <Button type="submit" variant="secondary" size="sm" className="h-9 px-3 rounded-xl shrink-0 cursor-pointer">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </form>
+
+            {/* Folder List */}
+            <div className="flex-1 overflow-y-auto flex flex-col gap-2 min-h-0 pr-1">
+              {folders.map((f) => (
+                <div key={f.id} className="flex items-center gap-2 justify-between py-1 border-b border-border-soft/30 last:border-0">
+                  {renamingFolderId === f.id ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={renamingFolderName}
+                        onChange={(e) => setRenamingFolderName(e.target.value)}
+                        className="flex-1 h-8 px-2 bg-bg-page border border-accent/40 rounded-lg text-[12px] text-text-primary focus:outline-none"
+                      />
+                      <button
+                        onClick={() => handleRenameFolder(f.id)}
+                        className="p-1.5 text-success hover:bg-accent-soft rounded-md cursor-pointer"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setRenamingFolderId(null)}
+                        className="p-1.5 text-text-secondary hover:bg-accent-soft rounded-md cursor-pointer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-col min-w-0 flex-1 pl-1">
+                        <span className="text-[12.5px] text-text-primary font-medium truncate">
+                          {f.name}
+                        </span>
+                        {f._count && f._count.notes > 0 && (
+                          <span className="text-[10px] text-text-secondary">
+                            {f._count.notes} catatan
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setRenamingFolderId(f.id);
+                            setRenamingFolderName(f.name);
+                          }}
+                          className="p-1.5 text-text-secondary hover:text-accent hover:bg-accent-soft/50 rounded-md cursor-pointer"
+                          title="Ubah Nama Folder"
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteFolder(f.id)}
+                          className="p-1.5 text-text-secondary hover:text-danger hover:bg-accent-soft/50 rounded-md cursor-pointer"
+                          title="Hapus Folder"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {folders.length === 0 && (
+                <div className="text-[11px] text-text-secondary text-center py-6 italic">
+                  Belum ada folder. Buat satu di atas.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+const extractUrls = (text: string | null): string[] => {
+  if (!text) return [];
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const matches = text.match(urlRegex) || [];
+  return matches
+    .map((url) => url.replace(/[\.,\)\(\]\[!\?]+$/, ""))
+    .filter((value, index, self) => self.indexOf(value) === index);
+};
 
 /* NOTE CARD SUB-COMPONENT */
 interface NoteCardProps {
@@ -1802,11 +2282,10 @@ interface NoteCardProps {
   onToggleType: (e: React.MouseEvent) => void;
   onDuplicate: (e: React.MouseEvent) => void;
   labels: Label[];
-  activeDropdownType: "color" | "label" | "sort" | "more" | null;
-  onOpenDropdown: (type: "color" | "label" | "sort" | "more" | null) => void;
+  folders: FolderItem[];
   onUpdateColor: (colorId: string, e: React.MouseEvent) => void;
   onToggleLabel: (labelId: string) => void;
-  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  onAssignNoteFolder: (noteId: string, folderId: string | null) => void;
 }
 
 function NoteCard({
@@ -1822,15 +2301,104 @@ function NoteCard({
   onToggleType,
   onDuplicate,
   labels,
-  activeDropdownType,
-  onOpenDropdown,
+  folders,
   onUpdateColor,
   onToggleLabel,
-  dropdownRef
+  onAssignNoteFolder,
 }: NoteCardProps) {
   // Group checklist items
   const activeItems = note.listItems.filter((i) => !i.isCompleted);
   const completedItems = note.listItems.filter((i) => i.isCompleted);
+
+  // Self-contained dropdown state — no parent state dependency
+  const moreButtonRef = React.useRef<HTMLButtonElement>(null);
+  const portalRef = React.useRef<HTMLDivElement>(null);
+  const [activeDropdown, setActiveDropdown] = React.useState<"more" | "color" | "label" | "folder" | null>(null);
+  const [dropdownPos, setDropdownPos] = React.useState<{ top: number; right: number } | null>(null);
+
+  // Close on outside click or scroll
+  React.useEffect(() => {
+    if (!activeDropdown) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (
+        portalRef.current && portalRef.current.contains(target)
+      ) return;
+      if (moreButtonRef.current && moreButtonRef.current.contains(target)) return;
+      setActiveDropdown(null);
+      setDropdownPos(null);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
+  }, [activeDropdown]);
+
+  const openDropdown = (type: "more" | "color" | "label" | "folder" | null) => {
+    if (type && moreButtonRef.current) {
+      const rect = moreButtonRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.top,
+        right: window.innerWidth - rect.right,
+      });
+    } else {
+      setDropdownPos(null);
+    }
+    setActiveDropdown(type);
+  };
+
+  const [linkPreviews, setLinkPreviews] = React.useState<{
+    url: string;
+    title: string;
+    description: string;
+    image: string | null;
+  }[]>([]);
+
+  const loadedUrlsRef = React.useRef<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    if (note.isList || note.isTable) {
+      setLinkPreviews([]);
+      loadedUrlsRef.current.clear();
+      return;
+    }
+
+    const urls = extractUrls(note.content);
+    if (urls.length === 0) {
+      setLinkPreviews([]);
+      loadedUrlsRef.current.clear();
+      return;
+    }
+
+    setLinkPreviews((prev) => prev.filter((p) => urls.includes(p.url)));
+    
+    const urlSet = new Set(urls);
+    loadedUrlsRef.current.forEach((url) => {
+      if (!urlSet.has(url)) {
+        loadedUrlsRef.current.delete(url);
+      }
+    });
+
+    urls.forEach(async (url) => {
+      if (loadedUrlsRef.current.has(url)) return;
+      loadedUrlsRef.current.add(url);
+
+      try {
+        const metadata = await fetchLinkMetadata(url);
+        if (metadata) {
+          setLinkPreviews((prev) => {
+            if (prev.some((p) => p.url === url)) return prev;
+            return [...prev, metadata];
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch link preview on card:", url, err);
+        loadedUrlsRef.current.delete(url);
+      }
+    });
+  }, [note.content, note.isList, note.isTable]);
 
   return (
     <div
@@ -1843,19 +2411,37 @@ function NoteCard({
         note.color === "default" ? "border-border-soft/60" : colorMap[note.color]?.borderClass
       )}
     >
+      {/* Note Image Preview Header */}
+      {note.imageUrl && (
+        <div className="w-full aspect-[16/9] overflow-hidden rounded-t-2xl border-b border-border-soft/40 relative flex-shrink-0">
+          <img
+            src={note.imageUrl}
+            alt="Pratinjau Catatan"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
+            loading="lazy"
+          />
+        </div>
+      )}
       
       {/* 1. Header (Title & Pin) */}
       <div className="flex items-start justify-between px-4 pt-3.5 pb-1 gap-2 shrink-0">
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          <h4 className={twMerge(
-            "text-[13.5px] font-semibold tracking-tight line-clamp-2 leading-tight truncate",
-            note.color !== "default" && colorMap[note.color]?.textClass
-          )}>
-            {note.title || (note.isList ? "Daftar Tanpa Judul" : "Catatan Tanpa Judul")}
-          </h4>
-          {note.isList && note.listItems.length > 0 && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black/5 dark:bg-white/10 text-text-secondary select-none shrink-0 font-sans">
-              {completedItems.length}/{note.listItems.length}
+        <div className="flex flex-col flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h4 className={twMerge(
+              "text-[13.5px] font-semibold tracking-tight line-clamp-2 leading-tight truncate",
+              note.color !== "default" && colorMap[note.color]?.textClass
+            )}>
+              {note.title || (note.isList ? "Daftar Tanpa Judul" : "Catatan Tanpa Judul")}
+            </h4>
+            {note.isList && note.listItems.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black/5 dark:bg-white/10 text-text-secondary select-none shrink-0 font-sans">
+                {completedItems.length}/{note.listItems.length}
+              </span>
+            )}
+          </div>
+          {note.folder && (
+            <span className="text-[9px] font-bold text-accent uppercase tracking-wider mt-0.5 inline-flex items-center gap-1">
+              <Folder className="h-2.5 w-2.5" /> {note.folder.name}
             </span>
           )}
         </div>
@@ -1881,7 +2467,11 @@ function NoteCard({
         {note.isTable ? (
           (() => {
             try {
-              const data = JSON.parse(note.content || "{}") as { headers: string[]; rows: string[][] };
+              const data = JSON.parse(note.content || "{}") as {
+                headers: string[];
+                rows: string[][];
+                accumulatedCols?: boolean[];
+              };
               if (!data.headers || !data.rows || data.headers.length === 0) {
                 return <em className="opacity-40 text-[11px] font-sans">Kosong</em>;
               }
@@ -1889,6 +2479,24 @@ function NoteCard({
               const displayRows = data.rows.slice(0, 3);
               const hasMoreCols = data.headers.length > 3;
               const hasMoreRows = data.rows.length > 3;
+
+              const accumulatedCols = data.accumulatedCols || [];
+              const hasAccumulated = accumulatedCols.slice(0, 3).some(Boolean);
+              
+              const totals = data.headers.slice(0, 3).map((_, idx) => {
+                if (accumulatedCols[idx]) {
+                  return calculateColumnTotal(data.rows, idx);
+                }
+                return "";
+              });
+              
+              let firstNonAcc = -1;
+              for (let i = 0; i < Math.min(data.headers.length, 3); i++) {
+                if (!accumulatedCols[i]) {
+                  firstNonAcc = i;
+                  break;
+                }
+              }
 
               return (
                 <div className="overflow-x-auto w-full max-w-full pb-1 flex flex-col gap-1 select-none">
@@ -1914,6 +2522,24 @@ function NoteCard({
                           {hasMoreCols && <td className="p-1 text-text-secondary opacity-60">...</td>}
                         </tr>
                       ))}
+                      {hasAccumulated && (
+                        <tr className="bg-black/[0.04] dark:bg-white/[0.04] font-semibold border-t border-border-soft text-accent">
+                          {data.headers.slice(0, 3).map((_, idx) => {
+                            let val = "";
+                            if (accumulatedCols[idx]) {
+                              val = `Σ ${totals[idx]}`;
+                            } else if (idx === firstNonAcc) {
+                              val = "Total";
+                            }
+                            return (
+                              <td key={idx} className="p-1 truncate max-w-[80px] border-r border-border-soft/60 font-bold">
+                                {val}
+                              </td>
+                            );
+                          })}
+                          {hasMoreCols && <td className="p-1 text-text-secondary opacity-60">...</td>}
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                   {(hasMoreRows || hasMoreCols) && (
@@ -1968,6 +2594,41 @@ function NoteCard({
             {note.listItems.length === 0 && (
               <em className="opacity-40 text-[11px] font-sans">Kosong</em>
             )}
+          </div>
+        )}
+
+        {/* Link Previews */}
+        {linkPreviews.length > 0 && (
+          <div className="flex flex-col gap-1.5 mt-3 border-t border-border-soft/40 pt-2 select-none">
+            {linkPreviews.map((preview, idx) => (
+              <a
+                key={idx}
+                href={preview.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-stretch rounded-lg border border-border-soft/60 hover:border-accent/40 bg-bg-surface/50 hover:bg-accent-soft/5 transition-all duration-200 overflow-hidden cursor-pointer h-12"
+              >
+                <div className="flex-1 p-2 flex flex-col justify-center min-w-0">
+                  <span className="text-[11px] font-semibold text-text-primary truncate">
+                    {preview.title}
+                  </span>
+                  <span className="text-[9px] text-text-secondary/60 truncate">
+                    {new URL(preview.url).hostname}
+                  </span>
+                </div>
+                {preview.image && (
+                  <div className="w-12 bg-black/5 dark:bg-white/5 border-l border-border-soft/60 flex-shrink-0 relative">
+                    <img
+                      src={preview.image}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+              </a>
+            ))}
           </div>
         )}
 
@@ -2029,97 +2690,122 @@ function NoteCard({
             {/* More Actions Popover */}
             <div className="relative ml-auto">
               <button
-                onClick={() => onOpenDropdown(activeDropdownType === "more" ? null : "more")}
+                ref={moreButtonRef}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDropdown(activeDropdown === "more" ? null : "more");
+                }}
                 className="p-1 text-text-secondary hover:text-text-primary hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-colors"
                 title="Opsi Lainnya"
               >
                 <MoreVertical className="h-3.5 w-3.5" />
               </button>
-
-              {activeDropdownType === "more" && (
-                <div
-                  ref={dropdownRef}
-                  className="absolute right-0 bottom-8 z-50 bg-bg-surface border border-border-soft p-1.5 rounded-xl shadow-xl flex flex-col gap-1 w-40"
-                >
-                  <button
-                    onClick={() => onOpenDropdown("color")}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full"
-                  >
-                    <Palette className="h-3.5 w-3.5" />
-                    <span>Ubah Warna</span>
-                  </button>
-
-                  <button
-                    onClick={() => onOpenDropdown("label")}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full"
-                  >
-                    <Tag className="h-3.5 w-3.5" />
-                    <span>Ubah Label</span>
-                  </button>
-
-                  <button
-                    onClick={(e) => {
-                      onToggleType(e);
-                      onOpenDropdown(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full"
-                  >
-                    {note.isList ? <FileText className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
-                    <span>{note.isList ? "Ubah ke Teks" : "Ubah ke Checklist"}</span>
-                  </button>
-                </div>
-              )}
-
-              {activeDropdownType === "label" && (
-                <div
-                  ref={dropdownRef}
-                  className="absolute right-0 bottom-8 z-50 bg-bg-surface border border-border-soft p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 w-44 max-h-44 overflow-y-auto"
-                >
-                  <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Label</span>
-                  {labels.length === 0 ? (
-                    <span className="text-[9px] text-text-secondary">Tidak ada label.</span>
-                  ) : (
-                    labels.map((label) => (
-                      <label key={label.id} className="flex items-center gap-1.5 text-[11px] font-medium text-text-primary hover:bg-accent-soft/30 p-1.5 rounded-lg cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={note.labels.some((l) => l.id === label.id)}
-                          onChange={() => onToggleLabel(label.id)}
-                          className="rounded border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
-                        />
-                        <span className="truncate">{label.name}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {activeDropdownType === "color" && (
-                <div
-                  ref={dropdownRef}
-                  className="absolute right-0 bottom-8 z-50 bg-bg-surface border border-border-soft p-1.5 rounded-xl shadow-xl flex gap-1 flex-wrap w-40"
-                >
-                  {Object.entries(colorMap).map(([colorId, colorOpt]) => (
-                    <button
-                      key={colorId}
-                      onClick={(e) => {
-                        onUpdateColor(colorId, e);
-                        onOpenDropdown(null);
-                      }}
-                      style={{
-                        backgroundColor: colorOpt.hex !== "transparent" ? colorOpt.hex : undefined
-                      }}
-                      className={twMerge(
-                        "h-5.5 w-5.5 rounded-full border border-border-soft cursor-pointer transition-transform hover:scale-110",
-                        note.color === colorId ? "ring-2 ring-accent" : "",
-                        colorOpt.hex === "transparent" && "bg-white dark:bg-slate-800"
-                      )}
-                      title={colorOpt.name}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
+
+            {/* Portal Dropdowns — rendered outside card to avoid clipping */}
+            {activeDropdown && dropdownPos && typeof document !== "undefined" && ReactDOM.createPortal(
+              <div
+                ref={portalRef}
+                style={{ top: dropdownPos.top, right: dropdownPos.right }}
+                className="fixed z-[500] -translate-y-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* More Menu */}
+                {activeDropdown === "more" && (
+                  <div className="bg-bg-surface border border-border-soft p-1.5 rounded-xl shadow-xl flex flex-col gap-1 w-44">
+                    <button onClick={() => openDropdown("color")} className="flex items-center gap-2 px-2.5 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full">
+                      <Palette className="h-3.5 w-3.5 shrink-0" />
+                      <span>Ubah Warna</span>
+                    </button>
+                    <button onClick={() => openDropdown("label")} className="flex items-center gap-2 px-2.5 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full">
+                      <Tag className="h-3.5 w-3.5 shrink-0" />
+                      <span>Ubah Label</span>
+                    </button>
+                    <button onClick={() => openDropdown("folder")} className="flex items-center gap-2 px-2.5 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full">
+                      <Folder className="h-3.5 w-3.5 shrink-0" />
+                      <span>Ubah Folder</span>
+                    </button>
+                    <button
+                      onClick={(e) => { onToggleType(e); openDropdown(null); }}
+                      className="flex items-center gap-2 px-2.5 py-2 text-xs text-text-secondary hover:text-text-primary hover:bg-accent-soft/30 rounded-lg cursor-pointer text-left w-full"
+                    >
+                      {note.isList ? <FileText className="h-3.5 w-3.5 shrink-0" /> : <CheckSquare className="h-3.5 w-3.5 shrink-0" />}
+                      <span>{note.isList ? "Ubah ke Teks" : "Ubah ke Checklist"}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Color Picker */}
+                {activeDropdown === "color" && (
+                  <div className="bg-bg-surface border border-border-soft p-1.5 rounded-xl shadow-xl flex gap-1.5 flex-wrap w-40">
+                    {Object.entries(colorMap).map(([colorId, colorOpt]) => (
+                      <button
+                        key={colorId}
+                        onClick={(e) => { onUpdateColor(colorId, e); openDropdown(null); }}
+                        style={{ backgroundColor: colorOpt.hex !== "transparent" ? colorOpt.hex : undefined }}
+                        className={twMerge(
+                          "h-6 w-6 rounded-full border border-border-soft cursor-pointer transition-transform active:scale-95",
+                          note.color === colorId ? "ring-2 ring-accent ring-offset-1" : "",
+                          colorOpt.hex === "transparent" && "bg-white dark:bg-slate-800"
+                        )}
+                        title={colorOpt.name}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Label Picker */}
+                {activeDropdown === "label" && (
+                  <div className="bg-bg-surface border border-border-soft p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 w-44 max-h-52 overflow-y-auto">
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Label</span>
+                    {labels.length === 0 ? (
+                      <span className="text-[9px] text-text-secondary italic">Tidak ada label.</span>
+                    ) : (
+                      labels.map((label) => (
+                        <label key={label.id} className="flex items-center gap-1.5 text-[11px] font-medium text-text-primary hover:bg-accent-soft/30 p-1.5 rounded-lg cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={note.labels.some((l) => l.id === label.id)}
+                            onChange={() => onToggleLabel(label.id)}
+                            className="rounded border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
+                          />
+                          <span className="truncate">{label.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* Folder Picker */}
+                {activeDropdown === "folder" && (
+                  <div className="bg-bg-surface border border-border-soft p-2.5 rounded-xl shadow-xl flex flex-col gap-1.5 w-44 max-h-52 overflow-y-auto">
+                    <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Pilih Folder</span>
+                    <button
+                      onClick={() => { onAssignNoteFolder(note.id, null); openDropdown(null); }}
+                      className="flex items-center gap-1.5 text-[11px] font-semibold text-text-primary hover:bg-accent-soft/30 p-1.5 rounded-lg cursor-pointer text-left w-full"
+                    >
+                      <span className="truncate italic">Tanpa Folder</span>
+                      {!note.folderId && <span className="text-accent text-[10px] font-bold ml-auto">✔</span>}
+                    </button>
+                    {folders.length === 0 ? (
+                      <span className="text-[9px] text-text-secondary italic">Tidak ada folder.</span>
+                    ) : (
+                      folders.map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => { onAssignNoteFolder(note.id, f.id); openDropdown(null); }}
+                          className="flex items-center justify-between text-[11px] font-medium text-text-primary hover:bg-accent-soft/30 p-1.5 rounded-lg cursor-pointer text-left w-full"
+                        >
+                          <span className="truncate">{f.name}</span>
+                          {note.folderId === f.id && <span className="text-accent text-[10px] font-bold">✔</span>}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>,
+              document.body
+            )}
 
           </div>
         ) : (
