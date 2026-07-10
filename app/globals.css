@@ -87,6 +87,7 @@
   --shadow-modal: 0 20px 60px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.3);
 }
 
+
 body {
   background-color: var(--bg-page);
   background-image: radial-gradient(ellipse 80% 40% at 50% -10%, var(--bg-glow) 0%, transparent 70%);
@@ -99,6 +100,12 @@ body {
 }
 
 /* ── Scrollbars ── */
+/* Hide main page (html) scrollbar visually — gutter space is already reserved
+   by scrollbar-gutter: stable above, so no layout shift occurs. */
+html::-webkit-scrollbar { width: 0; background: transparent; }
+html { scrollbar-width: none; } /* Firefox */
+
+/* Subtle scrollbar for inner scrollable containers (tables, modals, etc.) */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
