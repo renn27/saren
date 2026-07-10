@@ -15,7 +15,7 @@ const kolomSchema = z.object({
 });
 
 export async function createKolom(
-  garapanId: string,
+  garapanId: string | null,
   formData: {
     aplikasiId: string;
     namaKolom: string;
@@ -63,7 +63,11 @@ export async function createKolom(
       },
     });
 
-    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error creating kolom:", error);
@@ -71,7 +75,7 @@ export async function createKolom(
   }
 }
 
-export async function deleteKolom(id: string, garapanId: string, aplikasiId: string) {
+export async function deleteKolom(id: string, garapanId: string | null, aplikasiId: string) {
   try {
     await db.kolom.delete({
       where: { id },
@@ -90,7 +94,11 @@ export async function deleteKolom(id: string, garapanId: string, aplikasiId: str
       });
     }
 
-    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error deleting kolom:", error);
@@ -100,7 +108,7 @@ export async function deleteKolom(id: string, garapanId: string, aplikasiId: str
 
 export async function updateKolom(
   id: string,
-  garapanId: string,
+  garapanId: string | null,
   formData: {
     aplikasiId: string;
     namaKolom: string;
@@ -146,7 +154,11 @@ export async function updateKolom(
       },
     });
 
-    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error updating kolom:", error);
@@ -155,7 +167,7 @@ export async function updateKolom(
 }
 
 export async function swapKolomUrutan(
-  garapanId: string,
+  garapanId: string | null,
   aplikasiId: string,
   kolomId1: string,
   kolomId2: string
@@ -204,7 +216,11 @@ export async function swapKolomUrutan(
       data: { urutan: temp },
     });
 
-    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error swapping kolom:", error);
@@ -212,7 +228,7 @@ export async function swapKolomUrutan(
   }
 }
 
-export async function clearKolomData(id: string, garapanId: string, aplikasiId: string) {
+export async function clearKolomData(id: string, garapanId: string | null, aplikasiId: string) {
   try {
     const col = await db.kolom.findUnique({
       where: { id },
@@ -246,7 +262,11 @@ export async function clearKolomData(id: string, garapanId: string, aplikasiId: 
       })
     );
 
-    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error clearing kolom data:", error);

@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { AlertDialog } from "@/components/ui/dialog";
 import { twMerge } from "tailwind-merge";
 import {
   createNote,
@@ -286,6 +287,23 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
   const [newFolderInput, setNewFolderInput] = React.useState("");
   const [renamingFolderId, setRenamingFolderId] = React.useState<string | null>(null);
   const [renamingFolderName, setRenamingFolderName] = React.useState("");
+
+  // Confirmation Modal State
+  const [confirmDialog, setConfirmDialog] = React.useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    confirmText: string;
+    isDanger: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    confirmText: "",
+    isDanger: false,
+    onConfirm: () => {},
+  });
 
   // Create Note Input state
   const [isInputExpanded, setIsInputExpanded] = React.useState(false);
@@ -555,22 +573,40 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
   const handleToggleArchive = async (noteId: string, event?: React.MouseEvent) => {
     if (event) event.stopPropagation();
 
-    // Optimistic Update
-    setNotes((prev) =>
-      prev.map((n) => {
-        if (n.id === noteId) {
-          return { ...n, isArchived: !n.isArchived, isPinned: false };
-        }
-        return n;
-      })
-    );
+    const note = notes.find((n) => n.id === noteId);
+    const isCurrentlyArchived = note?.isArchived || false;
 
-    const res = await toggleArchiveNote(noteId);
-    if (res.success) {
-      toast.success(res.data?.isArchived ? "Catatan diarsipkan" : "Catatan dipulihkan dari arsip");
+    const performArchive = async () => {
+      // Optimistic Update
+      setNotes((prev) =>
+        prev.map((n) => {
+          if (n.id === noteId) {
+            return { ...n, isArchived: !n.isArchived, isPinned: false };
+          }
+          return n;
+        })
+      );
+
+      const res = await toggleArchiveNote(noteId);
+      if (res.success) {
+        toast.success(res.data?.isArchived ? "Catatan diarsipkan" : "Catatan dipulihkan dari arsip");
+      } else {
+        toast.error(res.error || "Gagal mengubah status arsip");
+        router.refresh();
+      }
+    };
+
+    if (!isCurrentlyArchived) {
+      setConfirmDialog({
+        isOpen: true,
+        title: "Arsipkan Catatan",
+        description: "Arsipkan catatan ini? Catatan akan dipindahkan ke daftar arsip.",
+        confirmText: "Arsip",
+        isDanger: false,
+        onConfirm: performArchive,
+      });
     } else {
-      toast.error(res.error || "Gagal mengubah status arsip");
-      router.refresh();
+      await performArchive();
     }
   };
 
@@ -578,23 +614,32 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
   const handleTrashNote = async (noteId: string, event?: React.MouseEvent) => {
     if (event) event.stopPropagation();
 
-    // Optimistic Update
-    setNotes((prev) =>
-      prev.map((n) => {
-        if (n.id === noteId) {
-          return { ...n, isTrashed: true, isPinned: false };
-        }
-        return n;
-      })
-    );
+    setConfirmDialog({
+      isOpen: true,
+      title: "Buang ke Sampah",
+      description: "Apakah Anda yakin ingin membuang catatan ini ke sampah?",
+      confirmText: "Buang",
+      isDanger: true,
+      onConfirm: async () => {
+        // Optimistic Update
+        setNotes((prev) =>
+          prev.map((n) => {
+            if (n.id === noteId) {
+              return { ...n, isTrashed: true, isPinned: false };
+            }
+            return n;
+          })
+        );
 
-    const res = await trashNote(noteId);
-    if (res.success) {
-      toast.success("Catatan dibuang ke sampah");
-    } else {
-      toast.error(res.error || "Gagal membuang catatan");
-      router.refresh();
-    }
+        const res = await trashNote(noteId);
+        if (res.success) {
+          toast.success("Catatan dibuang ke sampah");
+        } else {
+          toast.error(res.error || "Gagal membuang catatan");
+          router.refresh();
+        }
+      },
+    });
   };
 
   // Restore Note
@@ -624,20 +669,25 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
   const handleDeletePermanently = async (noteId: string, event?: React.MouseEvent) => {
     if (event) event.stopPropagation();
 
-    if (!confirm("Hapus catatan ini secara permanen? Tindakan ini tidak dapat dibatalkan.")) {
-      return;
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Hapus Permanen",
+      description: "Hapus catatan ini secara permanen? Tindakan ini tidak dapat dibatalkan.",
+      confirmText: "Hapus",
+      isDanger: true,
+      onConfirm: async () => {
+        // Optimistic Update
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
 
-    // Optimistic Update
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
-
-    const res = await deleteNotePermanently(noteId);
-    if (res.success) {
-      toast.success("Catatan dihapus permanen");
-    } else {
-      toast.error(res.error || "Gagal menghapus catatan");
-      router.refresh();
-    }
+        const res = await deleteNotePermanently(noteId);
+        if (res.success) {
+          toast.success("Catatan dihapus permanen");
+        } else {
+          toast.error(res.error || "Gagal menghapus catatan");
+          router.refresh();
+        }
+      },
+    });
   };
 
   // Duplicate Note
@@ -659,19 +709,24 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
 
   // Empty Trash
   const handleEmptyTrash = async () => {
-    if (!confirm("Kosongkan semua catatan di tempat sampah? Tindakan ini permanen.")) {
-      return;
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Kosongkan Sampah",
+      description: "Kosongkan semua catatan di tempat sampah? Tindakan ini permanen dan tidak dapat dibatalkan.",
+      confirmText: "Kosongkan",
+      isDanger: true,
+      onConfirm: async () => {
+        setNotes((prev) => prev.filter((n) => !n.isTrashed));
 
-    setNotes((prev) => prev.filter((n) => !n.isTrashed));
-
-    const res = await emptyTrash();
-    if (res.success) {
-      toast.success("Tempat sampah dikosongkan");
-    } else {
-      toast.error(res.error || "Gagal mengosongkan tempat sampah");
-      router.refresh();
-    }
+        const res = await emptyTrash();
+        if (res.success) {
+          toast.success("Tempat sampah dikosongkan");
+        } else {
+          toast.error(res.error || "Gagal mengosongkan tempat sampah");
+          router.refresh();
+        }
+      },
+    });
   };
 
   // Update Color
@@ -1527,7 +1582,7 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
         </div>
 
         {/* HORIZONTAL FOLDER FILTER BAR */}
-        <div className="flex items-center gap-2 mb-4 shrink-0 overflow-x-auto pb-1.5 scrollbar-thin select-none w-full">
+        <div className="flex items-center gap-2 mb-4 shrink-0 overflow-x-auto pb-0.5 no-scrollbar select-none w-full">
           <div className="flex items-center gap-1 shrink-0 text-text-secondary pr-1 text-[11px] font-bold uppercase tracking-wider">
             <FolderIcon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Folder:</span>
@@ -2285,6 +2340,17 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
         </div>,
         document.body
       )}
+
+      {/* 5. CONFIRMATION ALERTLOG */}
+      <AlertDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog((p) => ({ ...p, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        isDanger={confirmDialog.isDanger}
+      />
     </div>
   );
 }
@@ -2466,29 +2532,14 @@ function NoteCard({
             )}>
               {note.title || (note.isList ? "Daftar Tanpa Judul" : "Catatan Tanpa Judul")}
             </h4>
-            {note.isList && note.listItems.length > 0 && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black/5 dark:bg-white/10 text-text-secondary select-none shrink-0 font-sans">
-                {completedItems.length}/{note.listItems.length}
-              </span>
-            )}
           </div>
-          {note.folder && (
-            <span className="text-[9px] font-bold text-accent uppercase tracking-wider mt-0.5 inline-flex items-center gap-1">
-              <FolderIcon className="h-2.5 w-2.5" /> {note.folder.name}
-            </span>
-          )}
         </div>
 
-        {!note.isTrashed && (
+        {!note.isTrashed && note.isPinned && (
           <button
             onClick={onPin}
-            className={twMerge(
-              "p-1.5 rounded-lg transition-all cursor-pointer active:scale-95 shrink-0",
-              note.isPinned
-                ? "text-accent bg-accent-soft"
-                : "text-text-secondary hover:bg-accent-soft/30"
-            )}
-            title={note.isPinned ? "Lepas Sematan" : "Sematkan Catatan"}
+            className="p-1.5 rounded-lg transition-all cursor-pointer active:scale-95 shrink-0 text-accent bg-accent-soft"
+            title="Lepas Sematan"
           >
             <Pin className="h-3.5 w-3.5" />
           </button>
@@ -2700,6 +2751,17 @@ function NoteCard({
           /* REGULAR ACTIONS */
           <div className="flex items-center gap-1.5 w-full">
             
+            {/* Pin Button (Only when not pinned) */}
+            {!note.isPinned && (
+              <button
+                onClick={onPin}
+                className="p-1 text-text-secondary hover:text-accent hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-colors"
+                title="Sematkan Catatan"
+              >
+                <Pin className="h-3.5 w-3.5" />
+              </button>
+            )}
+
             {/* Archive Button */}
             <button
               onClick={onArchive}

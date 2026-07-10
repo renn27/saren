@@ -108,6 +108,17 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
 
+/* Hide scrollbars but keep scrolling functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+}
+
 /* ── Stagger animation for grid cards ── */
 @keyframes card-enter {
   from {

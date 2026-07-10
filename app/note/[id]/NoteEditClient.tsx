@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
+import { AlertDialog } from "@/components/ui/dialog";
 import {
   updateNote,
   trashNote,
@@ -288,6 +289,23 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
   const [isSaving, setIsSaving] = React.useState(false);
   const [isUploadingImage, setIsUploadingImage] = React.useState(false);
   const [showDeleteImageConfirm, setShowDeleteImageConfirm] = React.useState(false);
+
+  // Confirmation Modal State
+  const [confirmDialog, setConfirmDialog] = React.useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    confirmText: string;
+    isDanger: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    confirmText: "",
+    isDanger: false,
+    onConfirm: () => {},
+  });
   const [openMenu, setOpenMenu] = React.useState<"color" | "label" | "type" | "share" | "folder" | "reminder" | "more" | null>(null);
   const [activeSubMenu, setActiveSubMenu] = React.useState<"label" | "folder" | "type" | "share" | null>(null);
   const [tempReminderAt, setTempReminderAt] = React.useState(
@@ -986,17 +1004,40 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
 
   const handleArchive = async () => {
     const next = !note.isArchived;
-    setNote((p) => ({ ...p, isArchived: next, isPinned: false }));
-    await toggleArchiveNote(note.id);
-    toast.success(next ? "Diarsipkan" : "Dipulihkan dari arsip");
-    router.push("/note");
+    const performArchive = async () => {
+      setNote((p) => ({ ...p, isArchived: next, isPinned: false }));
+      await toggleArchiveNote(note.id);
+      toast.success(next ? "Diarsipkan" : "Dipulihkan dari arsip");
+      router.push("/note");
+    };
+
+    if (next) {
+      setConfirmDialog({
+        isOpen: true,
+        title: "Arsipkan Catatan",
+        description: "Arsipkan catatan ini? Catatan akan dipindahkan ke daftar arsip.",
+        confirmText: "Arsip",
+        isDanger: false,
+        onConfirm: performArchive,
+      });
+    } else {
+      await performArchive();
+    }
   };
 
   const handleTrash = async () => {
-    if (!confirm("Buang catatan ini ke sampah?")) return;
-    await trashNote(note.id);
-    toast.success("Dihapus ke sampah");
-    router.push("/note");
+    setConfirmDialog({
+      isOpen: true,
+      title: "Buang ke Sampah",
+      description: "Apakah Anda yakin ingin membuang catatan ini ke sampah?",
+      confirmText: "Buang",
+      isDanger: true,
+      onConfirm: async () => {
+        await trashNote(note.id);
+        toast.success("Dihapus ke sampah");
+        router.push("/note");
+      },
+    });
   };
 
   const handleDuplicate = async () => {
@@ -1712,6 +1753,17 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
         </div>,
         document.body
       )}
+
+      {/* Confirmation Modal */}
+      <AlertDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog((p) => ({ ...p, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        isDanger={confirmDialog.isDanger}
+      />
     </div>
   );
 }

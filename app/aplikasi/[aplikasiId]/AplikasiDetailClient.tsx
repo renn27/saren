@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { AlertDialog } from "@/components/ui/dialog";
@@ -11,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown";
 import {
   TableContainer,
@@ -29,12 +29,6 @@ import {
   Edit,
   X,
   Check,
-  HelpCircle,
-  Hash,
-  Coins,
-  FileText,
-  ToggleLeft,
-  Eye,
   ArrowUpDown,
   ChevronRight,
   ChevronUp,
@@ -45,6 +39,10 @@ import {
   Phone,
   Copy,
   MoreVertical,
+  Calendar,
+  Search,
+  Table as TableIcon,
+  LayoutGrid,
   CheckSquare,
   Square,
 } from "lucide-react";
@@ -54,12 +52,6 @@ import { createKolom, deleteKolom, swapKolomUrutan, updateKolom, clearKolomData 
 import { createAkun, updateAkun, deleteAkun, getAllAccountsForAutofill, swapAkunUrutan, bulkUpdateCentang } from "@/lib/actions/akun";
 import { updateAplikasi } from "@/lib/actions/aplikasi";
 import { TipeKolom } from "@prisma/client";
-
-interface Garapan {
-  id: string;
-  bulan: number;
-  tahun: number;
-}
 
 interface KolomItem {
   id: string;
@@ -88,15 +80,18 @@ interface AplikasiItem {
   akun: AkunItem[];
 }
 
-interface AplikasiDetailClientProps {
-  garapan: Garapan;
-  aplikasi: AplikasiItem;
+interface Nomor {
+  id: string;
+  provider: string;
+  nomorKartu: string;
+  pulsa: number;
+  masaAktif: Date;
 }
 
-const MONTH_NAMES = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-];
+interface AplikasiDetailClientProps {
+  aplikasi: AplikasiItem;
+  nomorList: Nomor[];
+}
 
 const formatNumberInput = (value: string | number) => {
   if (value === undefined || value === null || value === "") return "";
@@ -114,7 +109,7 @@ const parseNumberInput = (value: string) => {
   return isNegative ? `-${digits}` : digits;
 };
 
-export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClientProps) {
+export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClientProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -128,6 +123,10 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   };
 
   const [isReorderMode, setIsReorderMode] = React.useState(false);
+
+  // Search & View Mode states
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [viewMode, setViewMode] = React.useState<"table" | "card">("table");
 
   // Modals state
   const [isAddColumnOpen, setIsAddColumnOpen] = React.useState(false);
@@ -172,6 +171,35 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   const [appError, setAppError] = React.useState<string | null>(null);
   const [isAppSubmitting, setIsAppSubmitting] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Check phone number mapping in the database list
+  const getConnectedNomor = React.useCallback((nomorHp: string | null) => {
+    if (!nomorHp) return null;
+    const cleanHp = nomorHp.trim().replace(/\D/g, "");
+    return nomorList.find((n) => n.nomorKartu.trim().replace(/\D/g, "") === cleanHp) || null;
+  }, [nomorList]);
+
+  // Color logic for linked numbers
+  const getHighlightDot = React.useCallback((connected: Nomor | null) => {
+    if (!connected) return "";
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const masa = new Date(connected.masaAktif);
+    masa.setHours(0, 0, 0, 0);
+    const oneYearFromNow = new Date(now);
+    oneYearFromNow.setFullYear(now.getFullYear() + 1);
+    const diffTime = now.getTime() - masa.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (masa > oneYearFromNow) {
+      return "bg-emerald-500"; // Safe (Green)
+    } else if (masa < now && diffDays > 30) {
+      return "bg-rose-500"; // Expired >30 days (Red)
+    } else if (masa < now && diffDays <= 30) {
+      return "bg-amber-500"; // Expired <=30 days (Yellow)
+    }
+    return "bg-sky-500"; // Default
+  }, []);
 
   React.useEffect(() => {
     if (isEditAppOpen) {
@@ -266,8 +294,21 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     }
   }, [editingAccount, aplikasi.kolom]);
 
-  // Since search query is removed, filteredAkun is simply the list of accounts
-  const filteredAkun = aplikasi.akun;
+  const filteredAkun = React.useMemo(() => {
+    if (!searchQuery.trim()) return aplikasi.akun;
+    const q = searchQuery.toLowerCase().trim();
+    return aplikasi.akun.filter((acc) => {
+      const matchName = acc.nama.toLowerCase().includes(q);
+      const matchDevice = (acc.device || "").toLowerCase().includes(q);
+      const matchHp = (acc.nomorHp || "").toLowerCase().includes(q);
+      const matchCustom = aplikasi.kolom.some((col) => {
+        const val = acc.customValues[col.id];
+        if (val === undefined || val === null) return false;
+        return String(val).toLowerCase().includes(q);
+      });
+      return matchName || matchDevice || matchHp || matchCustom;
+    });
+  }, [aplikasi.akun, aplikasi.kolom, searchQuery]);
 
   const checkAkunMeetsTarget = React.useCallback((acc: AkunItem) => {
     const targetCols = aplikasi.kolom.filter((c) => c.isTarget && c.nilaiTarget !== null && c.nilaiTarget !== "");
@@ -309,7 +350,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     };
 
     if (editingColumn) {
-      const res = await updateKolom(editingColumn.id, garapan.id, data);
+      const res = await updateKolom(editingColumn.id, null, data);
       setIsColumnSubmitting(false);
       if (res.success) {
         toast.success("Kolom diperbarui");
@@ -319,7 +360,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         setColumnError(res.error || "Gagal memperbarui kolom.");
       }
     } else {
-      const res = await createKolom(garapan.id, data);
+      const res = await createKolom(null, data);
       setIsColumnSubmitting(false);
       if (res.success) {
         toast.success("Kolom ditambahkan");
@@ -333,7 +374,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
 
   const handleDeleteColumn = async () => {
     if (!deletingColumn) return;
-    const res = await deleteKolom(deletingColumn.id, garapan.id, aplikasi.id);
+    const res = await deleteKolom(deletingColumn.id, null, aplikasi.id);
     if (res.success) {
       toast.success("Kolom dihapus");
       setDeletingColumn(null);
@@ -345,7 +386,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
 
   const handleClearColumn = async () => {
     if (!clearingColumn) return;
-    const res = await clearKolomData(clearingColumn.id, garapan.id, aplikasi.id);
+    const res = await clearKolomData(clearingColumn.id, null, aplikasi.id);
     if (res.success) {
       toast.success(`Data kolom "${clearingColumn.namaKolom}" berhasil dikosongkan`);
       setClearingColumn(null);
@@ -392,7 +433,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     };
 
     if (editingAccount) {
-      const res = await updateAkun(editingAccount.id, garapan.id, data);
+      const res = await updateAkun(editingAccount.id, null, data);
       setIsAccountSubmitting(false);
       if (res.success) {
         toast.success("Akun diperbarui");
@@ -402,7 +443,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         setAccountError(res.error || "Gagal memperbarui akun.");
       }
     } else {
-      const res = await createAkun(garapan.id, data);
+      const res = await createAkun(null, data);
       setIsAccountSubmitting(false);
       if (res.success) {
         toast.success("Akun ditambahkan");
@@ -416,7 +457,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
 
   const handleDeleteAccount = async () => {
     if (!deletingAccount) return;
-    const res = await deleteAkun(deletingAccount.id, garapan.id, aplikasi.id);
+    const res = await deleteAkun(deletingAccount.id, null, aplikasi.id);
     if (res.success) {
       toast.success("Akun dihapus");
       setDeletingAccount(null);
@@ -431,7 +472,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     const acc2 = filteredAkun[idx2];
     if (!acc1 || !acc2) return;
 
-    const res = await swapAkunUrutan(garapan.id, aplikasi.id, acc1.id, acc2.id);
+    const res = await swapAkunUrutan(null, aplikasi.id, acc1.id, acc2.id);
     if (res.success) {
       toast.success("Urutan akun diperbarui", { duration: 1000 });
       router.refresh();
@@ -445,7 +486,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     const col2 = aplikasi.kolom[idx2];
     if (!col1 || !col2) return;
 
-    const res = await swapKolomUrutan(garapan.id, aplikasi.id, col1.id, col2.id);
+    const res = await swapKolomUrutan(null, aplikasi.id, col1.id, col2.id);
     if (res.success) {
       toast.success("Urutan kolom diperbarui", { duration: 1000 });
       router.refresh();
@@ -456,7 +497,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
 
   const handleBulkCentang = async (columnId: string, newValue: boolean) => {
     const toastId = toast.loading("Memperbarui data akun...");
-    const res = await bulkUpdateCentang(garapan.id, aplikasi.id, columnId, newValue);
+    const res = await bulkUpdateCentang(null, aplikasi.id, columnId, newValue);
     if (res.success) {
       toast.success("Semua data berhasil diperbarui", { id: toastId });
       router.refresh();
@@ -467,7 +508,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
 
   const handleInlineSave = async (
     accountId: string,
-    columnId: "nama" | string,
+    columnId: "nama" | "device" | "nomorHp" | string,
     newValue: any
   ) => {
     const acc = aplikasi.akun.find((a) => a.id === accountId);
@@ -480,6 +521,22 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         nama: String(newValue).trim() || acc.nama,
         device: acc.device,
         nomorHp: acc.nomorHp,
+        customValues: acc.customValues,
+      };
+    } else if (columnId === "device") {
+      data = {
+        aplikasiId: aplikasi.id,
+        nama: acc.nama,
+        device: newValue !== "" && newValue !== null ? String(newValue).trim() : null,
+        nomorHp: acc.nomorHp,
+        customValues: acc.customValues,
+      };
+    } else if (columnId === "nomorHp") {
+      data = {
+        aplikasiId: aplikasi.id,
+        nama: acc.nama,
+        device: acc.device,
+        nomorHp: newValue !== "" && newValue !== null ? String(newValue).trim() : null,
         customValues: acc.customValues,
       };
     } else {
@@ -496,7 +553,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       };
     }
 
-    const res = await updateAkun(accountId, garapan.id, data);
+    const res = await updateAkun(accountId, null, data);
     if (res.success) {
       toast.success("Data diperbarui", { duration: 1000 });
       router.refresh();
@@ -564,7 +621,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       formData.append("clearLogo", "true");
     }
 
-    const res = await updateAplikasi(aplikasi.id, garapan.id, formData);
+    const res = await updateAplikasi(aplikasi.id, null, formData);
     setIsAppSubmitting(false);
     if (res.success) {
       toast.success("Aplikasi diperbarui");
@@ -606,6 +663,20 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         ) : (
           <span className="text-text-secondary select-none flex justify-center w-full">–</span>
         );
+      case "TANGGAL":
+        try {
+          return (
+            <span>
+              {new Date(val).toLocaleDateString("id-ID", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </span>
+          );
+        } catch {
+          return <span>{String(val)}</span>;
+        }
       default:
         return <span>{String(val)}</span>;
     }
@@ -640,6 +711,8 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
           row.push(val ? "Ya" : "Tidak");
         } else if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
           row.push(Number(val));
+        } else if (col.tipeKolom === "TANGGAL") {
+          row.push(val); // Raw YYYY-MM-DD
         } else {
           row.push(String(val));
         }
@@ -655,8 +728,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
-    const monthSlug = MONTH_NAMES[garapan.bulan - 1].toLowerCase();
-    const fileName = `${appSlug}-${monthSlug}-${garapan.tahun}`;
+    const fileName = `${appSlug}-standalone`;
 
     if (format === "xlsx") {
       const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -691,8 +763,6 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     }
   };
 
-  const formattedMonthYear = `${MONTH_NAMES[garapan.bulan - 1]} ${garapan.tahun}`;
-
   return (
     <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
       {/* Breadcrumbs */}
@@ -700,11 +770,11 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         <Button
           variant="outline"
           size="sm"
-          onClick={() => handleNavigate(`/garapan/${garapan.id}`)}
+          onClick={() => handleNavigate(`/aplikasi`)}
           className="h-9 px-3.5 gap-1.5 text-text-secondary w-fit"
         >
           <ChevronLeft className="h-4 w-4 shrink-0" />
-          <span>Kembali ke {formattedMonthYear}</span>
+          <span>Kembali ke Daftar Aplikasi</span>
         </Button>
       </div>
 
@@ -750,7 +820,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
               </p>
             )}
 
-            {/* Targets Summary Box (Neutral styling, no high contrast emerald green text) */}
+            {/* Targets Summary Box */}
             {aplikasi.kolom.some((c) => c.isTarget) && (
               <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary bg-bg-page/40 border border-border-soft/60 px-3 py-1.5 rounded-xl w-fit font-sans">
                 <span className="font-semibold text-text-secondary select-none">Target:</span>
@@ -769,6 +839,14 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                         formattedTarget = new Intl.NumberFormat("id-ID").format(Number(col.nilaiTarget));
                       } else if (col.tipeKolom === "CENTANG") {
                         formattedTarget = col.nilaiTarget === "true" ? "Aktif" : "Mati";
+                      } else if (col.tipeKolom === "TANGGAL" && col.nilaiTarget) {
+                        try {
+                          formattedTarget = new Date(col.nilaiTarget).toLocaleDateString("id-ID", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          });
+                        } catch {}
                       }
                       return (
                         <React.Fragment key={col.id}>
@@ -787,83 +865,137 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         </div>
       </div>
 
-      {/* Toolbar / Actions Card */}
-      <div className="bg-bg-surface border border-border-soft p-3 sm:p-4 rounded-3xl [box-shadow:var(--shadow-card)] mb-4">
-        <div className="flex items-center gap-2 w-full">
-          {/* Primary CTA: Tambah Akun (Leftmost) */}
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => setIsAddAccountOpen(true)}
-            className="h-10 px-3 sm:px-4 flex-1 flex items-center justify-center gap-1.5"
-          >
-            <Plus className="h-4 w-4 shrink-0" />
-            <span>
-              <span className="sm:hidden">Akun</span>
-              <span className="hidden sm:inline">Tambah Akun</span>
-            </span>
-          </Button>
+      {/* Unified Controls Panel */}
+      <div className="bg-bg-surface border border-border-soft p-4 rounded-3xl [box-shadow:var(--shadow-card)] mb-4 flex flex-col gap-3.5">
+        {/* Row 1: Search & View Toggle */}
+        {aplikasi.akun.length > 0 && (
+          <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-border-soft/60 w-full">
+            {/* Search Input */}
+            <div className="relative flex-grow">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari data..."
+                className="w-full h-10 pl-10 pr-10 text-sm bg-bg-page border border-border-soft rounded-xl text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-all"
+              />
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-secondary">
+                <Search className="h-4 w-4" />
+              </span>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary cursor-pointer p-0.5"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsAddColumnOpen(true)}
-            className="h-10 px-3 sm:px-4 flex-1 flex items-center justify-center gap-1.5"
-          >
-            <Plus className="h-4 w-4 shrink-0" />
-            <span>
-              <span className="sm:hidden">Kolom</span>
-              <span className="hidden sm:inline">Tambah Kolom</span>
-            </span>
-          </Button>
-
-          {aplikasi.akun.length > 0 && (
-            <Button
-              variant={isReorderMode ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setIsReorderMode(!isReorderMode)}
-              className={`h-10 w-10 p-0 shrink-0 flex items-center justify-center transition-all duration-200 ${
-                isReorderMode
-                  ? "bg-accent/15 text-accent border-accent/30 hover:bg-accent/25"
-                  : ""
-              }`}
-              title="Atur Urutan Kolom & Baris"
-            >
-              <ArrowUpDown className="h-4 w-4 shrink-0" />
-            </Button>
-          )}
-
-          {aplikasi.akun.length > 0 && (
-            <div className="shrink-0">
-              <DropdownMenu
-                className="w-48"
-                align="right"
-                trigger={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-10 w-10 p-0 flex items-center justify-center shrink-0"
-                    title="Ekspor Data"
-                  >
-                    <Download className="h-4 w-4 shrink-0" />
-                  </Button>
-                }
+            {/* View Toggle */}
+            <div className="flex items-center border border-border-soft rounded-xl bg-bg-page p-1 shrink-0 h-10 select-none">
+              <button
+                onClick={() => setViewMode("table")}
+                className={`flex items-center gap-1.5 px-3.5 sm:px-4.5 h-full rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === "table"
+                    ? "bg-accent-soft text-accent border border-accent/15"
+                    : "text-text-secondary hover:text-text-primary border border-transparent"
+                }`}
               >
-                <DropdownMenuItem onClick={() => handleExport("xlsx")}>
-                  <span>Export sebagai Excel (.xlsx)</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleExport("csv")}>
-                  <span>Export sebagai CSV (.csv)</span>
-                </DropdownMenuItem>
-              </DropdownMenu>
+                <TableIcon className="h-3.5 w-3.5" />
+                <span className="hidden xs:inline">Tabel</span>
+              </button>
+              <button
+                onClick={() => setViewMode("card")}
+                className={`flex items-center gap-1.5 px-3.5 sm:px-4.5 h-full rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === "card"
+                    ? "bg-accent-soft text-accent border border-accent/15"
+                    : "text-text-secondary hover:text-text-primary border border-transparent"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                <span className="hidden xs:inline">Card</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Row 2: Action Buttons & Utilities */}
+        <div className="flex items-center justify-between gap-2 w-full">
+          {/* Main Action CTAs (Left) */}
+          <div className="flex items-center gap-2 grow">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsAddAccountOpen(true)}
+              className="h-10 px-3.5 sm:px-4.5 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 font-semibold text-xs rounded-xl text-nowrap shrink-0"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              <span>
+                <span className="sm:hidden">Akun</span>
+                <span className="hidden sm:inline">Tambah Akun</span>
+              </span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddColumnOpen(true)}
+              className="h-10 px-3.5 sm:px-4.5 flex-1 sm:flex-initial flex items-center justify-center gap-1.5 font-semibold text-xs rounded-xl text-nowrap shrink-0"
+            >
+              <Plus className="h-4 w-4 shrink-0" />
+              <span>
+                <span className="sm:hidden">Kolom</span>
+                <span className="hidden sm:inline">Tambah Kolom</span>
+              </span>
+            </Button>
+          </div>
+
+          {/* Utility Icons (Right) */}
+          {aplikasi.akun.length > 0 && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant={isReorderMode ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setIsReorderMode(!isReorderMode)}
+                className={`h-10 w-10 p-0 flex items-center justify-center transition-all duration-200 rounded-xl ${
+                  isReorderMode
+                    ? "bg-accent/15 text-accent border-accent/30 hover:bg-accent/25"
+                    : ""
+                }`}
+                title="Atur Urutan Kolom & Baris"
+              >
+                <ArrowUpDown className="h-4 w-4 shrink-0" />
+              </Button>
+
+              <div className="shrink-0">
+                <DropdownMenu
+                  className="w-48"
+                  align="right"
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-10 w-10 p-0 flex items-center justify-center rounded-xl"
+                      title="Ekspor Data"
+                    >
+                      <Download className="h-4 w-4 shrink-0" />
+                    </Button>
+                  }
+                >
+                  <DropdownMenuItem onClick={() => handleExport("xlsx")}>
+                    <span>Export sebagai Excel (.xlsx)</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport("csv")}>
+                    <span>Export sebagai CSV (.csv)</span>
+                  </DropdownMenuItem>
+                </DropdownMenu>
+              </div>
             </div>
           )}
         </div>
       </div>
-
-
-
-      {/* Main Table / Empty State */}
+            {/* Main Content: Search, Views, and Empty States */}
       {aplikasi.akun.length === 0 ? (
         <div className="py-12">
           <EmptyState
@@ -874,331 +1006,549 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             onAction={() => setIsAddAccountOpen(true)}
           />
         </div>
-      ) : filteredAkun.length === 0 ? (
-        <div className="py-12 bg-bg-surface border border-border-soft rounded-2xl text-center p-8">
-          <p className="text-text-secondary text-sm font-sans">
-            Tidak ada akun yang cocok dengan kata kunci pencarian.
-          </p>
-        </div>
       ) : (
-        <TableContainer className="max-h-[600px] overflow-y-auto">
-          <Table className="min-w-max md:min-w-full">
-            <TableHeader>
-              <TableRow>
-                {isReorderMode && (
-                  <TableHead className="w-20 text-center select-none bg-bg-surface font-semibold text-text-secondary">Urutan</TableHead>
-                )}
-                <TableHead className="sticky left-0 bg-bg-surface z-20 border-r border-border-soft min-w-[90px] sm:min-w-[150px] text-center">Akun</TableHead>
- 
-                {/* Render Dynamic Custom Column Headers */}
-                {aplikasi.kolom.map((col, colIndex) => {
-                  return (
-                    <TableHead
-                      key={col.id}
-                      className={`text-center border-r border-border-soft/50 ${
-                        isReorderMode
-                          ? `group relative pr-12 sm:pr-14 ${
-                              col.tipeKolom === "CENTANG"
-                                ? "min-w-[90px] sm:min-w-[120px]"
-                                : "min-w-[130px] sm:min-w-[180px]"
-                            }`
-                          : "p-0 select-none min-w-[100px] sm:min-w-[150px]"
-                      }`}
-                    >
-                      {isReorderMode ? (
-                        <div className="flex items-center gap-1.5 justify-center text-nowrap py-3 px-3.5 sm:px-6 sm:py-4">
-                          <span>{col.namaKolom}</span>
-                          {/* Type Icon Badge */}
-                          <Badge variant="circle" className="shrink-0">
-                            {col.tipeKolom === "TEKS" && "Aa"}
-                            {col.tipeKolom === "NOMOR" && "#"}
-                            {col.tipeKolom === "NOMINAL" && "Rp"}
-                            {col.tipeKolom === "CENTANG" && (
-                              <Check className="h-2.5 w-2.5 stroke-[3]" />
-                            )}
-                          </Badge>
- 
-                          <div className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-bg-surface border border-border-soft rounded-lg shadow-sm p-0.5 z-30">
-                            <button
-                              disabled={colIndex === 0}
-                              onClick={() => handleSwapKolom(colIndex, colIndex - 1)}
-                              className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
-                              title="Geser Kiri"
-                            >
-                              <ChevronLeft className="h-3 w-3" />
-                            </button>
-                            <button
-                              disabled={colIndex === aplikasi.kolom.length - 1}
-                              onClick={() => handleSwapKolom(colIndex, colIndex + 1)}
-                              className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
-                              title="Geser Kanan"
-                            >
-                              <ChevronRight className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <DropdownMenu
-                          className="w-44"
-                          align="left"
-                          trigger={
-                            <div className="flex items-center gap-1.5 justify-center text-nowrap cursor-pointer hover:text-accent transition-colors w-full h-full py-3 px-3.5 sm:px-6 sm:py-4 select-none">
+        <div className="flex flex-col gap-4">
+
+          {/* Search Result Condition */}
+          {filteredAkun.length === 0 ? (
+            <div className="py-12 bg-bg-surface border border-border-soft rounded-3xl text-center p-8 shadow-sm">
+              <p className="text-text-secondary text-sm font-sans">
+                Tidak ada akun yang cocok dengan kata kunci pencarian.
+              </p>
+            </div>
+          ) : viewMode === "table" ? (
+            <TableContainer className="max-h-[600px] overflow-y-auto">
+              <Table className="min-w-max md:min-w-full">
+                <TableHeader>
+                  <TableRow>
+                    {isReorderMode && (
+                      <TableHead className="w-20 text-center select-none bg-bg-surface font-semibold text-text-secondary">Urutan</TableHead>
+                    )}
+                    <TableHead className="sticky left-0 bg-bg-surface z-20 border-r border-border-soft min-w-[90px] sm:min-w-[150px] text-center font-bold">Akun</TableHead>
+                    <TableHead className="border-r border-border-soft/50 min-w-[110px] sm:min-w-[160px] text-center font-bold">Device</TableHead>
+                    <TableHead className="border-r border-border-soft/50 min-w-[120px] sm:min-w-[180px] text-center font-bold">No HP</TableHead>
+     
+                    {/* Render Dynamic Custom Column Headers */}
+                    {aplikasi.kolom.map((col, colIndex) => {
+                      return (
+                        <TableHead
+                          key={col.id}
+                          className={`text-center border-r border-border-soft/50 ${
+                            isReorderMode
+                              ? `group relative pr-12 sm:pr-14 ${
+                                  col.tipeKolom === "CENTANG"
+                                    ? "min-w-[90px] sm:min-w-[120px]"
+                                    : "min-w-[130px] sm:min-w-[180px]"
+                                }`
+                              : "p-0 select-none min-w-[100px] sm:min-w-[150px]"
+                          }`}
+                        >
+                          {isReorderMode ? (
+                            <div className="flex items-center gap-1.5 justify-center text-nowrap py-3 px-3.5 sm:px-6 sm:py-4">
                               <span>{col.namaKolom}</span>
-                              {/* Type Icon Badge */}
                               <Badge variant="circle" className="shrink-0">
                                 {col.tipeKolom === "TEKS" && "Aa"}
                                 {col.tipeKolom === "NOMOR" && "#"}
                                 {col.tipeKolom === "NOMINAL" && "Rp"}
+                                {col.tipeKolom === "TANGGAL" && "Tgl"}
                                 {col.tipeKolom === "CENTANG" && (
                                   <Check className="h-2.5 w-2.5 stroke-[3]" />
                                 )}
                               </Badge>
+     
+                              <div className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-bg-surface border border-border-soft rounded-lg shadow-sm p-0.5 z-30">
+                                <button
+                                  disabled={colIndex === 0}
+                                  onClick={() => handleSwapKolom(colIndex, colIndex - 1)}
+                                  className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
+                                  title="Geser Kiri"
+                                >
+                                  <ChevronLeft className="h-3 w-3" />
+                                </button>
+                                <button
+                                  disabled={colIndex === aplikasi.kolom.length - 1}
+                                  onClick={() => handleSwapKolom(colIndex, colIndex + 1)}
+                                  className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
+                                  title="Geser Gek"
+                                >
+                                  <ChevronRight className="h-3 w-3" />
+                                </button>
+                              </div>
                             </div>
+                          ) : (
+                            <DropdownMenu
+                              className="w-44"
+                              align="left"
+                              trigger={
+                                <div className="flex items-center gap-1.5 justify-center text-nowrap cursor-pointer hover:text-accent transition-colors w-full h-full py-3 px-3.5 sm:px-6 sm:py-4 select-none">
+                                  <span>{col.namaKolom}</span>
+                                  <Badge variant="circle" className="shrink-0">
+                                    {col.tipeKolom === "TEKS" && "Aa"}
+                                    {col.tipeKolom === "NOMOR" && "#"}
+                                    {col.tipeKolom === "NOMINAL" && "Rp"}
+                                    {col.tipeKolom === "TANGGAL" && "Tgl"}
+                                    {col.tipeKolom === "CENTANG" && (
+                                      <Check className="h-2.5 w-2.5 stroke-[3]" />
+                                    )}
+                                  </Badge>
+                                </div>
+                              }
+                            >
+                              {col.tipeKolom === "CENTANG" && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleBulkCentang(col.id, true)}>
+                                    <CheckSquare className="h-4 w-4 text-text-secondary" />
+                                    <span>Centang Semua</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleBulkCentang(col.id, false)}>
+                                    <Square className="h-4 w-4 text-text-secondary" />
+                                    <span>Hapus Centang</span>
+                                  </DropdownMenuItem>
+                                  <div className="h-px bg-border-soft/60 my-1" />
+                                </>
+                              )}
+                              <DropdownMenuItem onClick={() => setEditingColumn(col)}>
+                                <Edit className="h-4 w-4 text-text-secondary" />
+                                <span>Edit</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setClearingColumn(col)}
+                              >
+                                <X className="h-4 w-4 text-text-secondary" />
+                                <span>Kosongkan</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setDeletingColumn(col)} className="text-danger hover:bg-danger-soft">
+                                <Trash2 className="h-4 w-4 text-danger" />
+                                <span>Hapus</span>
+                              </DropdownMenuItem>
+                            </DropdownMenu>
+                          )}
+                        </TableHead>
+                      );
+                    })}
+     
+                    <TableHead className="w-14 px-1 text-center font-bold">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAkun.map((acc, index) => {
+                    const meetsTarget = checkAkunMeetsTarget(acc);
+                    const connectedNomor = getConnectedNomor(acc.nomorHp);
+                    const highlightDotColor = getHighlightDot(connectedNomor);
+    
+                    return (
+                      <TableRow
+                        key={acc.id}
+                        className={`group transition-all ${
+                          meetsTarget
+                            ? "bg-target-bg hover:bg-target-hover"
+                            : ""
+                        }`}
+                      >
+                        {isReorderMode && (
+                          <TableCell className={`align-middle py-2 px-1 text-center w-20 z-10 border-r border-border-soft transition-colors ${
+                            meetsTarget
+                              ? "bg-target-bg group-hover:bg-target-hover"
+                              : "bg-bg-surface"
+                          }`}>
+                            <div className="flex items-center justify-center gap-0.5">
+                              <button
+                                disabled={index === 0}
+                                onClick={() => handleSwapAkun(index, index - 1)}
+                                className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
+                                title="Pindahkan ke Atas"
+                              >
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                disabled={index === filteredAkun.length - 1}
+                                onClick={() => handleSwapAkun(index, index + 1)}
+                                className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
+                                title="Pindahkan ke Bawah"
+                              >
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </TableCell>
+                        )}
+                        <TableCell
+                          className={`sticky left-0 z-10 border-r border-border-soft font-semibold text-nowrap cursor-pointer hover:underline transition-all min-w-[90px] sm:min-w-[150px] ${
+                            meetsTarget
+                              ? "bg-target-bg group-hover:bg-target-hover text-target-text"
+                              : "bg-bg-surface group-hover:bg-accent/5 hover:text-accent text-text-primary"
+                          }`}
+                          onClick={() => setSelectedDetailAccount(acc)}
+                          title="Klik untuk melihat detail"
+                        >
+                          <span>{acc.nama}</span>
+                        </TableCell>
+    
+                        {/* Device Cell */}
+                        {editingCell?.accountId === acc.id && editingCell?.columnId === "device" ? (
+                          <TableCell className="p-1 min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50">
+                            <input
+                              type="text"
+                              defaultValue={acc.device || ""}
+                              autoFocus
+                              className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans"
+                              onBlur={(e) => {
+                                const finalVal = e.target.value || null;
+                                if (finalVal !== acc.device) {
+                                  handleInlineSave(acc.id, "device", finalVal);
+                                }
+                                setEditingCell(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const finalVal = (e.target as HTMLInputElement).value || null;
+                                  if (finalVal !== acc.device) {
+                                    handleInlineSave(acc.id, "device", finalVal);
+                                  }
+                                  setEditingCell(null);
+                                } else if (e.key === "Escape") {
+                                  setEditingCell(null);
+                                }
+                              }}
+                            />
+                          </TableCell>
+                        ) : (
+                          <TableCell
+                            className="cursor-pointer hover:bg-accent-soft/30 transition-colors select-none text-nowrap min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
+                            onClick={() => setEditingCell({ accountId: acc.id, columnId: "device" })}
+                            title="Klik untuk mengedit device"
+                          >
+                            {acc.device || <span className="text-text-secondary select-none">–</span>}
+                          </TableCell>
+                        )}
+    
+                        {/* No HP Cell */}
+                        {editingCell?.accountId === acc.id && editingCell?.columnId === "nomorHp" ? (
+                          <TableCell className="p-1 min-w-[120px] sm:min-w-[180px] border-r border-border-soft/50">
+                            <input
+                              type="text"
+                              defaultValue={acc.nomorHp || ""}
+                              autoFocus
+                              className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-mono"
+                              onBlur={(e) => {
+                                const finalVal = e.target.value || null;
+                                if (finalVal !== acc.nomorHp) {
+                                  handleInlineSave(acc.id, "nomorHp", finalVal);
+                                }
+                                setEditingCell(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  const finalVal = (e.target as HTMLInputElement).value || null;
+                                  if (finalVal !== acc.nomorHp) {
+                                    handleInlineSave(acc.id, "nomorHp", finalVal);
+                                  }
+                                  setEditingCell(null);
+                                } else if (e.key === "Escape") {
+                                  setEditingCell(null);
+                                }
+                              }}
+                            />
+                          </TableCell>
+                        ) : (
+                          <TableCell
+                            className="cursor-pointer hover:bg-accent-soft/30 transition-colors select-none text-nowrap min-w-[120px] sm:min-w-[180px] border-r border-border-soft/50 font-mono"
+                            onClick={() => setEditingCell({ accountId: acc.id, columnId: "nomorHp" })}
+                            title="Klik untuk mengedit No HP"
+                          >
+                            <div className="flex items-center gap-1.5 justify-between w-full">
+                              <span>{acc.nomorHp || <span className="text-text-secondary font-sans select-none">–</span>}</span>
+                              {connectedNomor && (
+                                <span 
+                                  className={`inline-block w-2.5 h-2.5 rounded-full border border-bg-surface shadow-sm shrink-0 ${highlightDotColor}`}
+                                  title={`Terhubung ke data nomor ${connectedNomor.provider} (${connectedNomor.nomorKartu})`}
+                                />
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+    
+                      {/* Render Dynamic custom values */}
+                      {aplikasi.kolom.map((col) => {
+                        const val = acc.customValues[col.id];
+    
+                        if (col.tipeKolom === "CENTANG") {
+                          return (
+                            <TableCell
+                              key={col.id}
+                              className={`align-middle py-2 border-r border-border-soft/50 ${col.tipeKolom === "CENTANG"
+                                  ? "min-w-[70px] sm:min-w-[100px]"
+                                  : "min-w-[110px] sm:min-w-[160px]"
+                                }`}
+                            >
+                              <div className="flex justify-center w-full">
+                                <Checkbox
+                                  checked={Boolean(val)}
+                                  onCheckedChange={(checked) => {
+                                    handleInlineSave(acc.id, col.id, checked);
+                                  }}
+                                />
+                              </div>
+                            </TableCell>
+                          );
+                        }
+    
+                        if (editingCell?.accountId === acc.id && editingCell?.columnId === col.id) {
+                          if (col.tipeKolom === "TANGGAL") {
+                            return (
+                              <TableCell
+                                key={col.id}
+                                className="p-1 min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
+                              >
+                                <input
+                                  type="date"
+                                  defaultValue={val || ""}
+                                  autoFocus
+                                  className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans"
+                                  onBlur={(e) => {
+                                    const finalVal = e.target.value || null;
+                                    if (finalVal !== val) {
+                                      handleInlineSave(acc.id, col.id, finalVal);
+                                    }
+                                    setEditingCell(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      const finalVal = (e.target as HTMLInputElement).value || null;
+                                      if (finalVal !== val) {
+                                        handleInlineSave(acc.id, col.id, finalVal);
+                                      }
+                                      setEditingCell(null);
+                                    } else if (e.key === "Escape") {
+                                      setEditingCell(null);
+                                    }
+                                  }}
+                                />
+                              </TableCell>
+                            );
+                          }
+    
+                          return (
+                            <TableCell
+                              key={col.id}
+                              className="p-1 min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
+                            >
+                              <input
+                                type="text"
+                                inputMode={col.tipeKolom === "TEKS" ? "text" : "numeric"}
+                                defaultValue={
+                                  val !== undefined && val !== null
+                                    ? (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL"
+                                        ? formatNumberInput(val)
+                                        : val)
+                                    : ""
+                                }
+                                autoFocus
+                                className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans"
+                                onChange={(e) => {
+                                  if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
+                                    const parsed = parseNumberInput(e.target.value);
+                                    e.target.value = formatNumberInput(parsed);
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const rawVal = e.target.value;
+                                  let finalVal: any = rawVal;
+                                  if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
+                                    const parsed = parseNumberInput(rawVal);
+                                    finalVal = parsed === "" || parsed === "-" ? null : Number(parsed);
+                                  } else {
+                                    finalVal = rawVal === "" ? null : rawVal;
+                                  }
+                                  if (finalVal !== val) {
+                                      handleInlineSave(acc.id, col.id, finalVal);
+                                  }
+                                  setEditingCell(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    const rawVal = (e.target as HTMLInputElement).value;
+                                    let finalVal: any = rawVal;
+                                    if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
+                                      const parsed = parseNumberInput(rawVal);
+                                      finalVal = parsed === "" || parsed === "-" ? null : Number(parsed);
+                                    } else {
+                                      finalVal = rawVal === "" ? null : rawVal;
+                                    }
+                                    if (finalVal !== val) {
+                                      handleInlineSave(acc.id, col.id, finalVal);
+                                    }
+                                    setEditingCell(null);
+                                  } else if (e.key === "Escape") {
+                                    setEditingCell(null);
+                                  }
+                                }}
+                              />
+                            </TableCell>
+                          );
+                        }
+    
+                        return (
+                          <TableCell
+                            key={col.id}
+                            className="cursor-pointer hover:bg-accent-soft/30 transition-colors select-none text-nowrap min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
+                            onClick={() => setEditingCell({ accountId: acc.id, columnId: col.id })}
+                            title="Klik untuk mengedit"
+                          >
+                            {formatValue(val, col.tipeKolom)}
+                          </TableCell>
+                        );
+                      })}
+    
+                      <TableCell className="text-center py-1 px-1 w-14">
+                        <div className="flex items-center justify-center">
+                          <DropdownMenu
+                            className="w-32"
+                            align="right"
+                            trigger={
+                              <button
+                                className="h-8 w-8 rounded-lg text-text-secondary hover:bg-accent-soft hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
+                                title="Opsi"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                            }
+                          >
+                            <DropdownMenuItem onClick={() => setEditingAccount(acc)}>
+                              <Edit className="h-4 w-4 text-text-secondary" />
+                              <span>Edit</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setDeletingAccount(acc)}
+                              className="text-danger hover:bg-danger-soft"
+                            >
+                              <Trash2 className="h-4 w-4 text-danger" />
+                              <span>Hapus</span>
+                            </DropdownMenuItem>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    );
+                  })}
+                
+                {/* Accumulation / Footer Row */}
+                {aplikasi.kolom.some((c) => c.isAccumulated) && (
+                  <TableRow className="bg-bg-surface font-bold text-text-primary hover:bg-bg-surface cursor-default">
+                    {isReorderMode && <TableCell className="border-r border-border-soft"></TableCell>}
+                    <TableCell colSpan={3} className="sticky left-0 bg-bg-surface z-10 border-r border-border-soft text-right font-bold pr-4">
+                      Total Akumulasi:
+                    </TableCell>
+                    {aplikasi.kolom.map((col) => {
+                      if (!col.isAccumulated) return <TableCell key={col.id}></TableCell>;
+                      
+                      const sum = filteredAkun.reduce((acc, curr) => {
+                        const val = curr.customValues[col.id];
+                        return acc + (Number(val) || 0);
+                      }, 0);
+    
+                      return (
+                        <TableCell key={col.id} className="text-right">
+                          {formatValue(sum, col.tipeKolom)}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell></TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            /* Card View */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filteredAkun.map((acc) => {
+                const meetsTarget = checkAkunMeetsTarget(acc);
+                const connectedNomor = getConnectedNomor(acc.nomorHp);
+                const highlightDotColor = getHighlightDot(connectedNomor);
+ 
+                return (
+                  <Card
+                    key={acc.id}
+                    onClick={() => setSelectedDetailAccount(acc)}
+                    className={`relative flex flex-col p-4 sm:p-5 gap-3 cursor-pointer transition-all hover:z-10 focus-within:z-10 min-h-[140px] border border-border-soft/60 [box-shadow:var(--shadow-card)] hover:border-accent/40 ${
+                      meetsTarget ? "bg-target-bg border-accent/25 shadow-[0_2px_8px_rgba(8,145,178,0.05)]" : "bg-bg-surface"
+                    }`}
+                  >
+                    {/* Header Row: Name & Action menu */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h4 className="text-[14px] font-bold text-text-primary font-display truncate">
+                          {acc.nama}
+                        </h4>
+                        {connectedNomor && (
+                          <span 
+                            className={`inline-block w-2.5 h-2.5 rounded-full border border-bg-surface shadow-sm shrink-0 ${highlightDotColor}`}
+                            title={`Terhubung ke data nomor ${connectedNomor.provider} (${connectedNomor.nomorKartu})`}
+                          />
+                        )}
+                      </div>
+ 
+                      <div onClick={(e) => e.stopPropagation()} className="shrink-0 -mt-1 -mr-1">
+                        <DropdownMenu
+                          className="w-32"
+                          align="right"
+                          trigger={
+                            <button
+                              className="h-8 w-8 rounded-lg text-text-secondary hover:bg-accent-soft hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
+                              title="Opsi"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
                           }
                         >
-                          {col.tipeKolom === "CENTANG" && (
-                            <>
-                              <DropdownMenuItem onClick={() => handleBulkCentang(col.id, true)}>
-                                <CheckSquare className="h-4 w-4 text-text-secondary" />
-                                <span>Centang Semua</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleBulkCentang(col.id, false)}>
-                                <Square className="h-4 w-4 text-text-secondary" />
-                                <span>Hapus Centang</span>
-                              </DropdownMenuItem>
-                              <div className="h-px bg-border-soft/60 my-1" />
-                            </>
-                          )}
-                          <DropdownMenuItem onClick={() => setEditingColumn(col)}>
+                          <DropdownMenuItem onClick={() => setEditingAccount(acc)}>
                             <Edit className="h-4 w-4 text-text-secondary" />
                             <span>Edit</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => setClearingColumn(col)}
+                            onClick={() => setDeletingAccount(acc)}
+                            className="text-danger hover:bg-danger-soft"
                           >
-                            <X className="h-4 w-4 text-text-secondary" />
-                            <span>Kosongkan</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setDeletingColumn(col)} className="text-danger hover:bg-danger-soft">
                             <Trash2 className="h-4 w-4 text-danger" />
                             <span>Hapus</span>
                           </DropdownMenuItem>
                         </DropdownMenu>
-                      )}
-                    </TableHead>
-                  );
-                })}
- 
-                <TableHead className="w-14 px-1 text-center">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAkun.map((acc, index) => {
-                const meetsTarget = checkAkunMeetsTarget(acc);
-                return (
-                  <TableRow
-                    key={acc.id}
-                    className={`group transition-all ${
-                      meetsTarget
-                        ? "bg-target-bg hover:bg-target-hover"
-                        : ""
-                    }`}
-                  >
-                    {isReorderMode && (
-                      <TableCell className={`align-middle py-2 px-1 text-center w-20 z-10 border-r border-border-soft transition-colors ${
-                        meetsTarget
-                          ? "bg-target-bg group-hover:bg-target-hover"
-                          : "bg-bg-surface"
-                      }`}>
-                        <div className="flex items-center justify-center gap-0.5">
-                          <button
-                            disabled={index === 0}
-                            onClick={() => handleSwapAkun(index, index - 1)}
-                            className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
-                            title="Pindahkan ke Atas"
-                          >
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            disabled={index === filteredAkun.length - 1}
-                            onClick={() => handleSwapAkun(index, index + 1)}
-                            className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
-                            title="Pindahkan ke Bawah"
-                          >
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </TableCell>
-                    )}
-                    <TableCell
-                      className={`sticky left-0 z-10 border-r border-border-soft font-medium text-nowrap cursor-pointer hover:underline transition-all min-w-[90px] sm:min-w-[150px] ${
-                        meetsTarget
-                          ? "bg-target-bg group-hover:bg-target-hover text-target-text"
-                          : "bg-bg-surface group-hover:bg-accent/5 hover:text-accent text-text-primary"
-                      }`}
-                      onClick={() => setSelectedDetailAccount(acc)}
-                      title="Klik untuk melihat detail"
-                    >
-                      {acc.nama}
-                    </TableCell>
-
-                  {/* Render Dynamic custom values: Inline Inputs or Checkbox or formatted Text */}
-                  {aplikasi.kolom.map((col) => {
-                    const val = acc.customValues[col.id];
-
-                    if (col.tipeKolom === "CENTANG") {
-                      return (
-                        <TableCell
-                          key={col.id}
-                          className={`align-middle py-2 border-r border-border-soft/50 ${col.tipeKolom === "CENTANG"
-                              ? "min-w-[70px] sm:min-w-[100px]"
-                              : "min-w-[110px] sm:min-w-[160px]"
-                            }`}
-                        >
-                          <div className="flex justify-center w-full">
-                            <Checkbox
-                              checked={Boolean(val)}
-                              onCheckedChange={(checked) => {
-                                handleInlineSave(acc.id, col.id, checked);
-                              }}
-                            />
-                          </div>
-                        </TableCell>
-                      );
-                    }
-
-                    if (editingCell?.accountId === acc.id && editingCell?.columnId === col.id) {
-                      return (
-                        <TableCell
-                          key={col.id}
-                          className="p-1 min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
-                        >
-                          <input
-                            type="text"
-                            inputMode={col.tipeKolom === "TEKS" ? "text" : "numeric"}
-                            defaultValue={
-                              val !== undefined && val !== null
-                                ? (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL"
-                                    ? formatNumberInput(val)
-                                    : val)
-                                : ""
-                            }
-                            autoFocus
-                            className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans"
-                            onChange={(e) => {
-                              if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
-                                const parsed = parseNumberInput(e.target.value);
-                                e.target.value = formatNumberInput(parsed);
-                              }
-                            }}
-                            onBlur={(e) => {
-                              const rawVal = e.target.value;
-                              let finalVal: any = rawVal;
-                              if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
-                                const parsed = parseNumberInput(rawVal);
-                                finalVal = parsed === "" || parsed === "-" ? null : Number(parsed);
-                              } else {
-                                finalVal = rawVal === "" ? null : rawVal;
-                              }
-                              if (finalVal !== val) {
-                                handleInlineSave(acc.id, col.id, finalVal);
-                              }
-                              setEditingCell(null);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                const rawVal = (e.target as HTMLInputElement).value;
-                                let finalVal: any = rawVal;
-                                if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
-                                  const parsed = parseNumberInput(rawVal);
-                                  finalVal = parsed === "" || parsed === "-" ? null : Number(parsed);
-                                } else {
-                                  finalVal = rawVal === "" ? null : rawVal;
-                                }
-                                if (finalVal !== val) {
-                                  handleInlineSave(acc.id, col.id, finalVal);
-                                }
-                                setEditingCell(null);
-                              } else if (e.key === "Escape") {
-                                setEditingCell(null);
-                              }
-                            }}
-                          />
-                        </TableCell>
-                      );
-                    }
-
-                    return (
-                      <TableCell
-                        key={col.id}
-                        className="cursor-pointer hover:bg-accent-soft/30 transition-colors select-none text-nowrap min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
-                        onClick={() => setEditingCell({ accountId: acc.id, columnId: col.id })}
-                        title="Klik untuk mengedit"
-                      >
-                        {formatValue(val, col.tipeKolom)}
-                      </TableCell>
-                    );
-                  })}
-
-                  <TableCell className="text-center py-1 px-1 w-14">
-                    <div className="flex items-center justify-center">
-                      <DropdownMenu
-                        className="w-32"
-                        align="right"
-                        trigger={
-                          <button
-                            className="h-8 w-8 rounded-lg text-text-secondary hover:bg-accent-soft hover:text-accent flex items-center justify-center transition-colors cursor-pointer"
-                            title="Opsi"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-                        }
-                      >
-                        <DropdownMenuItem onClick={() => setEditingAccount(acc)}>
-                          <Edit className="h-4 w-4 text-text-secondary" />
-                          <span>Edit</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setDeletingAccount(acc)}
-                          className="text-danger hover:bg-danger-soft"
-                        >
-                          <Trash2 className="h-4 w-4 text-danger" />
-                          <span>Hapus</span>
-                        </DropdownMenuItem>
-                      </DropdownMenu>
+                      </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-            
-            {/* Accumulation / Footer Row */}
-            {aplikasi.kolom.some((c) => c.isAccumulated) && (
-              <TableRow className="bg-bg-surface font-bold text-text-primary hover:bg-bg-surface cursor-default">
-                {isReorderMode && <TableCell className="border-r border-border-soft"></TableCell>}
-                <TableCell className="sticky left-0 bg-bg-surface z-10 border-r border-border-soft text-right">
-                  Total Akumulasi:
-                </TableCell>
-                {aplikasi.kolom.map((col) => {
-                  if (!col.isAccumulated) return <TableCell key={col.id}></TableCell>;
-                  
-                  const sum = filteredAkun.reduce((acc, curr) => {
-                    const val = curr.customValues[col.id];
-                    return acc + (Number(val) || 0);
-                  }, 0);
-
-                  return (
-                    <TableCell key={col.id} className="text-right">
-                      {formatValue(sum, col.tipeKolom)}
-                    </TableCell>
-                  );
-                })}
-                <TableCell></TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-          </Table>
-        </TableContainer>
+ 
+                    {/* Details Section */}
+                    <div className="flex flex-col gap-2 text-[12.5px] font-sans text-text-secondary mt-1">
+                      {/* Device field */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span>Device</span>
+                        <span className="font-semibold text-text-primary">{acc.device || "–"}</span>
+                      </div>
+ 
+                      {/* No HP field */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span>No HP</span>
+                        <span className="font-semibold text-text-primary font-mono">{acc.nomorHp || "–"}</span>
+                      </div>
+ 
+                      {/* Custom columns fields */}
+                      {aplikasi.kolom.map((col) => {
+                        const val = acc.customValues[col.id];
+                        return (
+                          <div key={col.id} className="flex items-center justify-between gap-2 pt-2 border-t border-border-soft/40">
+                            <span>{col.namaKolom}</span>
+                            <span className="font-semibold text-text-primary">
+                              {formatValue(val, col.tipeKolom)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Add / Edit Column Dialog */}
@@ -1247,6 +1597,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
               <option value="NOMOR">Nomor (Angka Biasa)</option>
               <option value="NOMINAL">Nominal (Rupiah Rp)</option>
               <option value="CENTANG">Centang (Benar / Salah)</option>
+              <option value="TANGGAL">Tanggal (Hari / Bulan / Tahun)</option>
             </Select>
           </div>
 
@@ -1301,6 +1652,13 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                   value={formatNumberInput(nilaiTarget)}
                   onChange={(e) => setNilaiTarget(parseNumberInput(e.target.value))}
                   placeholder="Contoh: 1.000.000"
+                  required
+                />
+              ) : tipeKolom === "TANGGAL" ? (
+                <Input
+                  type="date"
+                  value={nilaiTarget}
+                  onChange={(e) => setNilaiTarget(e.target.value)}
                   required
                 />
               ) : (
@@ -1432,14 +1790,43 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label className="text-xs font-semibold text-text-secondary">No HP (Opsional)</label>
-            <Input
-              type="text"
-              value={noHpAkun}
-              onChange={(e) => setNoHpAkun(e.target.value)}
-              placeholder="Contoh: 081234567890"
-            />
+            {nomorList.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-wider">Pilih dari Data Nomor</span>
+                <Select
+                  value={nomorList.find(n => n.nomorKartu === noHpAkun)?.id || ""}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    const match = nomorList.find((n) => n.id === selectedId);
+                    if (match) {
+                      setNoHpAkun(match.nomorKartu);
+                    } else {
+                      setNoHpAkun("");
+                    }
+                  }}
+                >
+                  <option value="">-- Ketik Manual / Pilih Kartu --</option>
+                  {nomorList.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.provider} - {n.nomorKartu}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              {nomorList.length > 0 && (
+                <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-wider">Nomor Terpilih / Input Manual</span>
+              )}
+              <Input
+                type="text"
+                value={noHpAkun}
+                onChange={(e) => setNoHpAkun(e.target.value)}
+                placeholder="Contoh: 081234567890"
+              />
+            </div>
           </div>
 
           {/* Render Dynamic Custom Fields */}
@@ -1528,6 +1915,19 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                           Aktif / Selesai
                         </span>
                       </div>
+                    )}
+
+                    {col.tipeKolom === "TANGGAL" && (
+                      <Input
+                        type="date"
+                        value={val || ""}
+                        onChange={(e) =>
+                          setCustomValues({
+                            ...customValues,
+                            [col.id]: e.target.value,
+                          })
+                        }
+                      />
                     )}
                   </div>
                 );
@@ -1628,7 +2028,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
               {selectedDetailAccount?.nomorHp && (
                 <button
                   type="button"
-                  className="p-2.5 rounded-2xl border border-border-soft text-text-secondary hover:text-accent hover:bg-accent-soft hover:border-accent/30 transition-all shadow-sm shrink-0 ml-4"
+                  className="p-2.5 rounded-2xl border border-border-soft text-text-secondary hover:text-accent hover:bg-accent-soft hover:border-accent/30 transition-all shadow-sm shrink-0 ml-4 cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     navigator.clipboard.writeText(selectedDetailAccount.nomorHp || "");
@@ -1641,10 +2041,50 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
               )}
             </div>
 
+            {/* Connected Card Info */}
+            {selectedDetailAccount && (() => {
+              const connected = getConnectedNomor(selectedDetailAccount.nomorHp);
+              const highlightColor = getHighlightDot(connected);
+              if (!connected) return null;
+
+              return (
+                <div className="mt-3 bg-bg-page/50 border border-border-soft p-4 rounded-2xl flex flex-col gap-2.5 shadow-sm">
+                  <div className="flex items-center justify-between pb-1 border-b border-border-soft/50">
+                    <h5 className="text-[11px] font-bold text-accent uppercase tracking-wider">Kartu Terhubung (Data Nomor)</h5>
+                    <span className={`inline-block w-2.5 h-2.5 rounded-full ${highlightColor}`} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-text-secondary">Provider</span>
+                    <span className="text-xs font-bold text-text-primary">{connected.provider}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-text-secondary">Masa Aktif</span>
+                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-md ${
+                      highlightColor === "bg-rose-500" ? "text-danger bg-danger-soft font-semibold" :
+                      highlightColor === "bg-amber-500" ? "text-amber-600 bg-amber-500/10 font-semibold" :
+                      "text-accent bg-accent-soft font-semibold"
+                    }`}>
+                      {new Date(connected.masaAktif).toLocaleDateString("id-ID", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-text-secondary">Pulsa</span>
+                    <span className="text-xs font-mono font-bold text-text-primary">
+                      {connected.pulsa ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(connected.pulsa) : "-"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
 
           {/* Action button: Tutup */}
-          <div className="flex items-center justify-end mt-1">
+          <div className="flex items-center justify-end mt-4 pt-3 border-t border-border-soft">
             <Button
               variant="outline"
               size="sm"

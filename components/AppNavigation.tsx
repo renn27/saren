@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Hash, StickyNote } from "lucide-react";
+import { Briefcase, Hash, StickyNote, AppWindow } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 
 function getNavItems(pathname: string) {
@@ -12,6 +12,12 @@ function getNavItems(pathname: string) {
       href: "/",
       icon: Briefcase,
       isActive: pathname === "/" || pathname.startsWith("/garapan"),
+    },
+    {
+      name: "Aplikasi",
+      href: "/aplikasi",
+      icon: AppWindow,
+      isActive: pathname.startsWith("/aplikasi"),
     },
     {
       name: "Nomor",

@@ -20,6 +20,18 @@ export async function getAplikasiList(garapanId: string) {
   }
 }
 
+export async function getStandaloneAplikasiList() {
+  try {
+    return await db.aplikasi.findMany({
+      where: { garapanId: null },
+      orderBy: { createdAt: "asc" },
+    });
+  } catch (error) {
+    console.error("Failed to fetch standalone aplikasi list:", error);
+    return [];
+  }
+}
+
 export async function getAplikasi(id: string) {
   try {
     return await db.aplikasi.findUnique({
@@ -39,7 +51,7 @@ export async function getAplikasi(id: string) {
   }
 }
 
-export async function createAplikasi(garapanId: string, formData: FormData) {
+export async function createAplikasi(garapanId: string | null, formData: FormData) {
   const namaAplikasi = formData.get("namaAplikasi") as string;
   const file = formData.get("logo") as File | null;
   const deskripsi = formData.get("deskripsi") as string | null;
@@ -85,7 +97,11 @@ export async function createAplikasi(garapanId: string, formData: FormData) {
       },
     });
 
-    revalidatePath(`/garapan/${garapanId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}`);
+    } else {
+      revalidatePath("/aplikasi");
+    }
     return { success: true };
   } catch (error) {
     console.error("Error creating aplikasi:", error);
@@ -93,7 +109,7 @@ export async function createAplikasi(garapanId: string, formData: FormData) {
   }
 }
 
-export async function updateAplikasi(id: string, garapanId: string, formData: FormData) {
+export async function updateAplikasi(id: string, garapanId: string | null, formData: FormData) {
   const namaAplikasi = formData.get("namaAplikasi") as string;
   const file = formData.get("logo") as File | null;
   const clearLogo = formData.get("clearLogo") === "true";
@@ -165,7 +181,12 @@ export async function updateAplikasi(id: string, garapanId: string, formData: Fo
       },
     });
 
-    revalidatePath(`/garapan/${garapanId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}`);
+    } else {
+      revalidatePath("/aplikasi");
+      revalidatePath(`/aplikasi/${id}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error updating aplikasi:", error);
@@ -173,7 +194,7 @@ export async function updateAplikasi(id: string, garapanId: string, formData: Fo
   }
 }
 
-export async function deleteAplikasi(id: string, garapanId: string) {
+export async function deleteAplikasi(id: string, garapanId: string | null) {
   try {
     const existing = await db.aplikasi.findUnique({ where: { id } });
     if (existing && existing.logoUrl && process.env.BLOB_READ_WRITE_TOKEN && existing.logoUrl.includes("public.blob.vercel-storage.com")) {
@@ -188,7 +209,11 @@ export async function deleteAplikasi(id: string, garapanId: string) {
       where: { id },
     });
 
-    revalidatePath(`/garapan/${garapanId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}`);
+    } else {
+      revalidatePath("/aplikasi");
+    }
     return { success: true };
   } catch (error) {
     console.error("Error deleting aplikasi:", error);

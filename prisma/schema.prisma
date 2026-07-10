@@ -24,8 +24,8 @@ model Garapan {
 
 model Aplikasi {
   id           String   @id @default(cuid())
-  garapanId    String
-  garapan      Garapan  @relation(fields: [garapanId], references: [id], onDelete: Cascade)
+  garapanId    String?
+  garapan      Garapan?  @relation(fields: [garapanId], references: [id], onDelete: Cascade)
   namaAplikasi String
   logoUrl      String?  // url dari Vercel Blob, nullable
   deskripsi    String?  // deskripsi aplikasi, nullable
@@ -42,6 +42,7 @@ enum TipeKolom {
   NOMOR
   NOMINAL
   CENTANG
+  TANGGAL
 }
 
 model Kolom {

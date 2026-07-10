@@ -12,7 +12,7 @@ const akunSchema = z.object({
 });
 
 export async function createAkun(
-  garapanId: string,
+  garapanId: string | null,
   data: {
     aplikasiId: string;
     nama: string;
@@ -85,7 +85,11 @@ export async function createAkun(
       },
     });
 
-    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error creating akun:", error);
@@ -95,7 +99,7 @@ export async function createAkun(
 
 export async function updateAkun(
   id: string,
-  garapanId: string,
+  garapanId: string | null,
   data: {
     aplikasiId: string;
     nama: string;
@@ -166,7 +170,11 @@ export async function updateAkun(
       },
     });
 
-    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error updating akun:", error);
@@ -174,7 +182,7 @@ export async function updateAkun(
   }
 }
 
-export async function deleteAkun(id: string, garapanId: string, aplikasiId: string) {
+export async function deleteAkun(id: string, garapanId: string | null, aplikasiId: string) {
   try {
     await db.akun.delete({
       where: { id },
@@ -193,7 +201,11 @@ export async function deleteAkun(id: string, garapanId: string, aplikasiId: stri
       });
     }
 
-    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error deleting akun:", error);
@@ -202,7 +214,7 @@ export async function deleteAkun(id: string, garapanId: string, aplikasiId: stri
 }
 
 export async function swapAkunUrutan(
-  garapanId: string,
+  garapanId: string | null,
   aplikasiId: string,
   akunId1: string,
   akunId2: string
@@ -251,7 +263,11 @@ export async function swapAkunUrutan(
       data: { urutan: temp },
     });
 
-    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
     return { success: true };
   } catch (error) {
     console.error("Error swapping akun:", error);
@@ -277,5 +293,44 @@ export async function getAllAccountsForAutofill() {
   } catch (error) {
     console.error("Error fetching accounts for autofill:", error);
     return { success: false, error: "Gagal mengambil data akun." };
+  }
+}
+
+export async function bulkUpdateCentang(
+  garapanId: string | null,
+  aplikasiId: string,
+  columnId: string,
+  newValue: boolean
+) {
+  try {
+    const accounts = await db.akun.findMany({
+      where: { aplikasiId },
+    });
+
+    await db.$transaction(
+      accounts.map((acc) => {
+        const updatedCustomValues = {
+          ...(acc.customValues as Record<string, any>),
+          [columnId]: newValue,
+        };
+        return db.akun.update({
+          where: { id: acc.id },
+          data: {
+            customValues: updatedCustomValues,
+          },
+        });
+      })
+    );
+
+    if (garapanId) {
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    } else {
+      revalidatePath(`/aplikasi/${aplikasiId}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error bulk updating centang:", error);
+    return { success: false, error: "Gagal memperbarui status centang secara massal." };
   }
 }
