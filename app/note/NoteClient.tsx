@@ -24,6 +24,8 @@ import {
   CornerDownLeft,
   FileText,
   CheckSquare,
+  Square,
+  Calendar,
   Table,
   Menu,
   ArrowUpDown,
@@ -2555,6 +2557,7 @@ function NoteCard({
                 headers: string[];
                 rows: string[][];
                 accumulatedCols?: boolean[];
+                columnTypes?: ("TEKS" | "TANGGAL" | "CENTANG")[];
               };
               if (!data.headers || !data.rows || data.headers.length === 0) {
                 return <em className="opacity-40 text-[11px] font-sans">Kosong</em>;
@@ -2598,11 +2601,30 @@ function NoteCard({
                     <tbody>
                       {displayRows.map((row, rowIdx) => (
                         <tr key={rowIdx} className="border-b border-border-soft/60 last:border-0 hover:bg-accent-soft/5">
-                          {row.slice(0, 3).map((cell, cellIdx) => (
-                            <td key={cellIdx} className="p-1 truncate max-w-[80px] border-r border-border-soft/60">
-                              {cell || <span className="opacity-20">-</span>}
-                            </td>
-                          ))}
+                          {row.slice(0, 3).map((cell, cellIdx) => {
+                            const colType = data.columnTypes?.[cellIdx] || "TEKS";
+                            return (
+                              <td key={cellIdx} className="p-1 truncate max-w-[80px] border-r border-border-soft/60">
+                                {colType === "CENTANG" ? (
+                                  <span className="flex items-center justify-center">
+                                    {cell === "true" || cell === "1" ? (
+                                      <CheckSquare className="h-3.5 w-3.5 text-accent" />
+                                    ) : (
+                                      <Square className="h-3.5 w-3.5 text-text-secondary/30" />
+                                    )}
+                                  </span>
+                                ) : colType === "TANGGAL" ? (
+                                  cell ? (
+                                    <span className="font-mono text-[10px] text-accent">{cell}</span>
+                                  ) : (
+                                    <span className="opacity-20">-</span>
+                                  )
+                                ) : (
+                                  cell || <span className="opacity-20">-</span>
+                                )}
+                              </td>
+                            );
+                          })}
                           {hasMoreCols && <td className="p-1 text-text-secondary opacity-60">...</td>}
                         </tr>
                       ))}

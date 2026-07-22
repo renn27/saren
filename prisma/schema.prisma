@@ -43,15 +43,17 @@ enum TipeKolom {
   NOMINAL
   CENTANG
   TANGGAL
+  RUMUS
 }
 
 model Kolom {
-  id         String    @id @default(cuid())
-  aplikasiId String
-  aplikasi   Aplikasi  @relation(fields: [aplikasiId], references: [id], onDelete: Cascade)
-  namaKolom  String
-  tipeKolom  TipeKolom
-  urutan     Int       @default(0) // urutan tampil kolom, isi otomatis = jumlah kolom existing saat dibuat
+  id            String    @id @default(cuid())
+  aplikasiId    String
+  aplikasi      Aplikasi  @relation(fields: [aplikasiId], references: [id], onDelete: Cascade)
+  namaKolom     String
+  tipeKolom     TipeKolom
+  rumus         String?   // ekspresi rumus, misal "8 - limit" atau "harga * jumlah"
+  urutan        Int       @default(0) // urutan tampil kolom, isi otomatis = jumlah kolom existing saat dibuat
   isTarget      Boolean   @default(false)
   nilaiTarget   String?
   isAccumulated Boolean   @default(false)

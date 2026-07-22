@@ -8,7 +8,8 @@ import { z } from "zod";
 const kolomSchema = z.object({
   aplikasiId: z.string(),
   namaKolom: z.string().min(1, "Nama kolom wajib diisi."),
-  tipeKolom: z.nativeEnum(TipeKolom),
+  tipeKolom: z.enum(["TEKS", "NOMOR", "NOMINAL", "CENTANG", "TANGGAL", "RUMUS"]),
+  rumus: z.string().nullable().optional(),
   isTarget: z.boolean().optional(),
   nilaiTarget: z.string().nullable().optional(),
   isAccumulated: z.boolean().optional(),
@@ -20,6 +21,7 @@ export async function createKolom(
     aplikasiId: string;
     namaKolom: string;
     tipeKolom: TipeKolom;
+    rumus?: string | null;
     isTarget?: boolean;
     nilaiTarget?: string | null;
     isAccumulated?: boolean;
@@ -30,7 +32,7 @@ export async function createKolom(
     return { success: false, error: validation.error.issues[0].message };
   }
 
-  const { aplikasiId, namaKolom, tipeKolom, isTarget, nilaiTarget, isAccumulated } = validation.data;
+  const { aplikasiId, namaKolom, tipeKolom, rumus, isTarget, nilaiTarget, isAccumulated } = validation.data;
 
   try {
     const existing = await db.kolom.findFirst({
@@ -51,17 +53,36 @@ export async function createKolom(
       where: { aplikasiId },
     });
 
-    await db.kolom.create({
-      data: {
+    try {
+      await db.kolom.create({
+        data: {
+          aplikasiId,
+          namaKolom,
+          tipeKolom: tipeKolom as any,
+          rumus: tipeKolom === "RUMUS" ? rumus || null : null,
+          urutan: count,
+          isTarget: isTarget || false,
+          nilaiTarget: nilaiTarget || null,
+          isAccumulated: isAccumulated || false,
+        },
+      });
+    } catch (createErr) {
+      console.warn("db.kolom.create failed, executing raw SQL fallback:", createErr);
+      const newId = `col_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      await db.$executeRawUnsafe(
+        `INSERT INTO "kolom" ("id", "aplikasiId", "namaKolom", "tipeKolom", "rumus", "urutan", "isTarget", "nilaiTarget", "isAccumulated", "createdAt")
+         VALUES ($1, $2, $3, $4::"TipeKolom", $5, $6, $7, $8, $9, NOW())`,
+        newId,
         aplikasiId,
         namaKolom,
         tipeKolom,
-        urutan: count,
-        isTarget: isTarget || false,
-        nilaiTarget: nilaiTarget || null,
-        isAccumulated: isAccumulated || false,
-      },
-    });
+        tipeKolom === "RUMUS" ? rumus || null : null,
+        count,
+        isTarget || false,
+        nilaiTarget || null,
+        isAccumulated || false
+      );
+    }
 
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
@@ -71,7 +92,7 @@ export async function createKolom(
     return { success: true };
   } catch (error) {
     console.error("Error creating kolom:", error);
-    return { success: false, error: "Gagal menambahkan kolom." };
+    return { success: false, error: error instanceof Error ? error.message : "Gagal menambahkan kolom." };
   }
 }
 
@@ -113,6 +134,7 @@ export async function updateKolom(
     aplikasiId: string;
     namaKolom: string;
     tipeKolom: TipeKolom;
+    rumus?: string | null;
     isTarget?: boolean;
     nilaiTarget?: string | null;
     isAccumulated?: boolean;
@@ -123,7 +145,7 @@ export async function updateKolom(
     return { success: false, error: validation.error.issues[0].message };
   }
 
-  const { aplikasiId, namaKolom, tipeKolom, isTarget, nilaiTarget, isAccumulated } = validation.data;
+  const { aplikasiId, namaKolom, tipeKolom, rumus, isTarget, nilaiTarget, isAccumulated } = validation.data;
 
   try {
     const existing = await db.kolom.findFirst({
@@ -143,16 +165,33 @@ export async function updateKolom(
       return { success: false, error: "Nama kolom sudah digunakan di aplikasi ini." };
     }
 
-    await db.kolom.update({
-      where: { id },
-      data: {
+    try {
+      await db.kolom.update({
+        where: { id },
+        data: {
+          namaKolom,
+          tipeKolom: tipeKolom as any,
+          rumus: tipeKolom === "RUMUS" ? rumus || null : null,
+          isTarget: isTarget || false,
+          nilaiTarget: nilaiTarget || null,
+          isAccumulated: isAccumulated || false,
+        },
+      });
+    } catch (updateErr) {
+      console.warn("db.kolom.update failed, executing raw SQL fallback:", updateErr);
+      await db.$executeRawUnsafe(
+        `UPDATE "kolom"
+         SET "namaKolom" = $1, "tipeKolom" = $2::"TipeKolom", "rumus" = $3, "isTarget" = $4, "nilaiTarget" = $5, "isAccumulated" = $6
+         WHERE "id" = $7`,
         namaKolom,
         tipeKolom,
-        isTarget: isTarget || false,
-        nilaiTarget: nilaiTarget || null,
-        isAccumulated: isAccumulated || false,
-      },
-    });
+        tipeKolom === "RUMUS" ? rumus || null : null,
+        isTarget || false,
+        nilaiTarget || null,
+        isAccumulated || false,
+        id
+      );
+    }
 
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);

@@ -191,9 +191,11 @@ export async function duplicateGarapan(sourceId: string, targetData: { bulan: nu
               aplikasiId: newApp.id,
               namaKolom: col.namaKolom,
               tipeKolom: col.tipeKolom,
+              rumus: col.rumus,
               urutan: col.urutan,
               isTarget: col.isTarget,
               nilaiTarget: col.nilaiTarget,
+              isAccumulated: col.isAccumulated,
             },
           });
           kolomIdMap.set(col.id, newCol.id);

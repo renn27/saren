@@ -53,7 +53,9 @@ export async function createAkun(
     for (const col of columns) {
       const val = data.customValues[col.id];
 
-      if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
+      if (col.tipeKolom === "RUMUS") {
+        validatedCustomValues[col.id] = null;
+      } else if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
         if (val !== undefined && val !== null && val !== "") {
           const num = Number(val);
           if (isNaN(num)) {
@@ -143,7 +145,9 @@ export async function updateAkun(
     for (const col of columns) {
       const val = data.customValues[col.id];
 
-      if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
+      if (col.tipeKolom === "RUMUS") {
+        validatedCustomValues[col.id] = null;
+      } else if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
         if (val !== undefined && val !== null && val !== "") {
           const num = Number(val);
           if (isNaN(num)) {

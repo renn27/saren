@@ -46,8 +46,31 @@ export async function getAplikasi(id: string) {
       },
     });
   } catch (error) {
-    console.error("Failed to fetch aplikasi:", error);
-    return null;
+    console.error("Failed to fetch aplikasi via Prisma ORM, attempting raw query fallback:", error);
+    try {
+      const aplikasiRows = await db.$queryRaw<any[]>`
+        SELECT * FROM "aplikasi" WHERE "id" = ${id} LIMIT 1
+      `;
+      if (!aplikasiRows || aplikasiRows.length === 0) return null;
+      const app = aplikasiRows[0];
+
+      const kolomRows = await db.$queryRaw<any[]>`
+        SELECT * FROM "kolom" WHERE "aplikasiId" = ${id} ORDER BY "urutan" ASC
+      `;
+
+      const akunRows = await db.$queryRaw<any[]>`
+        SELECT * FROM "akun" WHERE "aplikasiId" = ${id} ORDER BY "urutan" ASC
+      `;
+
+      return {
+        ...app,
+        kolom: kolomRows || [],
+        akun: akunRows || [],
+      };
+    } catch (rawError) {
+      console.error("Failed to fetch aplikasi via raw fallback:", rawError);
+      return null;
+    }
   }
 }
 

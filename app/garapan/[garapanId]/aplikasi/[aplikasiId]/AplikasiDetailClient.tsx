@@ -54,6 +54,7 @@ import { createKolom, deleteKolom, swapKolomUrutan, updateKolom, clearKolomData 
 import { createAkun, updateAkun, deleteAkun, getAllAccountsForAutofill, swapAkunUrutan, bulkUpdateCentang } from "@/lib/actions/akun";
 import { updateAplikasi } from "@/lib/actions/aplikasi";
 import { TipeKolom } from "@prisma/client";
+import { evaluateFormula } from "@/lib/utils/formulaEvaluator";
 
 interface Garapan {
   id: string;
@@ -65,6 +66,7 @@ interface KolomItem {
   id: string;
   namaKolom: string;
   tipeKolom: TipeKolom;
+  rumus?: string | null;
   urutan: number;
   isTarget: boolean;
   nilaiTarget: string | null;
@@ -144,6 +146,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   // Column form states
   const [namaKolom, setNamaKolom] = React.useState("");
   const [tipeKolom, setTipeKolom] = React.useState<TipeKolom>("TEKS");
+  const [rumus, setRumus] = React.useState("");
   const [isTarget, setIsTarget] = React.useState(false);
   const [nilaiTarget, setNilaiTarget] = React.useState("");
   const [isAccumulated, setIsAccumulated] = React.useState(false);
@@ -207,6 +210,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     if (isAddColumnOpen) {
       setNamaKolom("");
       setTipeKolom("TEKS");
+      setRumus("");
       setIsTarget(false);
       setNilaiTarget("");
       setIsAccumulated(false);
@@ -218,6 +222,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     if (editingColumn) {
       setNamaKolom(editingColumn.namaKolom);
       setTipeKolom(editingColumn.tipeKolom);
+      setRumus(editingColumn.rumus || "");
       setIsTarget(editingColumn.isTarget);
       setNilaiTarget(editingColumn.nilaiTarget || "");
       setIsAccumulated(editingColumn.isAccumulated || false);
@@ -274,6 +279,12 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     if (targetCols.length === 0) return false;
 
     return targetCols.some((col) => {
+      if (col.tipeKolom === "RUMUS") {
+        const calcVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+        if (calcVal === null) return false;
+        return calcVal >= Number(col.nilaiTarget);
+      }
+
       const val = acc.customValues[col.id];
       if (val === undefined || val === null || val === "") return false;
 
@@ -296,6 +307,11 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       return;
     }
 
+    if (tipeKolom === "RUMUS" && !rumus.trim()) {
+      setColumnError("Rumus wajib diisi.");
+      return;
+    }
+
     setIsColumnSubmitting(true);
     setColumnError(null);
 
@@ -303,9 +319,10 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       aplikasiId: aplikasi.id,
       namaKolom: namaKolom.trim(),
       tipeKolom,
+      rumus: tipeKolom === "RUMUS" ? rumus.trim() : null,
       isTarget,
       nilaiTarget: isTarget ? nilaiTarget.trim() : null,
-      isAccumulated: (tipeKolom === "NOMOR" || tipeKolom === "NOMINAL") ? isAccumulated : false,
+      isAccumulated: (tipeKolom === "NOMOR" || tipeKolom === "NOMINAL" || tipeKolom === "RUMUS") ? isAccumulated : false,
     };
 
     if (editingColumn) {
@@ -588,6 +605,12 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             {new Intl.NumberFormat("id-ID").format(Number(val))}
           </span>
         );
+      case "RUMUS":
+        return (
+          <span className="font-mono text-right block w-full text-accent font-medium">
+            {new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 }).format(Number(val))}
+          </span>
+        );
       case "NOMINAL":
         return (
           <span className="font-mono text-right block w-full text-nowrap">
@@ -633,15 +656,20 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       ];
 
       aplikasi.kolom.forEach((col) => {
-        const val = acc.customValues[col.id];
-        if (val === undefined || val === null) {
-          row.push("");
-        } else if (col.tipeKolom === "CENTANG") {
-          row.push(val ? "Ya" : "Tidak");
-        } else if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
-          row.push(Number(val));
+        if (col.tipeKolom === "RUMUS") {
+          const calcVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+          row.push(calcVal !== null ? calcVal : "");
         } else {
-          row.push(String(val));
+          const val = acc.customValues[col.id];
+          if (val === undefined || val === null) {
+            row.push("");
+          } else if (col.tipeKolom === "CENTANG") {
+            row.push(val ? "Ya" : "Tidak");
+          } else if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
+            row.push(Number(val));
+          } else {
+            row.push(String(val));
+          }
         }
       });
 
@@ -913,11 +941,12 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                             {col.tipeKolom === "TEKS" && "Aa"}
                             {col.tipeKolom === "NOMOR" && "#"}
                             {col.tipeKolom === "NOMINAL" && "Rp"}
+                            {col.tipeKolom === "RUMUS" && "fx"}
                             {col.tipeKolom === "CENTANG" && (
                               <Check className="h-2.5 w-2.5 stroke-[3]" />
                             )}
                           </Badge>
- 
+
                           <div className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-bg-surface border border-border-soft rounded-lg shadow-sm p-0.5 z-30">
                             <button
                               disabled={colIndex === 0}
@@ -949,6 +978,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                                 {col.tipeKolom === "TEKS" && "Aa"}
                                 {col.tipeKolom === "NOMOR" && "#"}
                                 {col.tipeKolom === "NOMINAL" && "Rp"}
+                                {col.tipeKolom === "RUMUS" && "fx"}
                                 {col.tipeKolom === "CENTANG" && (
                                   <Check className="h-2.5 w-2.5 stroke-[3]" />
                                 )}
@@ -988,7 +1018,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                     </TableHead>
                   );
                 })}
- 
+
                 <TableHead className="w-14 px-1 text-center">Aksi</TableHead>
               </TableRow>
             </TableHeader>
@@ -1044,6 +1074,19 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
 
                   {/* Render Dynamic custom values: Inline Inputs or Checkbox or formatted Text */}
                   {aplikasi.kolom.map((col) => {
+                    if (col.tipeKolom === "RUMUS") {
+                      const formulaVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+                      return (
+                        <TableCell
+                          key={col.id}
+                          className="select-none text-nowrap min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50 font-mono"
+                          title={`Rumus: ${col.rumus || ""}`}
+                        >
+                          {formatValue(formulaVal, col.tipeKolom)}
+                        </TableCell>
+                      );
+                    }
+
                     const val = acc.customValues[col.id];
 
                     if (col.tipeKolom === "CENTANG") {
@@ -1183,6 +1226,10 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                   if (!col.isAccumulated) return <TableCell key={col.id}></TableCell>;
                   
                   const sum = filteredAkun.reduce((acc, curr) => {
+                    if (col.tipeKolom === "RUMUS") {
+                      const calcVal = evaluateFormula(col.rumus, curr.customValues, aplikasi.kolom);
+                      return acc + (calcVal || 0);
+                    }
                     const val = curr.customValues[col.id];
                     return acc + (Number(val) || 0);
                   }, 0);
@@ -1247,8 +1294,82 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
               <option value="NOMOR">Nomor (Angka Biasa)</option>
               <option value="NOMINAL">Nominal (Rupiah Rp)</option>
               <option value="CENTANG">Centang (Benar / Salah)</option>
+              <option value="RUMUS">Rumus (Kalkulasi Otomatis)</option>
             </Select>
           </div>
+
+          {tipeKolom === "RUMUS" && (
+            <div className="flex flex-col gap-2.5 p-3.5 bg-bg-page/60 border border-border-soft rounded-2xl">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-text-secondary">
+                  Ekspresi Rumus
+                </label>
+                <Input
+                  type="text"
+                  value={rumus}
+                  onChange={(e) => setRumus(e.target.value)}
+                  placeholder="Contoh: 8 - limit atau (harga * jumlah) - diskon"
+                  required
+                />
+                <span className="text-[11px] text-text-secondary">
+                  Dapat menggunakan nama kolom (misal: <code className="text-accent bg-accent-soft/30 px-1 py-0.5 rounded font-mono">limit</code>), nilai target (misal: <code className="text-accent bg-accent-soft/30 px-1 py-0.5 rounded font-mono">target limit</code>), atau angka. Contoh: <code className="text-accent bg-accent-soft/30 px-1 py-0.5 rounded font-mono">target limit - limit</code>
+                </span>
+              </div>
+
+              {/* Column Chips */}
+              {aplikasi.kolom.filter((c) => !editingColumn || c.id !== editingColumn.id).length > 0 && (
+                <div className="flex flex-col gap-1.5 mt-1">
+                  <span className="text-[11px] font-semibold text-text-secondary">
+                    Klik Kolom untuk Menyisipkan Ke Rumus:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {aplikasi.kolom
+                      .filter((c) => !editingColumn || c.id !== editingColumn.id)
+                      .map((c) => (
+                        <div key={c.id} className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setRumus((prev) => (prev ? `${prev} [${c.namaKolom}]` : `[${c.namaKolom}]`))}
+                            className="text-xs font-medium px-2.5 py-1 rounded-lg bg-bg-surface border border-border-soft hover:border-accent hover:text-accent transition-colors cursor-pointer select-none"
+                          >
+                            +{c.namaKolom}
+                          </button>
+                          {c.isTarget && (
+                            <button
+                              type="button"
+                              onClick={() => setRumus((prev) => (prev ? `${prev} target [${c.namaKolom}]` : `target [${c.namaKolom}]`))}
+                              className="text-xs font-medium px-2 py-1 rounded-lg bg-target-bg border border-target-text/20 text-target-text hover:bg-target-hover transition-colors cursor-pointer select-none"
+                              title={`Menyisipkan nilai target dari ${c.namaKolom}`}
+                            >
+                              🎯 Target {c.namaKolom}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Operator Buttons */}
+              <div className="flex flex-col gap-1.5 mt-1">
+                <span className="text-[11px] font-semibold text-text-secondary">
+                  Operator Matematika:
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {["+", "-", "*", "/", "(", ")"].map((op) => (
+                    <button
+                      key={op}
+                      type="button"
+                      onClick={() => setRumus((prev) => (prev ? `${prev} ${op} ` : `${op} `))}
+                      className="text-xs font-mono font-bold w-8 h-8 rounded-lg bg-bg-surface border border-border-soft hover:bg-accent-soft hover:text-accent flex items-center justify-center transition-colors cursor-pointer select-none"
+                    >
+                      {op}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center gap-2 py-1">
             <Checkbox
@@ -1268,7 +1389,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             </label>
           </div>
 
-          {(tipeKolom === "NOMOR" || tipeKolom === "NOMINAL") && (
+          {(tipeKolom === "NOMOR" || tipeKolom === "NOMINAL" || tipeKolom === "RUMUS") && (
             <div className="flex items-center gap-2 py-1">
               <Checkbox
                 id="isAccumulated"
@@ -1460,6 +1581,15 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                         ({col.tipeKolom.toLowerCase()})
                       </span>
                     </label>
+
+                    {col.tipeKolom === "RUMUS" && (
+                      <div className="p-3 bg-bg-page/50 border border-border-soft/60 rounded-xl text-xs text-text-secondary flex items-center justify-between font-mono">
+                        <span>Kalkulasi Otomatis: <code className="text-accent">{col.rumus || "–"}</code></span>
+                        <span className="font-semibold text-text-primary">
+                          {evaluateFormula(col.rumus, customValues, aplikasi.kolom) ?? "–"}
+                        </span>
+                      </div>
+                    )}
 
                     {col.tipeKolom === "TEKS" && (
                       <Input

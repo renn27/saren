@@ -95,7 +95,7 @@ Mengelola alur pengeditan satu catatan secara mendalam, dioptimalkan sepenuhnya 
 * **Target Sentuh Checklist**: Di dalam `ChecklistEditor`, setiap baris memiliki padding vertikal longgar (`py-1.5`) dengan ukuran checkbox `h-4.5 w-4.5` (18px) dan kelengkungan `rounded-md` untuk kenyamanan jari mobile. Tombol hapus item (`X`) di kanan baris tidak menggunakan status hover tersembunyi, melainkan hanya dimunculkan secara dinamis saat baris input teks yang bersangkutan sedang berfokus/diedit (menggunakan state focus).
 * **Pengaturan Urutan (Drag and Drop)**: Setiap item aktif pada `ChecklistEditor` dilengkapi dengan tombol drag handle (`GripVertical`) di sebelah kiri untuk melakukan drag and drop guna mengatur urutan item secara interaktif.
 * **Auto-collapse Item Selesai**: Secara default, ketika halaman edit dibuka, daftar tugas yang sudah diselesaikan (`done`) disembunyikan dalam keadaan tertutup/terlipat (*auto-collapse*). Pengguna dapat membukanya kembali dengan menekan tombol toggle *"Selesai (Jumlah)"*.
-* **Mode Pengaturan Tabel (Table Editor)**: Di dalam `TableEditor`, tombol hapus baris, hapus kolom, tambah kolom, serta tombol **`Total`** (dengan ikon `Sigma` untuk menjumlahkan kolom otomatis) disembunyikan secara default untuk mencegah visual yang terlalu ramai. Semua tombol konfigurasi ini dikendalikan melalui tombol toggle **`Atur Kolom & Baris`** (ikon gerigi `Settings`) di bawah tabel. Ketika dinonaktifkan, tabel terlihat bersih dan hanya menampilkan input teks data, serta baris Total di bagian paling bawah tabel jika terdapat setidaknya satu kolom yang diaktifkan akumulasinya. Fitur total ini juga akan terender secara otomatis pada pratinjau kartu di dashboard utama dengan simbol awalan `Σ`.
+* **Mode Pengaturan Tabel (Table Editor)**: Di dalam `TableEditor`, tombol hapus baris, hapus kolom, tambah kolom, tombol **`Total`** (dengan ikon `Sigma` untuk menjumlahkan kolom otomatis), serta tombol **`Tipe Kolom`** (berganti antara `Teks`, `Tanggal` dengan date picker, dan `Centang` dengan Checkbox) disembunyikan secara default untuk mencegah visual yang terlalu ramai. Semua tombol konfigurasi ini dikendalikan melalui tombol toggle **`Atur Kolom & Baris`** (ikon gerigi `Settings`) di bawah tabel. Ketika dinonaktifkan, tabel terlihat bersih dan hanya menampilkan elemen interaktif data (input teks, input date picker, atau checkbox) serta baris Total jika diaktifkan. Fitur ini juga terender pada pratinjau kartu di dashboard utama.
 
 ---
 
@@ -197,6 +197,24 @@ Model `Nomor` memiliki kolom-kolom berikut di Prisma schema:
   // Di TableCell sticky yang sama
   className={meetsTarget ? "bg-target-bg group-hover:bg-target-hover" : "bg-bg-surface"}
   ```
+
+---
+
+## 🧮 Fitur Kolom Rumus (Formula Column)
+
+* **Tipe Kolom `RUMUS`**: Kolom kustom yang menghitung nilainya secara otomatis per baris berdasarkan ekspresi matematika dari kolom lain (seperti Excel).
+* **Evaluator Matematika (`lib/utils/formulaEvaluator.ts`)**:
+  * Menggunakan parser matematika aman (Shunting-yard algorithm) tanpa `eval()`.
+  * Mendukung operator `+`, `-`, `*`, `/`, `%`, `^`, dan tanda kurung `(`, `)`.
+  * Menggantikan nama kolom atau `[NamaKolom]` secara case-insensitive dengan nilai numerik dari baris akun (`customValues`).
+  * **Dukungan Parameter Target**: Mendukung referensi ke nilai target kolom spesifik (misal: `target Limit - Limit` atau `target [Limit] - [Limit]`). `target` akan mengambil nilai numerik `nilaiTarget` dari kolom yang bersangkutan.
+  * Penanganan kesalahan: pembagian dengan nol menghasilkan `0`, deteksi ketergantungan sirkular (recursive cycle protection).
+* **Tampilan & Interaksi**:
+  * Sel bertipe `RUMUS` bersifat **read-only** di tabel dan tidak memicu modal edit inline.
+  * Header kolom `RUMUS` ditandai dengan badge `fx`.
+  * Modal Tambah/Edit Kolom menyediakan input rumus dilengkapi tombol pembantu (*chips*) nama kolom lain dan tombol operator matematika.
+  * Mendukung **Total Akumulasi** (penjumlahan hasil rumus seluruh baris) dan **Jadikan Target** (highlight hijau jika hasil kalkulasi mencapai target).
+  * Pada ekspor Excel/CSV, hasil kalkulasi rumus disertakan sebagai angka numerik.
 
 ---
 
