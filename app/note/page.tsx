@@ -15,7 +15,10 @@ export default async function NotePage() {
         labels: true,
         folder: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
+      // Safeguard: batasi 200 catatan terbaru agar tidak overload client.
+      // Catatan yang isTrashed/isArchived tetap diambil agar filter client-side berjalan.
+      take: 200,
     }),
     db.label.findMany({
       orderBy: { name: "asc" },

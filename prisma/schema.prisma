@@ -29,11 +29,13 @@ model Aplikasi {
   namaAplikasi String
   logoUrl      String?  // url dari Vercel Blob, nullable
   deskripsi    String?  // deskripsi aplikasi, nullable
+  kategori     String?  // kategori aplikasi (e.g. E-Wallet, Bank, Investasi), nullable
   kolom        Kolom[]
   akun         Akun[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@index([garapanId])
   @@map("aplikasi")
 }
 
@@ -60,6 +62,7 @@ model Kolom {
   createdAt     DateTime  @default(now())
 
   @@unique([aplikasiId, namaKolom]) // nama kolom unik per aplikasi
+  @@index([aplikasiId, urutan])
   @@map("kolom")
 }
 
@@ -75,6 +78,7 @@ model Akun {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@index([aplikasiId, urutan])
   @@map("akun")
 }
 
@@ -87,6 +91,7 @@ model Nomor {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  @@index([masaAktif])
   @@map("nomor")
 }
 

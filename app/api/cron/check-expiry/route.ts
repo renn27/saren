@@ -25,24 +25,55 @@ export async function GET(request: Request) {
   try {
     webpush.setVapidDetails(subject, publicKey, privateKey);
 
-    // 1. Ambil semua nomor yang masa aktifnya akan habis dalam <= 7 hari, ATAU sudah habis
+    // 1. Ambil semua nomor telepon dari database
+    const allNumbers = await db.nomor.findMany();
+
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
-    const sevenDaysFromNow = new Date(now);
-    sevenDaysFromNow.setDate(now.getDate() + 7);
+    // Filter nomor yang memenuhi syarat pengiriman notifikasi sesuai aturan:
+    // Aturan 1: Masa aktif habis tepat hari ini (diffDays === 0).
+    // Aturan 2: Masuk masa tenggang dan sisa masa tenggang <= 5 hari lagi (sisaMasaTenggangDays >= 0 && sisaMasaTenggangDays <= 5).
+    const notificationsToSend: { num: any; title: string; body: string }[] = [];
 
-    // Ambil nomor yang masa aktif <= 7 hari ke depan
-    const warningNumbers = await db.nomor.findMany({
-      where: {
-        masaAktif: {
-          lte: sevenDaysFromNow,
-        },
-      },
-    });
+    for (const num of allNumbers) {
+      const masaAktifDate = new Date(num.masaAktif);
+      masaAktifDate.setHours(0, 0, 0, 0);
 
-    if (warningNumbers.length === 0) {
-      return NextResponse.json({ success: true, message: "No numbers expiring soon." });
+      // Selisih hari sampai masa aktif habis
+      const diffDays = Math.floor((masaAktifDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Masa tenggang berakhir 30 hari setelah masa aktif habis
+      const masaTenggangEndDate = new Date(masaAktifDate);
+      masaTenggangEndDate.setDate(masaTenggangEndDate.getDate() + 30);
+      masaTenggangEndDate.setHours(0, 0, 0, 0);
+
+      const sisaMasaTenggangDays = Math.floor((masaTenggangEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      let title = "";
+      let body = "";
+
+      // Aturan 1: Tepat pada hari H masa aktif habis
+      if (diffDays === 0) {
+        title = `⚠️ Masa Aktif ${num.provider} Habis Hari Ini!`;
+        body = `Nomor ${num.nomorKartu} habis masa aktifnya hari ini (${masaAktifDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}). Segera isi pulsa agar tidak masuk masa tenggang!`;
+        notificationsToSend.push({ num, title, body });
+      } 
+      // Aturan 2: Sudah lewat masa aktif (masuk masa tenggang), dan sisa masa tenggang <= 5 hari
+      else if (diffDays < 0 && sisaMasaTenggangDays >= 0 && sisaMasaTenggangDays <= 5) {
+        if (sisaMasaTenggangDays === 0) {
+          title = `🚨 DARURAT: Hari Terakhir Masa Tenggang ${num.provider}!`;
+          body = `Nomor ${num.nomorKartu} akan HANGUS PERMANEN hari ini! Segera isi pulsa sekarang juga!`;
+        } else {
+          title = `🚨 Masa Tenggang ${num.provider} Sisa ${sisaMasaTenggangDays} Hari!`;
+          body = `Nomor ${num.nomorKartu} akan hangus permanen dalam ${sisaMasaTenggangDays} hari lagi. Segera isi pulsa sebelum terlambat!`;
+        }
+        notificationsToSend.push({ num, title, body });
+      }
+    }
+
+    if (notificationsToSend.length === 0) {
+      return NextResponse.json({ success: true, message: "No numbers trigger notification today." });
     }
 
     // 2. Ambil semua subskripsi push dari database
@@ -55,27 +86,11 @@ export async function GET(request: Request) {
     let sentCount = 0;
     let failedSubscriptions: string[] = [];
 
-    // 3. Kirim notifikasi untuk setiap nomor ke semua subskripsi
-    for (const num of warningNumbers) {
-      const daysLeft = Math.ceil((new Date(num.masaAktif).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      
-      let title = "";
-      let body = "";
-      
-      if (daysLeft < 0) {
-        title = `🚨 Masa Aktif ${num.provider} Habis!`;
-        body = `Nomor ${num.nomorKartu} telah melewati masa aktif sejak ${new Date(num.masaAktif).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}.`;
-      } else if (daysLeft === 0) {
-        title = `⚠️ Masa Aktif ${num.provider} Habis Hari Ini!`;
-        body = `Nomor ${num.nomorKartu} habis masa aktifnya hari ini. Segera isi pulsa sekarang!`;
-      } else {
-        title = `⚠️ Masa Aktif ${num.provider} Hampir Habis!`;
-        body = `Nomor ${num.nomorKartu} akan berakhir dalam ${daysLeft} hari (${new Date(num.masaAktif).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}).`;
-      }
-
+    // 3. Kirim notifikasi untuk setiap nomor yang memenuhi syarat ke semua subskripsi
+    for (const item of notificationsToSend) {
       const payload = JSON.stringify({
-        title,
-        body,
+        title: item.title,
+        body: item.body,
         url: "/nomor",
       });
 
@@ -93,7 +108,6 @@ export async function GET(request: Request) {
           sentCount++;
         } catch (err: any) {
           console.error("Failed to send notification:", err);
-          // Jika subskripsi kadaluarsa atau tidak valid (status 410 atau 404), kumpulkan id-nya untuk dihapus
           if (err.statusCode === 410 || err.statusCode === 404) {
             failedSubscriptions.push(sub.id);
           }

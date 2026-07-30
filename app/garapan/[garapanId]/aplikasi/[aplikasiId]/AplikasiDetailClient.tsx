@@ -49,7 +49,6 @@ import {
   Square,
 } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 import { createKolom, deleteKolom, swapKolomUrutan, updateKolom, clearKolomData } from "@/lib/actions/kolom";
 import { createAkun, updateAkun, deleteAkun, getAllAccountsForAutofill, swapAkunUrutan, bulkUpdateCentang } from "@/lib/actions/akun";
 import { updateAplikasi } from "@/lib/actions/aplikasi";
@@ -271,16 +270,27 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     }
   }, [editingAccount, aplikasi.kolom]);
 
-  // Since search query is removed, filteredAkun is simply the list of accounts
-  const filteredAkun = aplikasi.akun;
+  // Local State for Optimistic UI Updates
+  const [akunList, setAkunList] = React.useState<AkunItem[]>(aplikasi.akun);
+  const [kolomList, setKolomList] = React.useState<KolomItem[]>(aplikasi.kolom);
+
+  React.useEffect(() => {
+    setAkunList(aplikasi.akun);
+  }, [aplikasi.akun]);
+
+  React.useEffect(() => {
+    setKolomList(aplikasi.kolom);
+  }, [aplikasi.kolom]);
+
+  const filteredAkun = akunList;
 
   const checkAkunMeetsTarget = React.useCallback((acc: AkunItem) => {
-    const targetCols = aplikasi.kolom.filter((c) => c.isTarget && c.nilaiTarget !== null && c.nilaiTarget !== "");
+    const targetCols = kolomList.filter((c) => c.isTarget && c.nilaiTarget !== null && c.nilaiTarget !== "");
     if (targetCols.length === 0) return false;
 
     return targetCols.some((col) => {
       if (col.tipeKolom === "RUMUS") {
-        const calcVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+        const calcVal = evaluateFormula(col.rumus, acc.customValues, kolomList);
         if (calcVal === null) return false;
         return calcVal >= Number(col.nilaiTarget);
       }
@@ -297,7 +307,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         return String(val).trim().toLowerCase() === String(col.nilaiTarget).trim().toLowerCase();
       }
     });
-  }, [aplikasi.kolom]);
+  }, [kolomList]);
 
   // Column CRUD
   const handleColumnSubmit = async (e: React.FormEvent) => {
@@ -385,7 +395,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
 
     // Clean custom values before sending
     const cleanedCustomValues: Record<string, any> = {};
-    aplikasi.kolom.forEach((col) => {
+    kolomList.forEach((col) => {
       const val = customValues[col.id];
       if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
         if (val !== "" && val !== undefined && val !== null) {
@@ -448,36 +458,75 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     const acc2 = filteredAkun[idx2];
     if (!acc1 || !acc2) return;
 
+    // 🚀 Optimistic update: swap items in local state instantly (0ms)
+    const previousAkunList = [...akunList];
+    setAkunList((prev) => {
+      const next = [...prev];
+      const i1 = next.findIndex((a) => a.id === acc1.id);
+      const i2 = next.findIndex((a) => a.id === acc2.id);
+      if (i1 !== -1 && i2 !== -1) {
+        const temp = next[i1];
+        next[i1] = next[i2];
+        next[i2] = temp;
+      }
+      return next;
+    });
+
     const res = await swapAkunUrutan(garapan.id, aplikasi.id, acc1.id, acc2.id);
     if (res.success) {
       toast.success("Urutan akun diperbarui", { duration: 1000 });
       router.refresh();
     } else {
+      setAkunList(previousAkunList);
       toast.error(res.error || "Gagal memindahkan akun.");
     }
   };
 
   const handleSwapKolom = async (idx1: number, idx2: number) => {
-    const col1 = aplikasi.kolom[idx1];
-    const col2 = aplikasi.kolom[idx2];
+    const col1 = kolomList[idx1];
+    const col2 = kolomList[idx2];
     if (!col1 || !col2) return;
+
+    // 🚀 Optimistic update: swap columns in local state instantly (0ms)
+    const previousKolomList = [...kolomList];
+    setKolomList((prev) => {
+      const next = [...prev];
+      const temp = next[idx1];
+      next[idx1] = next[idx2];
+      next[idx2] = temp;
+      return next;
+    });
 
     const res = await swapKolomUrutan(garapan.id, aplikasi.id, col1.id, col2.id);
     if (res.success) {
       toast.success("Urutan kolom diperbarui", { duration: 1000 });
       router.refresh();
     } else {
+      setKolomList(previousKolomList);
       toast.error(res.error || "Gagal memindahkan kolom.");
     }
   };
 
   const handleBulkCentang = async (columnId: string, newValue: boolean) => {
+    // 🚀 Optimistic update: instantly toggle all checkboxes locally (0ms)
+    const previousAkunList = [...akunList];
+    setAkunList((prev) =>
+      prev.map((acc) => ({
+        ...acc,
+        customValues: {
+          ...acc.customValues,
+          [columnId]: newValue,
+        },
+      }))
+    );
+
     const toastId = toast.loading("Memperbarui data akun...");
     const res = await bulkUpdateCentang(garapan.id, aplikasi.id, columnId, newValue);
     if (res.success) {
       toast.success("Semua data berhasil diperbarui", { id: toastId });
       router.refresh();
     } else {
+      setAkunList(previousAkunList);
       toast.error(res.error || "Gagal memperbarui data secara massal.", { id: toastId });
     }
   };
@@ -487,7 +536,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     columnId: "nama" | string,
     newValue: any
   ) => {
-    const acc = aplikasi.akun.find((a) => a.id === accountId);
+    const acc = akunList.find((a) => a.id === accountId);
     if (!acc) return;
 
     let data;
@@ -513,11 +562,28 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
       };
     }
 
+    // 🚀 Optimistic update: update local state instantly (0ms response)
+    const previousAkunList = [...akunList];
+    setAkunList((prev) =>
+      prev.map((a) => {
+        if (a.id !== accountId) return a;
+        if (columnId === "nama") return { ...a, nama: String(newValue).trim() || a.nama };
+        return {
+          ...a,
+          customValues: {
+            ...a.customValues,
+            [columnId]: newValue,
+          },
+        };
+      })
+    );
+
     const res = await updateAkun(accountId, garapan.id, data);
     if (res.success) {
       toast.success("Data diperbarui", { duration: 1000 });
       router.refresh();
     } else {
+      setAkunList(previousAkunList);
       toast.error(res.error || "Gagal memperbarui data.");
     }
   };
@@ -635,7 +701,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
   };
 
   // Export handling
-  const handleExport = (format: "xlsx" | "csv") => {
+  const handleExport = async (format: "xlsx" | "csv") => {
     if (filteredAkun.length === 0) {
       toast.error("Tidak ada data untuk diekspor.");
       return;
@@ -643,7 +709,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
 
     // Build Headers
     const headers = ["Nama", "Device", "No HP"];
-    aplikasi.kolom.forEach((col) => {
+    kolomList.forEach((col) => {
       headers.push(col.namaKolom);
     });
 
@@ -655,9 +721,9 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
         acc.nomorHp || "",
       ];
 
-      aplikasi.kolom.forEach((col) => {
+      kolomList.forEach((col) => {
         if (col.tipeKolom === "RUMUS") {
-          const calcVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+          const calcVal = evaluateFormula(col.rumus, acc.customValues, kolomList);
           row.push(calcVal !== null ? calcVal : "");
         } else {
           const val = acc.customValues[col.id];
@@ -687,6 +753,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
     const fileName = `${appSlug}-${monthSlug}-${garapan.tahun}`;
 
     if (format === "xlsx") {
+      const XLSX = await import("xlsx");
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Akun");
@@ -779,11 +846,11 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             )}
 
             {/* Targets Summary Box (Neutral styling, no high contrast emerald green text) */}
-            {aplikasi.kolom.some((c) => c.isTarget) && (
+            {kolomList.some((c) => c.isTarget) && (
               <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary bg-bg-page/40 border border-border-soft/60 px-3 py-1.5 rounded-xl w-fit font-sans">
                 <span className="font-semibold text-text-secondary select-none">Target:</span>
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-text-primary">
-                  {aplikasi.kolom
+                  {kolomList
                     .filter((c) => c.isTarget)
                     .map((col, idx) => {
                       let formattedTarget = col.nilaiTarget || "–";
@@ -845,7 +912,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             </span>
           </Button>
 
-          {aplikasi.akun.length > 0 && (
+          {akunList.length > 0 && (
             <Button
               variant={isReorderMode ? "secondary" : "outline"}
               size="sm"
@@ -919,7 +986,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                 <TableHead className="sticky left-0 bg-bg-surface z-20 border-r border-border-soft min-w-[90px] sm:min-w-[150px] text-center">Akun</TableHead>
  
                 {/* Render Dynamic Custom Column Headers */}
-                {aplikasi.kolom.map((col, colIndex) => {
+                {kolomList.map((col, colIndex) => {
                   return (
                     <TableHead
                       key={col.id}
@@ -957,7 +1024,7 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                               <ChevronLeft className="h-3 w-3" />
                             </button>
                             <button
-                              disabled={colIndex === aplikasi.kolom.length - 1}
+                              disabled={colIndex === kolomList.length - 1}
                               onClick={() => handleSwapKolom(colIndex, colIndex + 1)}
                               className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
                               title="Geser Kanan"
@@ -1073,9 +1140,9 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
                     </TableCell>
 
                   {/* Render Dynamic custom values: Inline Inputs or Checkbox or formatted Text */}
-                  {aplikasi.kolom.map((col) => {
+                  {kolomList.map((col) => {
                     if (col.tipeKolom === "RUMUS") {
-                      const formulaVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+                      const formulaVal = evaluateFormula(col.rumus, acc.customValues, kolomList);
                       return (
                         <TableCell
                           key={col.id}
@@ -1216,18 +1283,18 @@ export function AplikasiDetailClient({ garapan, aplikasi }: AplikasiDetailClient
             })}
             
             {/* Accumulation / Footer Row */}
-            {aplikasi.kolom.some((c) => c.isAccumulated) && (
+            {kolomList.some((c) => c.isAccumulated) && (
               <TableRow className="bg-bg-surface font-bold text-text-primary hover:bg-bg-surface cursor-default">
                 {isReorderMode && <TableCell className="border-r border-border-soft"></TableCell>}
                 <TableCell className="sticky left-0 bg-bg-surface z-10 border-r border-border-soft text-right">
                   Total Akumulasi:
                 </TableCell>
-                {aplikasi.kolom.map((col) => {
+                {kolomList.map((col) => {
                   if (!col.isAccumulated) return <TableCell key={col.id}></TableCell>;
                   
                   const sum = filteredAkun.reduce((acc, curr) => {
                     if (col.tipeKolom === "RUMUS") {
-                      const calcVal = evaluateFormula(col.rumus, curr.customValues, aplikasi.kolom);
+                      const calcVal = evaluateFormula(col.rumus, curr.customValues, kolomList);
                       return acc + (calcVal || 0);
                     }
                     const val = curr.customValues[col.id];

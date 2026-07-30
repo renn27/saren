@@ -10,14 +10,16 @@ import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MoreVertical, Edit2, Trash2, Calendar, Plus, List } from "lucide-react";
+import { MoreVertical, Edit2, Trash2, Calendar, Plus, List, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { createGarapan, updateGarapan, deleteGarapan } from "@/lib/actions/garapan";
+import { checkAppTargetCompleted } from "@/lib/utils/formulaEvaluator";
 
 interface GarapanItem {
   id: string;
   bulan: number;
   tahun: number;
+  aplikasi?: any[];
 }
 
 interface GarapanListClientProps {
@@ -48,6 +50,13 @@ const MONTH_ACCENTS = [
 export function GarapanListClient({ initialList }: GarapanListClientProps) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // Local optimistic state
+  const [list, setList] = React.useState<GarapanItem[]>(initialList);
+
+  React.useEffect(() => {
+    setList(initialList);
+  }, [initialList]);
 
   // Route transition state
   const [isExiting, setIsExiting] = React.useState(false);
@@ -99,6 +108,8 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
     const data = { bulan, tahun };
 
     if (editingItem) {
+      const prevList = [...list];
+      setList((prev) => prev.map((g) => (g.id === editingItem.id ? { ...g, ...data } : g)));
       const res = await updateGarapan(editingItem.id, data);
       setIsSubmitting(false);
       if (res.success) {
@@ -106,13 +117,16 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
         setEditingItem(null);
         router.refresh();
       } else {
+        setList(prevList);
         setFormError(res.error || "Gagal memperbarui garapan.");
       }
     } else {
       const res = await createGarapan(data);
       setIsSubmitting(false);
-      if (res.success) {
+      if (res.success && res.data) {
         toast.success("Garapan ditambahkan");
+        const newItem = res.data;
+        setList((prev) => [newItem, ...prev]);
         setIsAddOpen(false);
         router.refresh();
       } else {
@@ -123,12 +137,17 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
 
   const handleDelete = async () => {
     if (!deletingItem) return;
-    const res = await deleteGarapan(deletingItem.id);
+    const targetId = deletingItem.id;
+    const prevList = [...list];
+    setList((prev) => prev.filter((g) => g.id !== targetId));
+    setDeletingItem(null);
+
+    const res = await deleteGarapan(targetId);
     if (res.success) {
       toast.success("Garapan dihapus");
-      setDeletingItem(null);
       router.refresh();
     } else {
+      setList(prevList);
       toast.error(res.error || "Gagal menghapus garapan.");
     }
   };
@@ -146,52 +165,63 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
               Daftar Garapan
             </h2>
             <p className="text-xs text-text-secondary font-sans mt-0.5">
-              {initialList.length} bulan tercatat
+              {list.length} bulan tercatat
             </p>
           </div>
         </div>
-
-        {initialList.length > 0 && (
-          <Button onClick={() => setIsAddOpen(true)} className="flex items-center gap-2 w-full sm:w-auto justify-center shrink-0">
-            <Plus className="h-4 w-4" />
-            <span>Tambah Garapan</span>
-          </Button>
-        )}
+        <Button
+          variant="primary"
+          onClick={() => setIsAddOpen(true)}
+          className="gap-2 font-semibold text-xs px-4 h-10 rounded-xl"
+        >
+          <Plus className="h-4 w-4 shrink-0" />
+          <span>Tambah Garapan</span>
+        </Button>
       </Card>
 
-      {/* Grid or Empty State */}
-      {initialList.length === 0 ? (
-        <div className="py-16">
-          <EmptyState
-            icon={Calendar}
-            title="Belum ada garapan"
-            description="Tambahkan bulan dan tahun pertamamu untuk mulai mencatat pekerjaan."
-            actionLabel="Tambah Garapan Pertama"
-            onAction={() => setIsAddOpen(true)}
-          />
-        </div>
+      {/* List Grid */}
+      {list.length === 0 ? (
+        <EmptyState
+          icon={Calendar}
+          title="Belum ada garapan"
+          description="Tambahkan bulan dan tahun garapan pertama Anda untuk mulai mencatat akun aplikasi."
+          actionLabel="Tambah Garapan Pertama"
+          onAction={() => setIsAddOpen(true)}
+        />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5">
-          {initialList.map((item) => (
-            <Card
-              key={item.id}
-              hoverable
-              onClick={() => handleNavigate(`/garapan/${item.id}`)}
-              className="card-stagger relative group pr-12 flex items-center p-4 sm:p-5 gap-4 hover:z-10 focus-within:z-10 min-h-[100px]"
-            >
-              {/* Month color icon */}
-              <div className={`h-11 w-11 rounded-2xl bg-gradient-to-br ${MONTH_ACCENTS[item.bulan - 1]} text-accent flex items-center justify-center shrink-0 border border-accent/10`}>
-                <Calendar className="h-5 w-5 group-hover:scale-110 transition-transform duration-300 ease-out" />
-              </div>
-              {/* Title & Year */}
-              <div className="flex-1 min-w-0 flex flex-row items-center gap-2.5">
-                <h3 className="text-[17px] font-bold text-text-primary font-display truncate">
-                  {MONTH_NAMES[item.bulan - 1]}
-                </h3>
-                <span className="inline-flex items-center rounded-md bg-bg-page px-2 py-0.5 text-[11px] font-medium text-text-secondary border border-border-soft shrink-0">
-                  {item.tahun}
-                </span>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {list.map((item) => {
+            const monthAccent = MONTH_ACCENTS[(item.bulan - 1) % 12];
+            const monthName = MONTH_NAMES[item.bulan - 1];
+
+            const isGarapanCompleted =
+              Boolean(item.aplikasi && item.aplikasi.length > 0) &&
+              item.aplikasi!.every((app) => checkAppTargetCompleted(app));
+
+            return (
+              <Card
+                key={item.id}
+                onClick={() => handleNavigate(`/garapan/${item.id}`)}
+                className="card-stagger group relative flex items-center gap-3.5 p-4 sm:p-5 pr-12 cursor-pointer hover:border-accent/40 transition-all duration-200 min-h-[80px]"
+              >
+                {/* Month color icon */}
+                <div className={`h-11 w-11 rounded-2xl bg-gradient-to-br ${monthAccent} text-accent flex items-center justify-center shrink-0 border border-accent/10 relative`}>
+                  <Calendar className="h-5 w-5 group-hover:scale-110 transition-transform duration-300 ease-out" />
+                </div>
+                {/* Title & Year */}
+                <div className="flex-1 min-w-0 flex flex-row items-center gap-2 font-display">
+                  <h3 className="text-[17px] font-bold text-text-primary truncate leading-none">
+                    {monthName}
+                  </h3>
+                  <span className="inline-flex items-center rounded-md bg-bg-page px-2 py-0.5 text-[11px] font-semibold text-text-secondary border border-border-soft shrink-0">
+                    {item.tahun}
+                  </span>
+                  {isGarapanCompleted && (
+                    <span className="inline-flex items-center justify-center h-5.5 w-5.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-500 shrink-0 select-none" title="Garapan Selesai">
+                      <CheckCircle2 className="h-3.5 w-3.5 stroke-[2.5]" />
+                    </span>
+                  )}
+                </div>
 
               {/* Dropdown Action Menu */}
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -212,8 +242,9 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
                   </DropdownMenuItem>
                 </DropdownMenu>
               </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 

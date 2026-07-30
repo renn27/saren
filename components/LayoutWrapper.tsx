@@ -29,11 +29,18 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
         {!isNoteDetailPage && (
           <header className="relative md:sticky md:top-0 z-40 w-full border-b border-border-soft/50 bg-bg-surface/80 backdrop-blur-xl transition-all duration-200 shrink-0">
             <div className="max-w-7xl mx-auto w-full px-4 h-16 flex items-center justify-between md:px-8">
-              <Link href="/" className="flex items-center gap-2.5 group">
+              <Link href="/" prefetch={true} className="flex items-center gap-2.5 group">
+                {/* Logo dark mode */}
                 <img
                   src="/saren_logo_dark.png"
                   alt="SAREN Logo"
-                  className="h-9 w-9 rounded-xl object-cover shadow-sm border border-border-soft/50 bg-bg-surface transition-transform duration-200 group-hover:scale-105 group-active:scale-95"
+                  className="hidden dark:block h-9 w-9 rounded-xl object-cover shadow-sm border border-border-soft/50 bg-bg-surface transition-transform duration-200 group-hover:scale-105 group-active:scale-95"
+                />
+                {/* Logo light mode */}
+                <img
+                  src="/saren_logo_light.png"
+                  alt="SAREN Logo"
+                  className="block dark:hidden h-9 w-9 rounded-xl object-cover shadow-sm border border-border-soft/50 bg-bg-surface transition-transform duration-200 group-hover:scale-105 group-active:scale-95"
                 />
                 <span className="font-display font-semibold text-base text-text-primary tracking-tight">
                   SAREN

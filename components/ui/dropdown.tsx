@@ -67,9 +67,9 @@ export function DropdownMenu({
     }
   }, [isOpen]);
 
-  // Click outside to close
+  // Click outside to close (supports both mouse and touch events for mobile)
   React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (
         containerRef.current &&
         !containerRef.current.contains(event.target as Node)
@@ -77,27 +77,37 @@ export function DropdownMenu({
         setIsOpen(false);
       }
     };
-    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, [isOpen]);
 
   return (
     <div ref={containerRef} className="relative inline-block text-left">
       <div
         onClick={(e) => {
+          e.preventDefault();
           e.stopPropagation();
-          setIsOpen(!isOpen);
+          setIsOpen((prev) => !prev);
         }}
-        className="cursor-pointer"
+        className="cursor-pointer select-none"
       >
         {trigger}
       </div>
 
       {shouldRender && (
         <div
-          onClick={() => setIsOpen(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(false);
+          }}
           className={twMerge(
-            "absolute z-30 mt-2 w-36 rounded-xl bg-bg-surface border border-border-soft py-1",
+            "absolute z-50 mt-2 w-36 rounded-xl bg-bg-surface border border-border-soft py-1",
             "[box-shadow:0_8px_32px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)]",
             "transition-all duration-[180ms] ease-out origin-top",
             isAnimating

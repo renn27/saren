@@ -3,47 +3,74 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { put, del } from "@vercel/blob";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 
-interface NoteListItemInput {
-  text: string;
-  isCompleted: boolean;
-  urutan: number;
+// ── Zod schemas ──────────────────────────────────────────────────────────────
+
+const noteListItemSchema = z.object({
+  text: z.string(),
+  isCompleted: z.boolean(),
+  urutan: z.number().int(),
+});
+
+const createNoteSchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  isPinned: z.boolean().optional(),
+  isArchived: z.boolean().optional(),
+  color: z.string().optional(),
+  isList: z.boolean().optional(),
+  isTable: z.boolean().optional(),
+  listItems: z.array(noteListItemSchema).optional(),
+  labelIds: z.array(z.string()).optional(),
+  imageUrl: z.string().nullable().optional(),
+  folderId: z.string().nullable().optional(),
+  reminderAt: z.union([z.date(), z.string()]).nullable().optional(),
+  reminderMinutesBefore: z.number().int().optional(),
+});
+
+const updateNoteSchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  isPinned: z.boolean().optional(),
+  isArchived: z.boolean().optional(),
+  isTrashed: z.boolean().optional(),
+  color: z.string().optional(),
+  isList: z.boolean().optional(),
+  isTable: z.boolean().optional(),
+  listItems: z.array(noteListItemSchema).optional(),
+  labelIds: z.array(z.string()).optional(),
+  imageUrl: z.string().nullable().optional(),
+  folderId: z.string().nullable().optional(),
+  reminderAt: z.union([z.date(), z.string()]).nullable().optional(),
+  reminderMinutesBefore: z.number().int().optional(),
+});
+
+type CreateNoteInput = z.infer<typeof createNoteSchema>;
+type UpdateNoteInput = z.infer<typeof updateNoteSchema>;
+
+// ── SSRF: blokir IP internal / private ───────────────────────────────────────
+
+const PRIVATE_HOST_PATTERN =
+  /^(localhost|0\.0\.0\.0|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/;
+
+function isSsrfSafeUrl(url: URL): boolean {
+  const host = url.hostname.toLowerCase();
+  if (PRIVATE_HOST_PATTERN.test(host)) return false;
+  // Hanya izinkan HTTP dan HTTPS
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  return true;
 }
 
-interface CreateNoteInput {
-  title?: string;
-  content?: string;
-  isPinned?: boolean;
-  isArchived?: boolean;
-  color?: string;
-  isList?: boolean;
-  isTable?: boolean;
-  listItems?: NoteListItemInput[];
-  labelIds?: string[];
-  imageUrl?: string | null;
-  folderId?: string | null;
-  reminderAt?: Date | string | null;
-  reminderMinutesBefore?: number;
-}
-
-interface UpdateNoteInput {
-  title?: string;
-  content?: string;
-  isPinned?: boolean;
-  isArchived?: boolean;
-  isTrashed?: boolean;
-  color?: string;
-  isList?: boolean;
-  isTable?: boolean;
-  listItems?: NoteListItemInput[];
-  labelIds?: string[];
-  imageUrl?: string | null;
-  folderId?: string | null;
-  reminderAt?: Date | string | null;
-  reminderMinutesBefore?: number;
-}
+// ── Note CRUD ─────────────────────────────────────────────────────────────────
 
 export async function createNote(data: CreateNoteInput) {
+  const validation = createNoteSchema.safeParse(data);
+  if (!validation.success) {
+    return { success: false, error: validation.error.issues[0].message };
+  }
+
   try {
     const note = await db.$transaction(async (tx) => {
       return await tx.note.create({
@@ -94,11 +121,15 @@ export async function createNote(data: CreateNoteInput) {
 }
 
 export async function updateNote(id: string, data: UpdateNoteInput) {
+  const validation = updateNoteSchema.safeParse(data);
+  if (!validation.success) {
+    return { success: false, error: validation.error.issues[0].message };
+  }
+
   try {
     const note = await db.$transaction(async (tx) => {
       // If list items are provided, replace them
       if (data.listItems !== undefined) {
-        // delete old items
         await tx.noteListItem.deleteMany({
           where: { noteId: id },
         });
@@ -117,25 +148,35 @@ export async function updateNote(id: string, data: UpdateNoteInput) {
           isTable: data.isTable !== undefined ? data.isTable : undefined,
           imageUrl: data.imageUrl !== undefined ? data.imageUrl : undefined,
           folderId: data.folderId !== undefined ? data.folderId : undefined,
-          reminderAt: data.reminderAt !== undefined ? (data.reminderAt ? new Date(data.reminderAt) : null) : undefined,
-          reminderMinutesBefore: data.reminderMinutesBefore !== undefined ? data.reminderMinutesBefore : undefined,
+          reminderAt:
+            data.reminderAt !== undefined
+              ? data.reminderAt
+                ? new Date(data.reminderAt)
+                : null
+              : undefined,
+          reminderMinutesBefore:
+            data.reminderMinutesBefore !== undefined
+              ? data.reminderMinutesBefore
+              : undefined,
           reminderSent: data.reminderAt !== undefined ? false : undefined,
-          listItems: data.listItems !== undefined && data.listItems.length > 0
-            ? {
-                createMany: {
-                  data: data.listItems.map((item) => ({
-                    text: item.text,
-                    isCompleted: item.isCompleted,
-                    urutan: item.urutan,
-                  })),
-                },
-              }
-            : undefined,
-          labels: data.labelIds !== undefined
-            ? {
-                set: data.labelIds.map((lid) => ({ id: lid })),
-              }
-            : undefined,
+          listItems:
+            data.listItems !== undefined && data.listItems.length > 0
+              ? {
+                  createMany: {
+                    data: data.listItems.map((item) => ({
+                      text: item.text,
+                      isCompleted: item.isCompleted,
+                      urutan: item.urutan,
+                    })),
+                  },
+                }
+              : undefined,
+          labels:
+            data.labelIds !== undefined
+              ? {
+                  set: data.labelIds.map((lid) => ({ id: lid })),
+                }
+              : undefined,
         },
         include: {
           listItems: true,
@@ -158,7 +199,7 @@ export async function trashNote(id: string) {
       where: { id },
       data: {
         isTrashed: true,
-        isPinned: false, // Untrash / Trash removes pin state
+        isPinned: false,
       },
     });
     revalidatePath("/note");
@@ -211,41 +252,59 @@ export async function emptyTrash() {
   }
 }
 
+// ── Toggle pin — atomic transaction (satu round-trip) ─────────────────────────
+
 export async function togglePinNote(id: string) {
   try {
-    const note = await db.note.findUnique({ where: { id } });
-    if (!note) return { success: false, error: "Catatan tidak ditemukan" };
-
-    const updated = await db.note.update({
-      where: { id },
-      data: {
-        isPinned: !note.isPinned,
-        isArchived: false, // Pinned note is not archived
-      },
+    const updated = await db.$transaction(async (tx) => {
+      const note = await tx.note.findUnique({
+        where: { id },
+        select: { isPinned: true },
+      });
+      if (!note) throw new Error("NOT_FOUND");
+      return tx.note.update({
+        where: { id },
+        data: {
+          isPinned: !note.isPinned,
+          isArchived: false,
+        },
+      });
     });
     revalidatePath("/note");
     return { success: true, data: updated };
   } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return { success: false, error: "Catatan tidak ditemukan" };
+    }
     console.error("Failed to toggle pin note:", error);
     return { success: false, error: "Gagal mengubah status sematan" };
   }
 }
 
+// ── Toggle archive — atomic transaction ───────────────────────────────────────
+
 export async function toggleArchiveNote(id: string) {
   try {
-    const note = await db.note.findUnique({ where: { id } });
-    if (!note) return { success: false, error: "Catatan tidak ditemukan" };
-
-    const updated = await db.note.update({
-      where: { id },
-      data: {
-        isArchived: !note.isArchived,
-        isPinned: false, // Archived note is not pinned
-      },
+    const updated = await db.$transaction(async (tx) => {
+      const note = await tx.note.findUnique({
+        where: { id },
+        select: { isArchived: true },
+      });
+      if (!note) throw new Error("NOT_FOUND");
+      return tx.note.update({
+        where: { id },
+        data: {
+          isArchived: !note.isArchived,
+          isPinned: false,
+        },
+      });
     });
     revalidatePath("/note");
     return { success: true, data: updated };
   } catch (error) {
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return { success: false, error: "Catatan tidak ditemukan" };
+    }
     console.error("Failed to toggle archive note:", error);
     return { success: false, error: "Gagal mengubah status arsip" };
   }
@@ -265,7 +324,8 @@ export async function updateNoteColor(id: string, color: string) {
   }
 }
 
-// Label Actions
+// ── Label Actions ─────────────────────────────────────────────────────────────
+
 export async function createLabel(name: string) {
   try {
     const cleanName = name.trim();
@@ -276,8 +336,11 @@ export async function createLabel(name: string) {
     });
     revalidatePath("/note");
     return { success: true, data: label };
-  } catch (error: any) {
-    if (error.code === "P2002") {
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       return { success: false, error: "Nama label sudah ada" };
     }
     console.error("Failed to create label:", error);
@@ -296,8 +359,11 @@ export async function updateLabel(id: string, name: string) {
     });
     revalidatePath("/note");
     return { success: true, data: label };
-  } catch (error: any) {
-    if (error.code === "P2002") {
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       return { success: false, error: "Nama label sudah digunakan" };
     }
     console.error("Failed to update label:", error);
@@ -337,29 +403,31 @@ export async function duplicateNote(id: string) {
         title: sourceNote.title ? `${sourceNote.title} (Salinan)` : "Catatan Salinan",
         content: sourceNote.content,
         color: sourceNote.color,
-        isPinned: false, // Default copy is not pinned
+        isPinned: false,
         isArchived: false,
         isTrashed: false,
         isList: sourceNote.isList,
         isTable: sourceNote.isTable,
         imageUrl: sourceNote.imageUrl,
         folderId: sourceNote.folderId,
-        listItems: sourceNote.listItems.length > 0
-          ? {
-              createMany: {
-                data: sourceNote.listItems.map((item) => ({
-                  text: item.text,
-                  isCompleted: item.isCompleted,
-                  urutan: item.urutan,
-                })),
-              },
-            }
-          : undefined,
-        labels: sourceNote.labels.length > 0
-          ? {
-              connect: sourceNote.labels.map((l) => ({ id: l.id })),
-            }
-          : undefined,
+        listItems:
+          sourceNote.listItems.length > 0
+            ? {
+                createMany: {
+                  data: sourceNote.listItems.map((item) => ({
+                    text: item.text,
+                    isCompleted: item.isCompleted,
+                    urutan: item.urutan,
+                  })),
+                },
+              }
+            : undefined,
+        labels:
+          sourceNote.labels.length > 0
+            ? {
+                connect: sourceNote.labels.map((l) => ({ id: l.id })),
+              }
+            : undefined,
       },
       include: {
         listItems: true,
@@ -388,7 +456,11 @@ export async function uploadNoteImage(id: string, formData: FormData) {
     }
 
     // Delete old image
-    if (existing.imageUrl && process.env.BLOB_READ_WRITE_TOKEN && existing.imageUrl.includes("public.blob.vercel-storage.com")) {
+    if (
+      existing.imageUrl &&
+      process.env.BLOB_READ_WRITE_TOKEN &&
+      existing.imageUrl.includes("public.blob.vercel-storage.com")
+    ) {
       try {
         await del(existing.imageUrl);
       } catch (e) {
@@ -399,7 +471,8 @@ export async function uploadNoteImage(id: string, formData: FormData) {
     let imageUrl = "";
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       console.warn("BLOB_READ_WRITE_TOKEN is missing. Using fallback mockup image.");
-      imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=60";
+      imageUrl =
+        "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=60";
     } else {
       const blob = await put(`notes/${id}/${Date.now()}-${file.name}`, file, {
         access: "public",
@@ -414,9 +487,10 @@ export async function uploadNoteImage(id: string, formData: FormData) {
 
     revalidatePath("/note");
     return { success: true, data: note };
-  } catch (error: any) {
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error("Failed to upload note image:", error);
-    return { success: false, error: `Gagal mengupload gambar: ${error?.message || error}` };
+    return { success: false, error: `Gagal mengupload gambar: ${msg}` };
   }
 }
 
@@ -425,7 +499,11 @@ export async function deleteNoteImage(id: string) {
     const existing = await db.note.findUnique({ where: { id } });
     if (!existing) return { success: false, error: "Catatan tidak ditemukan" };
 
-    if (existing.imageUrl && process.env.BLOB_READ_WRITE_TOKEN && existing.imageUrl.includes("public.blob.vercel-storage.com")) {
+    if (
+      existing.imageUrl &&
+      process.env.BLOB_READ_WRITE_TOKEN &&
+      existing.imageUrl.includes("public.blob.vercel-storage.com")
+    ) {
       try {
         await del(existing.imageUrl);
       } catch (e) {
@@ -440,21 +518,30 @@ export async function deleteNoteImage(id: string) {
 
     revalidatePath("/note");
     return { success: true, data: note };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to delete note image:", error);
     return { success: false, error: "Gagal menghapus gambar" };
   }
 }
 
+// ── fetchLinkMetadata — dengan SSRF protection ────────────────────────────────
+
 export async function fetchLinkMetadata(url: string) {
   try {
-    // Basic validation
     const parsedUrl = new URL(url);
+
+    // Blokir IP internal / private (SSRF protection)
+    if (!isSsrfSafeUrl(parsedUrl)) {
+      console.warn("[SSRF] Blocked request to private host:", parsedUrl.hostname);
+      return null;
+    }
+
     const response = await fetch(parsedUrl.toString(), {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       },
-      next: { revalidate: 3600 }, // Cache on Next.js server for 1 hour
+      next: { revalidate: 3600 },
     });
     if (!response.ok) return null;
 
@@ -462,8 +549,9 @@ export async function fetchLinkMetadata(url: string) {
 
     // Extract title (og:title or <title>)
     let title = "";
-    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+    const ogTitleMatch =
+      html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
     if (ogTitleMatch) {
       title = ogTitleMatch[1];
     } else {
@@ -471,39 +559,40 @@ export async function fetchLinkMetadata(url: string) {
       if (titleMatch) title = titleMatch[1];
     }
 
-    // Extract description (og:description or description)
+    // Extract description
     let description = "";
-    const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
-                       html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i);
+    const ogDescMatch =
+      html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i);
     if (ogDescMatch) {
       description = ogDescMatch[1];
     } else {
-      const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
+      const descMatch =
+        html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i) ||
+        html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i);
       if (descMatch) description = descMatch[1];
     }
 
     // Extract image (og:image)
     let image = "";
-    const ogImgMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                       html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+    const ogImgMatch =
+      html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
     if (ogImgMatch) image = ogImgMatch[1];
 
-    const unescape = (str: string) => {
-      return str
+    const unescape = (str: string) =>
+      str
         .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
         .replace(/&quot;/g, '"')
         .replace(/&#39;/g, "'")
         .replace(/&#x2F;/g, "/");
-    };
 
     const cleanTitle = title ? unescape(title.trim()) : "";
     const cleanDescription = description ? unescape(description.trim()) : "";
     let cleanImage = image ? image.trim() : "";
 
-    // Resolve relative image URLs if necessary
     if (cleanImage && !cleanImage.startsWith("http") && !cleanImage.startsWith("//")) {
       try {
         cleanImage = new URL(cleanImage, parsedUrl.origin).toString();
@@ -526,6 +615,8 @@ export async function fetchLinkMetadata(url: string) {
   }
 }
 
+// ── Folder Actions ─────────────────────────────────────────────────────────────
+
 export async function getFolders() {
   try {
     const folders = await db.folder.findMany({
@@ -534,11 +625,11 @@ export async function getFolders() {
         _count: {
           select: {
             notes: {
-              where: { isTrashed: false, isArchived: false }
-            }
-          }
-        }
-      }
+              where: { isTrashed: false, isArchived: false },
+            },
+          },
+        },
+      },
     });
     return { success: true, data: folders };
   } catch (error) {
@@ -557,8 +648,11 @@ export async function createFolder(name: string) {
     });
     revalidatePath("/note");
     return { success: true, data: folder };
-  } catch (error: any) {
-    if (error.code === "P2002") {
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       return { success: false, error: "Nama folder sudah digunakan" };
     }
     console.error("Failed to create folder:", error);
@@ -577,8 +671,11 @@ export async function renameFolder(id: string, name: string) {
     });
     revalidatePath("/note");
     return { success: true, data: folder };
-  } catch (error: any) {
-    if (error.code === "P2002") {
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       return { success: false, error: "Nama folder sudah digunakan" };
     }
     console.error("Failed to rename folder:", error);

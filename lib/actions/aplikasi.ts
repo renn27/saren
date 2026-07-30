@@ -12,6 +12,27 @@ export async function getAplikasiList(garapanId: string) {
   try {
     return await db.aplikasi.findMany({
       where: { garapanId },
+      select: {
+        id: true,
+        namaAplikasi: true,
+        logoUrl: true,
+        deskripsi: true,
+        kategori: true,
+        kolom: {
+          select: {
+            id: true,
+            tipeKolom: true,
+            isTarget: true,
+            nilaiTarget: true,
+            rumus: true,
+          },
+        },
+        akun: {
+          select: {
+            customValues: true,
+          },
+        },
+      },
       orderBy: { createdAt: "asc" },
     });
   } catch (error) {
@@ -24,11 +45,103 @@ export async function getStandaloneAplikasiList() {
   try {
     return await db.aplikasi.findMany({
       where: { garapanId: null },
+      select: {
+        id: true,
+        namaAplikasi: true,
+        logoUrl: true,
+        deskripsi: true,
+        kategori: true,
+        _count: {
+          select: { akun: true },
+        },
+        kolom: {
+          select: {
+            id: true,
+            tipeKolom: true,
+            isTarget: true,
+            nilaiTarget: true,
+            rumus: true,
+          },
+        },
+        akun: {
+          select: {
+            id: true,
+            nama: true,
+            device: true,
+            nomorHp: true,
+            urutan: true,
+            customValues: true,
+          },
+        },
+      },
       orderBy: { createdAt: "asc" },
     });
   } catch (error) {
-    console.error("Failed to fetch standalone aplikasi list:", error);
-    return [];
+    console.error("Failed to fetch standalone aplikasi list via Prisma ORM, using raw query fallback:", error);
+    try {
+      const rows = await db.$queryRaw<any[]>`
+        SELECT * FROM "aplikasi" WHERE "garapanId" IS NULL ORDER BY "createdAt" ASC
+      `;
+      return rows.map((app) => ({
+        ...app,
+        _count: { akun: 0 },
+        kolom: [],
+        akun: [],
+      }));
+    } catch (rawError) {
+      console.error("Failed raw query fallback for standalone aplikasi list:", rawError);
+      return [];
+    }
+  }
+}
+
+export async function importAplikasiToGarapan(standaloneAplikasiId: string, garapanId: string) {
+  try {
+    const standaloneApp = await db.aplikasi.findUnique({
+      where: { id: standaloneAplikasiId },
+      include: {
+        akun: {
+          orderBy: { urutan: "asc" },
+        },
+      },
+    });
+
+    if (!standaloneApp) {
+      return { success: false, error: "Aplikasi standalone tidak ditemukan." };
+    }
+
+    const newApp = await db.$transaction(async (tx) => {
+      const createdApp = await tx.aplikasi.create({
+        data: {
+          garapanId,
+          namaAplikasi: standaloneApp.namaAplikasi,
+          logoUrl: standaloneApp.logoUrl,
+          deskripsi: standaloneApp.deskripsi,
+          kategori: standaloneApp.kategori,
+        },
+      });
+
+      if (standaloneApp.akun.length > 0) {
+        await tx.akun.createMany({
+          data: standaloneApp.akun.map((acc, index) => ({
+            aplikasiId: createdApp.id,
+            nama: acc.nama,
+            device: acc.device,
+            nomorHp: acc.nomorHp,
+            urutan: acc.urutan ?? index,
+            customValues: {},
+          })),
+        });
+      }
+
+      return createdApp;
+    });
+
+    revalidatePath(`/garapan/${garapanId}`);
+    return { success: true, aplikasi: newApp };
+  } catch (error) {
+    console.error("Failed to import aplikasi to garapan:", error);
+    return { success: false, error: "Gagal mengimpor aplikasi ke garapan." };
   }
 }
 
@@ -78,6 +191,7 @@ export async function createAplikasi(garapanId: string | null, formData: FormDat
   const namaAplikasi = formData.get("namaAplikasi") as string;
   const file = formData.get("logo") as File | null;
   const deskripsi = formData.get("deskripsi") as string | null;
+  const kategori = formData.get("kategori") as string | null;
 
   if (!namaAplikasi || namaAplikasi.trim().length === 0) {
     return { success: false, error: "Nama aplikasi wajib diisi." };
@@ -111,12 +225,13 @@ export async function createAplikasi(garapanId: string | null, formData: FormDat
   }
 
   try {
-    await db.aplikasi.create({
+    const newApp = await db.aplikasi.create({
       data: {
         garapanId,
         namaAplikasi,
         logoUrl,
         deskripsi: deskripsi?.trim() || null,
+        kategori: kategori?.trim() || null,
       },
     });
 
@@ -125,7 +240,7 @@ export async function createAplikasi(garapanId: string | null, formData: FormDat
     } else {
       revalidatePath("/aplikasi");
     }
-    return { success: true };
+    return { success: true, data: newApp };
   } catch (error) {
     console.error("Error creating aplikasi:", error);
     return { success: false, error: "Gagal menambahkan aplikasi." };
@@ -137,6 +252,7 @@ export async function updateAplikasi(id: string, garapanId: string | null, formD
   const file = formData.get("logo") as File | null;
   const clearLogo = formData.get("clearLogo") === "true";
   const deskripsi = formData.get("deskripsi") as string | null;
+  const kategori = formData.get("kategori") as string | null;
 
   if (!namaAplikasi || namaAplikasi.trim().length === 0) {
     return { success: false, error: "Nama aplikasi wajib diisi." };
@@ -191,26 +307,28 @@ export async function updateAplikasi(id: string, garapanId: string | null, formD
         }
       } catch (error) {
         console.error("Vercel Blob upload failed:", error);
-        return { success: false, error: "Gagal mengupload logo baru." };
+        return { success: false, error: "Gagal mengupload logo." };
       }
     }
 
-    await db.aplikasi.update({
+    const updatedApp = await db.aplikasi.update({
       where: { id },
       data: {
         namaAplikasi,
         logoUrl,
         deskripsi: deskripsi?.trim() || null,
+        kategori: kategori?.trim() || null,
       },
     });
 
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}`);
+      revalidatePath(`/garapan/${garapanId}/aplikasi/${id}`);
     } else {
       revalidatePath("/aplikasi");
       revalidatePath(`/aplikasi/${id}`);
     }
-    return { success: true };
+    return { success: true, data: updatedApp };
   } catch (error) {
     console.error("Error updating aplikasi:", error);
     return { success: false, error: "Gagal memperbarui aplikasi." };

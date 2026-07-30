@@ -47,7 +47,6 @@ import {
   Square,
 } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 import { createKolom, deleteKolom, swapKolomUrutan, updateKolom, clearKolomData } from "@/lib/actions/kolom";
 import { createAkun, updateAkun, deleteAkun, getAllAccountsForAutofill, swapAkunUrutan, bulkUpdateCentang } from "@/lib/actions/akun";
 import { updateAplikasi } from "@/lib/actions/aplikasi";
@@ -299,16 +298,28 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
     }
   }, [editingAccount, aplikasi.kolom]);
 
+  // Local State for Optimistic UI Updates
+  const [akunList, setAkunList] = React.useState<AkunItem[]>(aplikasi.akun);
+  const [kolomList, setKolomList] = React.useState<KolomItem[]>(aplikasi.kolom);
+
+  React.useEffect(() => {
+    setAkunList(aplikasi.akun);
+  }, [aplikasi.akun]);
+
+  React.useEffect(() => {
+    setKolomList(aplikasi.kolom);
+  }, [aplikasi.kolom]);
+
   const filteredAkun = React.useMemo(() => {
-    if (!searchQuery.trim()) return aplikasi.akun;
+    if (!searchQuery.trim()) return akunList;
     const q = searchQuery.toLowerCase().trim();
-    return aplikasi.akun.filter((acc) => {
+    return akunList.filter((acc) => {
       const matchName = acc.nama.toLowerCase().includes(q);
       const matchDevice = (acc.device || "").toLowerCase().includes(q);
       const matchHp = (acc.nomorHp || "").toLowerCase().includes(q);
-      const matchCustom = aplikasi.kolom.some((col) => {
+      const matchCustom = kolomList.some((col) => {
         if (col.tipeKolom === "RUMUS") {
-          const calcVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+          const calcVal = evaluateFormula(col.rumus, acc.customValues, kolomList);
           return calcVal !== null && String(calcVal).toLowerCase().includes(q);
         }
         const val = acc.customValues[col.id];
@@ -317,15 +328,15 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
       });
       return matchName || matchDevice || matchHp || matchCustom;
     });
-  }, [aplikasi.akun, aplikasi.kolom, searchQuery]);
+  }, [akunList, kolomList, searchQuery]);
 
   const checkAkunMeetsTarget = React.useCallback((acc: AkunItem) => {
-    const targetCols = aplikasi.kolom.filter((c) => c.isTarget && c.nilaiTarget !== null && c.nilaiTarget !== "");
+    const targetCols = kolomList.filter((c) => c.isTarget && c.nilaiTarget !== null && c.nilaiTarget !== "");
     if (targetCols.length === 0) return false;
 
     return targetCols.some((col) => {
       if (col.tipeKolom === "RUMUS") {
-        const calcVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+        const calcVal = evaluateFormula(col.rumus, acc.customValues, kolomList);
         if (calcVal === null) return false;
         return calcVal >= Number(col.nilaiTarget);
       }
@@ -342,7 +353,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
         return String(val).trim().toLowerCase() === String(col.nilaiTarget).trim().toLowerCase();
       }
     });
-  }, [aplikasi.kolom]);
+  }, [kolomList]);
 
   // Column CRUD
   const handleColumnSubmit = async (e: React.FormEvent) => {
@@ -430,7 +441,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
 
     // Clean custom values before sending
     const cleanedCustomValues: Record<string, any> = {};
-    aplikasi.kolom.forEach((col) => {
+    kolomList.forEach((col) => {
       const val = customValues[col.id];
       if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
         if (val !== "" && val !== undefined && val !== null) {
@@ -493,36 +504,75 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
     const acc2 = filteredAkun[idx2];
     if (!acc1 || !acc2) return;
 
+    // 🚀 Optimistic update: swap items in local state instantly (0ms)
+    const previousAkunList = [...akunList];
+    setAkunList((prev) => {
+      const next = [...prev];
+      const i1 = next.findIndex((a) => a.id === acc1.id);
+      const i2 = next.findIndex((a) => a.id === acc2.id);
+      if (i1 !== -1 && i2 !== -1) {
+        const temp = next[i1];
+        next[i1] = next[i2];
+        next[i2] = temp;
+      }
+      return next;
+    });
+
     const res = await swapAkunUrutan(null, aplikasi.id, acc1.id, acc2.id);
     if (res.success) {
       toast.success("Urutan akun diperbarui", { duration: 1000 });
       router.refresh();
     } else {
+      setAkunList(previousAkunList);
       toast.error(res.error || "Gagal memindahkan akun.");
     }
   };
 
   const handleSwapKolom = async (idx1: number, idx2: number) => {
-    const col1 = aplikasi.kolom[idx1];
-    const col2 = aplikasi.kolom[idx2];
+    const col1 = kolomList[idx1];
+    const col2 = kolomList[idx2];
     if (!col1 || !col2) return;
+
+    // 🚀 Optimistic update: swap columns in local state instantly (0ms)
+    const previousKolomList = [...kolomList];
+    setKolomList((prev) => {
+      const next = [...prev];
+      const temp = next[idx1];
+      next[idx1] = next[idx2];
+      next[idx2] = temp;
+      return next;
+    });
 
     const res = await swapKolomUrutan(null, aplikasi.id, col1.id, col2.id);
     if (res.success) {
       toast.success("Urutan kolom diperbarui", { duration: 1000 });
       router.refresh();
     } else {
+      setKolomList(previousKolomList);
       toast.error(res.error || "Gagal memindahkan kolom.");
     }
   };
 
   const handleBulkCentang = async (columnId: string, newValue: boolean) => {
+    // 🚀 Optimistic update: instantly toggle all checkboxes locally (0ms)
+    const previousAkunList = [...akunList];
+    setAkunList((prev) =>
+      prev.map((acc) => ({
+        ...acc,
+        customValues: {
+          ...acc.customValues,
+          [columnId]: newValue,
+        },
+      }))
+    );
+
     const toastId = toast.loading("Memperbarui data akun...");
     const res = await bulkUpdateCentang(null, aplikasi.id, columnId, newValue);
     if (res.success) {
       toast.success("Semua data berhasil diperbarui", { id: toastId });
       router.refresh();
     } else {
+      setAkunList(previousAkunList);
       toast.error(res.error || "Gagal memperbarui data secara massal.", { id: toastId });
     }
   };
@@ -532,7 +582,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
     columnId: "nama" | "device" | "nomorHp" | string,
     newValue: any
   ) => {
-    const acc = aplikasi.akun.find((a) => a.id === accountId);
+    const acc = akunList.find((a) => a.id === accountId);
     if (!acc) return;
 
     let data;
@@ -574,11 +624,30 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
       };
     }
 
+    // 🚀 Optimistic update: update local state instantly (0ms response)
+    const previousAkunList = [...akunList];
+    setAkunList((prev) =>
+      prev.map((a) => {
+        if (a.id !== accountId) return a;
+        if (columnId === "nama") return { ...a, nama: String(newValue).trim() || a.nama };
+        if (columnId === "device") return { ...a, device: newValue !== "" && newValue !== null ? String(newValue).trim() : null };
+        if (columnId === "nomorHp") return { ...a, nomorHp: newValue !== "" && newValue !== null ? String(newValue).trim() : null };
+        return {
+          ...a,
+          customValues: {
+            ...a.customValues,
+            [columnId]: newValue,
+          },
+        };
+      })
+    );
+
     const res = await updateAkun(accountId, null, data);
     if (res.success) {
       toast.success("Data diperbarui", { duration: 1000 });
       router.refresh();
     } else {
+      setAkunList(previousAkunList);
       toast.error(res.error || "Gagal memperbarui data.");
     }
   };
@@ -710,7 +779,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
   };
 
   // Export handling
-  const handleExport = (format: "xlsx" | "csv") => {
+  const handleExport = async (format: "xlsx" | "csv") => {
     if (filteredAkun.length === 0) {
       toast.error("Tidak ada data untuk diekspor.");
       return;
@@ -718,7 +787,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
 
     // Build Headers
     const headers = ["Nama", "Device", "No HP"];
-    aplikasi.kolom.forEach((col) => {
+    kolomList.forEach((col) => {
       headers.push(col.namaKolom);
     });
 
@@ -730,9 +799,9 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
         acc.nomorHp || "",
       ];
 
-      aplikasi.kolom.forEach((col) => {
+      kolomList.forEach((col) => {
         if (col.tipeKolom === "RUMUS") {
-          const calcVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+          const calcVal = evaluateFormula(col.rumus, acc.customValues, kolomList);
           row.push(calcVal !== null ? calcVal : "");
         } else {
           const val = acc.customValues[col.id];
@@ -760,9 +829,10 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
-    const fileName = `${appSlug}-standalone`;
+    const fileName = `${appSlug}-data`;
 
     if (format === "xlsx") {
+      const XLSX = await import("xlsx");
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Akun");
@@ -853,11 +923,11 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
             )}
 
             {/* Targets Summary Box */}
-            {aplikasi.kolom.some((c) => c.isTarget) && (
+            {kolomList.some((c) => c.isTarget) && (
               <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary bg-bg-page/40 border border-border-soft/60 px-3 py-1.5 rounded-xl w-fit font-sans">
                 <span className="font-semibold text-text-secondary select-none">Target:</span>
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-text-primary">
-                  {aplikasi.kolom
+                  {kolomList
                     .filter((c) => c.isTarget)
                     .map((col, idx) => {
                       let formattedTarget = col.nilaiTarget || "–";
@@ -900,7 +970,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
       {/* Unified Controls Panel */}
       <div className="bg-bg-surface border border-border-soft p-4 rounded-3xl [box-shadow:var(--shadow-card)] mb-4 flex flex-col gap-3.5">
         {/* Row 1: Search & View Toggle */}
-        {aplikasi.akun.length > 0 && (
+        {akunList.length > 0 && (
           <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-border-soft/60 w-full">
             {/* Search Input */}
             <div className="relative flex-grow">
@@ -984,7 +1054,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
           </div>
 
           {/* Utility Icons (Right) */}
-          {aplikasi.akun.length > 0 && (
+          {akunList.length > 0 && (
             <div className="flex items-center gap-2 shrink-0">
               <Button
                 variant={isReorderMode ? "secondary" : "outline"}
@@ -1057,8 +1127,6 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                       <TableHead className="w-20 text-center select-none bg-bg-surface font-semibold text-text-secondary">Urutan</TableHead>
                     )}
                     <TableHead className="sticky left-0 bg-bg-surface z-20 border-r border-border-soft min-w-[90px] sm:min-w-[150px] text-center font-bold">Akun</TableHead>
-                    <TableHead className="border-r border-border-soft/50 min-w-[110px] sm:min-w-[160px] text-center font-bold">Device</TableHead>
-                    <TableHead className="border-r border-border-soft/50 min-w-[120px] sm:min-w-[180px] text-center font-bold">No HP</TableHead>
      
                     {/* Render Dynamic Custom Column Headers */}
                     {aplikasi.kolom.map((col, colIndex) => {
@@ -1102,7 +1170,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                                   disabled={colIndex === aplikasi.kolom.length - 1}
                                   onClick={() => handleSwapKolom(colIndex, colIndex + 1)}
                                   className="p-1 rounded hover:bg-accent-soft disabled:opacity-30 disabled:hover:bg-transparent text-text-primary transition-colors cursor-pointer"
-                                  title="Geser Gek"
+                                  title="Geser Kanan"
                                 >
                                   <ChevronRight className="h-3 w-3" />
                                 </button>
@@ -1167,9 +1235,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                 <TableBody>
                   {filteredAkun.map((acc, index) => {
                     const meetsTarget = checkAkunMeetsTarget(acc);
-                    const connectedNomor = getConnectedNomor(acc.nomorHp);
-                    const highlightDotColor = getHighlightDot(connectedNomor);
-    
+
                     return (
                       <TableRow
                         key={acc.id}
@@ -1216,90 +1282,6 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                         >
                           <span>{acc.nama}</span>
                         </TableCell>
-    
-                        {/* Device Cell */}
-                        {editingCell?.accountId === acc.id && editingCell?.columnId === "device" ? (
-                          <TableCell className="p-1 min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50">
-                            <input
-                              type="text"
-                              defaultValue={acc.device || ""}
-                              autoFocus
-                              className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans"
-                              onBlur={(e) => {
-                                const finalVal = e.target.value || null;
-                                if (finalVal !== acc.device) {
-                                  handleInlineSave(acc.id, "device", finalVal);
-                                }
-                                setEditingCell(null);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  const finalVal = (e.target as HTMLInputElement).value || null;
-                                  if (finalVal !== acc.device) {
-                                    handleInlineSave(acc.id, "device", finalVal);
-                                  }
-                                  setEditingCell(null);
-                                } else if (e.key === "Escape") {
-                                  setEditingCell(null);
-                                }
-                              }}
-                            />
-                          </TableCell>
-                        ) : (
-                          <TableCell
-                            className="cursor-pointer hover:bg-accent-soft/30 transition-colors select-none text-nowrap min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
-                            onClick={() => setEditingCell({ accountId: acc.id, columnId: "device" })}
-                            title="Klik untuk mengedit device"
-                          >
-                            {acc.device || <span className="text-text-secondary select-none">–</span>}
-                          </TableCell>
-                        )}
-    
-                        {/* No HP Cell */}
-                        {editingCell?.accountId === acc.id && editingCell?.columnId === "nomorHp" ? (
-                          <TableCell className="p-1 min-w-[120px] sm:min-w-[180px] border-r border-border-soft/50">
-                            <input
-                              type="text"
-                              defaultValue={acc.nomorHp || ""}
-                              autoFocus
-                              className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-mono"
-                              onBlur={(e) => {
-                                const finalVal = e.target.value || null;
-                                if (finalVal !== acc.nomorHp) {
-                                  handleInlineSave(acc.id, "nomorHp", finalVal);
-                                }
-                                setEditingCell(null);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  const finalVal = (e.target as HTMLInputElement).value || null;
-                                  if (finalVal !== acc.nomorHp) {
-                                    handleInlineSave(acc.id, "nomorHp", finalVal);
-                                  }
-                                  setEditingCell(null);
-                                } else if (e.key === "Escape") {
-                                  setEditingCell(null);
-                                }
-                              }}
-                            />
-                          </TableCell>
-                        ) : (
-                          <TableCell
-                            className="cursor-pointer hover:bg-accent-soft/30 transition-colors select-none text-nowrap min-w-[120px] sm:min-w-[180px] border-r border-border-soft/50 font-mono"
-                            onClick={() => setEditingCell({ accountId: acc.id, columnId: "nomorHp" })}
-                            title="Klik untuk mengedit No HP"
-                          >
-                            <div className="flex items-center gap-1.5 justify-between w-full">
-                              <span>{acc.nomorHp || <span className="text-text-secondary font-sans select-none">–</span>}</span>
-                              {connectedNomor && (
-                                <span 
-                                  className={`inline-block w-2.5 h-2.5 rounded-full border border-bg-surface shadow-sm shrink-0 ${highlightDotColor}`}
-                                  title={`Terhubung ke data nomor ${connectedNomor.provider} (${connectedNomor.nomorKartu})`}
-                                />
-                              )}
-                            </div>
-                          </TableCell>
-                        )}
     
                       {/* Render Dynamic custom values */}
                       {aplikasi.kolom.map((col) => {
@@ -1482,7 +1464,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                 {aplikasi.kolom.some((c) => c.isAccumulated) && (
                   <TableRow className="bg-bg-surface font-bold text-text-primary hover:bg-bg-surface cursor-default">
                     {isReorderMode && <TableCell className="border-r border-border-soft"></TableCell>}
-                    <TableCell colSpan={3} className="sticky left-0 bg-bg-surface z-10 border-r border-border-soft text-right font-bold pr-4">
+                    <TableCell className="sticky left-0 bg-bg-surface z-10 border-r border-border-soft text-right font-bold">
                       Total Akumulasi:
                     </TableCell>
                     {aplikasi.kolom.map((col) => {
@@ -1498,7 +1480,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                       }, 0);
     
                       return (
-                        <TableCell key={col.id} className="text-right">
+                        <TableCell key={col.id} className="text-right font-bold">
                           {formatValue(sum, col.tipeKolom)}
                         </TableCell>
                       );

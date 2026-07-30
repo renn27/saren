@@ -2,7 +2,7 @@
 
 import { db } from "../db";
 import { revalidatePath } from "next/cache";
-import { TipeKolom } from "@prisma/client";
+import { TipeKolom, Prisma } from "@prisma/client";
 import { z } from "zod";
 
 const kolomSchema = z.object({
@@ -32,7 +32,8 @@ export async function createKolom(
     return { success: false, error: validation.error.issues[0].message };
   }
 
-  const { aplikasiId, namaKolom, tipeKolom, rumus, isTarget, nilaiTarget, isAccumulated } = validation.data;
+  const { aplikasiId, namaKolom, tipeKolom, rumus, isTarget, nilaiTarget, isAccumulated } =
+    validation.data;
 
   try {
     const existing = await db.kolom.findFirst({
@@ -53,36 +54,18 @@ export async function createKolom(
       where: { aplikasiId },
     });
 
-    try {
-      await db.kolom.create({
-        data: {
-          aplikasiId,
-          namaKolom,
-          tipeKolom: tipeKolom as any,
-          rumus: tipeKolom === "RUMUS" ? rumus || null : null,
-          urutan: count,
-          isTarget: isTarget || false,
-          nilaiTarget: nilaiTarget || null,
-          isAccumulated: isAccumulated || false,
-        },
-      });
-    } catch (createErr) {
-      console.warn("db.kolom.create failed, executing raw SQL fallback:", createErr);
-      const newId = `col_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      await db.$executeRawUnsafe(
-        `INSERT INTO "kolom" ("id", "aplikasiId", "namaKolom", "tipeKolom", "rumus", "urutan", "isTarget", "nilaiTarget", "isAccumulated", "createdAt")
-         VALUES ($1, $2, $3, $4::"TipeKolom", $5, $6, $7, $8, $9, NOW())`,
-        newId,
+    await db.kolom.create({
+      data: {
         aplikasiId,
         namaKolom,
-        tipeKolom,
-        tipeKolom === "RUMUS" ? rumus || null : null,
-        count,
-        isTarget || false,
-        nilaiTarget || null,
-        isAccumulated || false
-      );
-    }
+        tipeKolom: tipeKolom as TipeKolom,
+        rumus: tipeKolom === "RUMUS" ? rumus || null : null,
+        urutan: count,
+        isTarget: isTarget || false,
+        nilaiTarget: nilaiTarget || null,
+        isAccumulated: isAccumulated || false,
+      },
+    });
 
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
@@ -92,7 +75,10 @@ export async function createKolom(
     return { success: true };
   } catch (error) {
     console.error("Error creating kolom:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Gagal menambahkan kolom." };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menambahkan kolom.",
+    };
   }
 }
 
@@ -102,17 +88,21 @@ export async function deleteKolom(id: string, garapanId: string | null, aplikasi
       where: { id },
     });
 
-    // Reorder remaining columns
+    // Reorder remaining columns — gunakan batch $transaction, bukan loop sequential
     const columns = await db.kolom.findMany({
       where: { aplikasiId },
       orderBy: { urutan: "asc" },
     });
 
-    for (let i = 0; i < columns.length; i++) {
-      await db.kolom.update({
-        where: { id: columns[i].id },
-        data: { urutan: i },
-      });
+    if (columns.length > 0) {
+      await db.$transaction(
+        columns.map((col, i) =>
+          db.kolom.update({
+            where: { id: col.id },
+            data: { urutan: i },
+          })
+        )
+      );
     }
 
     if (garapanId) {
@@ -145,7 +135,8 @@ export async function updateKolom(
     return { success: false, error: validation.error.issues[0].message };
   }
 
-  const { aplikasiId, namaKolom, tipeKolom, rumus, isTarget, nilaiTarget, isAccumulated } = validation.data;
+  const { aplikasiId, namaKolom, tipeKolom, rumus, isTarget, nilaiTarget, isAccumulated } =
+    validation.data;
 
   try {
     const existing = await db.kolom.findFirst({
@@ -165,33 +156,17 @@ export async function updateKolom(
       return { success: false, error: "Nama kolom sudah digunakan di aplikasi ini." };
     }
 
-    try {
-      await db.kolom.update({
-        where: { id },
-        data: {
-          namaKolom,
-          tipeKolom: tipeKolom as any,
-          rumus: tipeKolom === "RUMUS" ? rumus || null : null,
-          isTarget: isTarget || false,
-          nilaiTarget: nilaiTarget || null,
-          isAccumulated: isAccumulated || false,
-        },
-      });
-    } catch (updateErr) {
-      console.warn("db.kolom.update failed, executing raw SQL fallback:", updateErr);
-      await db.$executeRawUnsafe(
-        `UPDATE "kolom"
-         SET "namaKolom" = $1, "tipeKolom" = $2::"TipeKolom", "rumus" = $3, "isTarget" = $4, "nilaiTarget" = $5, "isAccumulated" = $6
-         WHERE "id" = $7`,
+    await db.kolom.update({
+      where: { id },
+      data: {
         namaKolom,
-        tipeKolom,
-        tipeKolom === "RUMUS" ? rumus || null : null,
-        isTarget || false,
-        nilaiTarget || null,
-        isAccumulated || false,
-        id
-      );
-    }
+        tipeKolom: tipeKolom as TipeKolom,
+        rumus: tipeKolom === "RUMUS" ? rumus || null : null,
+        isTarget: isTarget || false,
+        nilaiTarget: nilaiTarget || null,
+        isAccumulated: isAccumulated || false,
+      },
+    });
 
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
@@ -219,24 +194,22 @@ export async function swapKolomUrutan(
       return { success: false, error: "Kolom tidak ditemukan." };
     }
 
+    // Jika urutan sama, re-index dulu dalam satu batch $transaction
     if (col1.urutan === col2.urutan) {
-      // Re-index all columns for this application first
       const columns = await db.kolom.findMany({
         where: { aplikasiId },
-        orderBy: [
-          { urutan: "asc" },
-          { createdAt: "asc" },
-        ],
+        orderBy: [{ urutan: "asc" }, { createdAt: "asc" }],
       });
 
-      for (let i = 0; i < columns.length; i++) {
-        await db.kolom.update({
-          where: { id: columns[i].id },
-          data: { urutan: i },
-        });
-      }
+      await db.$transaction(
+        columns.map((col, i) =>
+          db.kolom.update({
+            where: { id: col.id },
+            data: { urutan: i },
+          })
+        )
+      );
 
-      // Re-fetch updated columns
       const u1 = await db.kolom.findUnique({ where: { id: kolomId1 } });
       const u2 = await db.kolom.findUnique({ where: { id: kolomId2 } });
       if (u1 && u2) {
@@ -245,15 +218,18 @@ export async function swapKolomUrutan(
       }
     }
 
+    // Swap urutan dalam satu $transaction — atomic, tanpa race condition
     const temp = col1.urutan;
-    await db.kolom.update({
-      where: { id: kolomId1 },
-      data: { urutan: col2.urutan },
-    });
-    await db.kolom.update({
-      where: { id: kolomId2 },
-      data: { urutan: temp },
-    });
+    await db.$transaction([
+      db.kolom.update({
+        where: { id: kolomId1 },
+        data: { urutan: col2.urutan },
+      }),
+      db.kolom.update({
+        where: { id: kolomId2 },
+        data: { urutan: temp },
+      }),
+    ]);
 
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
@@ -282,20 +258,15 @@ export async function clearKolomData(id: string, garapanId: string | null, aplik
 
     const isCentang = col.tipeKolom === "CENTANG";
 
-    // Gunakan transaction untuk memastikan semua data di-update secara konsisten
     await db.$transaction(
       akuns.map((acc) => {
-        const updatedCustomValues = { ...(acc.customValues as Record<string, any>) };
-        if (isCentang) {
-          updatedCustomValues[id] = false;
-        } else {
-          updatedCustomValues[id] = null;
-        }
+        const updatedCustomValues = { ...(acc.customValues as Record<string, unknown>) };
+        updatedCustomValues[id] = isCentang ? false : null;
 
         return db.akun.update({
           where: { id: acc.id },
           data: {
-            customValues: updatedCustomValues,
+            customValues: updatedCustomValues as Prisma.InputJsonValue,
           },
         });
       })

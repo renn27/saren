@@ -2,6 +2,7 @@
 
 import { db } from "../db";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 const akunSchema = z.object({
@@ -18,7 +19,7 @@ export async function createAkun(
     nama: string;
     device?: string | null;
     nomorHp?: string | null;
-    customValues: Record<string, any>;
+    customValues: Record<string, unknown>;
   }
 ) {
   const validation = akunSchema.safeParse(data);
@@ -48,7 +49,7 @@ export async function createAkun(
       where: { aplikasiId },
     });
 
-    const validatedCustomValues: Record<string, any> = {};
+    const validatedCustomValues: Record<string, unknown> = {};
 
     for (const col of columns) {
       const val = data.customValues[col.id];
@@ -59,7 +60,10 @@ export async function createAkun(
         if (val !== undefined && val !== null && val !== "") {
           const num = Number(val);
           if (isNaN(num)) {
-            return { success: false, error: `Nilai kolom '${col.namaKolom}' harus berupa angka.` };
+            return {
+              success: false,
+              error: `Nilai kolom '${col.namaKolom}' harus berupa angka.`,
+            };
           }
           validatedCustomValues[col.id] = num;
         } else {
@@ -68,7 +72,8 @@ export async function createAkun(
       } else if (col.tipeKolom === "CENTANG") {
         validatedCustomValues[col.id] = Boolean(val);
       } else {
-        validatedCustomValues[col.id] = val !== undefined && val !== null ? String(val) : null;
+        validatedCustomValues[col.id] =
+          val !== undefined && val !== null ? String(val) : null;
       }
     }
 
@@ -82,7 +87,7 @@ export async function createAkun(
         nama: trimmedNama,
         device: device || null,
         nomorHp: nomorHp || null,
-        customValues: validatedCustomValues,
+        customValues: validatedCustomValues as Prisma.InputJsonValue,
         urutan: count,
       },
     });
@@ -107,7 +112,7 @@ export async function updateAkun(
     nama: string;
     device?: string | null;
     nomorHp?: string | null;
-    customValues: Record<string, any>;
+    customValues: Record<string, unknown>;
   }
 ) {
   const validation = akunSchema.safeParse(data);
@@ -140,7 +145,7 @@ export async function updateAkun(
       where: { aplikasiId },
     });
 
-    const validatedCustomValues: Record<string, any> = {};
+    const validatedCustomValues: Record<string, unknown> = {};
 
     for (const col of columns) {
       const val = data.customValues[col.id];
@@ -151,7 +156,10 @@ export async function updateAkun(
         if (val !== undefined && val !== null && val !== "") {
           const num = Number(val);
           if (isNaN(num)) {
-            return { success: false, error: `Nilai kolom '${col.namaKolom}' harus berupa angka.` };
+            return {
+              success: false,
+              error: `Nilai kolom '${col.namaKolom}' harus berupa angka.`,
+            };
           }
           validatedCustomValues[col.id] = num;
         } else {
@@ -160,7 +168,8 @@ export async function updateAkun(
       } else if (col.tipeKolom === "CENTANG") {
         validatedCustomValues[col.id] = Boolean(val);
       } else {
-        validatedCustomValues[col.id] = val !== undefined && val !== null ? String(val) : null;
+        validatedCustomValues[col.id] =
+          val !== undefined && val !== null ? String(val) : null;
       }
     }
 
@@ -170,7 +179,7 @@ export async function updateAkun(
         nama: trimmedNama,
         device: device || null,
         nomorHp: nomorHp || null,
-        customValues: validatedCustomValues,
+        customValues: validatedCustomValues as Prisma.InputJsonValue,
       },
     });
 
@@ -192,17 +201,21 @@ export async function deleteAkun(id: string, garapanId: string | null, aplikasiI
       where: { id },
     });
 
-    // Reorder remaining accounts
+    // Reorder remaining accounts — gunakan batch $transaction, bukan loop sequential
     const accounts = await db.akun.findMany({
       where: { aplikasiId },
       orderBy: { urutan: "asc" },
     });
 
-    for (let i = 0; i < accounts.length; i++) {
-      await db.akun.update({
-        where: { id: accounts[i].id },
-        data: { urutan: i },
-      });
+    if (accounts.length > 0) {
+      await db.$transaction(
+        accounts.map((acc, i) =>
+          db.akun.update({
+            where: { id: acc.id },
+            data: { urutan: i },
+          })
+        )
+      );
     }
 
     if (garapanId) {
@@ -231,24 +244,23 @@ export async function swapAkunUrutan(
       return { success: false, error: "Akun tidak ditemukan." };
     }
 
+    // Jika urutan sama, re-index dulu dalam satu $transaction batch
     if (akun1.urutan === akun2.urutan) {
-      // Re-index all accounts for this application first
       const accounts = await db.akun.findMany({
         where: { aplikasiId },
-        orderBy: [
-          { urutan: "asc" },
-          { createdAt: "asc" },
-        ],
+        orderBy: [{ urutan: "asc" }, { createdAt: "asc" }],
       });
 
-      for (let i = 0; i < accounts.length; i++) {
-        await db.akun.update({
-          where: { id: accounts[i].id },
-          data: { urutan: i },
-        });
-      }
+      await db.$transaction(
+        accounts.map((acc, i) =>
+          db.akun.update({
+            where: { id: acc.id },
+            data: { urutan: i },
+          })
+        )
+      );
 
-      // Re-fetch updated accounts
+      // Re-fetch setelah re-index
       const u1 = await db.akun.findUnique({ where: { id: akunId1 } });
       const u2 = await db.akun.findUnique({ where: { id: akunId2 } });
       if (u1 && u2) {
@@ -257,15 +269,18 @@ export async function swapAkunUrutan(
       }
     }
 
+    // Swap urutan dalam satu $transaction — atomic, tanpa race condition
     const temp = akun1.urutan;
-    await db.akun.update({
-      where: { id: akunId1 },
-      data: { urutan: akun2.urutan },
-    });
-    await db.akun.update({
-      where: { id: akunId2 },
-      data: { urutan: temp },
-    });
+    await db.$transaction([
+      db.akun.update({
+        where: { id: akunId1 },
+        data: { urutan: akun2.urutan },
+      }),
+      db.akun.update({
+        where: { id: akunId2 },
+        data: { urutan: temp },
+      }),
+    ]);
 
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
@@ -314,13 +329,13 @@ export async function bulkUpdateCentang(
     await db.$transaction(
       accounts.map((acc) => {
         const updatedCustomValues = {
-          ...(acc.customValues as Record<string, any>),
+          ...(acc.customValues as Record<string, unknown>),
           [columnId]: newValue,
         };
         return db.akun.update({
           where: { id: acc.id },
           data: {
-            customValues: updatedCustomValues,
+            customValues: updatedCustomValues as Prisma.InputJsonValue,
           },
         });
       })

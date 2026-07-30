@@ -9,18 +9,21 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-display",
   weight: ["600"],
+  display: "swap",
 });
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
   weight: ["400", "500"],
+  display: "swap",
 });
 
 const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
   weight: ["400"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

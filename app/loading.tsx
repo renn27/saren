@@ -1,15 +1,34 @@
+import { Skeleton } from "@/components/ui/skeleton";
+
 export default function Loading() {
   return (
-    <div className="w-full flex-1 flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in duration-300">
-      <div className="flex flex-col items-center gap-5">
-        <div className="relative h-14 w-14 rounded-2xl bg-bg-surface border border-border-soft flex items-center justify-center shadow-sm overflow-hidden">
-          <div className="absolute inset-0 bg-accent/5 animate-pulse"></div>
-          <img
-             src="/saren_logo_dark.png"
-             alt="Loading"
-             className="h-9 w-9 object-cover opacity-70 animate-pulse"
-          />
+    <div className="max-w-5xl w-full mx-auto px-4 py-5 sm:px-6 sm:py-8 space-y-4">
+      {/* Header Card Skeleton */}
+      <div className="bg-bg-surface border border-border-soft p-4 sm:p-5 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <Skeleton className="h-11 w-11 rounded-2xl shrink-0" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-6 w-36 rounded-xl" />
+            <Skeleton className="h-3.5 w-24 rounded" />
+          </div>
         </div>
+        <Skeleton className="h-10 w-36 rounded-xl" />
+      </div>
+
+      {/* Grid Month Cards Skeleton */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="bg-bg-surface border border-border-soft p-4 rounded-2xl flex items-center justify-between min-h-[76px]">
+            <div className="flex items-center gap-3.5 flex-1">
+              <Skeleton className="h-11 w-11 rounded-2xl shrink-0" />
+              <div className="space-y-1.5 flex-1">
+                <Skeleton className="h-5 w-24 rounded-lg" />
+                <Skeleton className="h-3.5 w-12 rounded" />
+              </div>
+            </div>
+            <Skeleton className="h-6 w-6 rounded-lg shrink-0" />
+          </div>
+        ))}
       </div>
     </div>
   );

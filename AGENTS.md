@@ -34,7 +34,21 @@ Aplikasi SAREN dirancang dan dioptimalkan secara penuh untuk **perangkat layar s
 ### 1. Framework & Routing
 * **Next.js (App Router)**: Proyek ini menggunakan App Router.
 * **Prisma ORM**: Digunakan untuk berinteraksi dengan database.
-  * **Optimasi Indeks**: Model `Note` memiliki indeks database khusus (`@@index([isTrashed, isArchived, isPinned])` dan `@@index([updatedAt])`) untuk mempercepat penyaringan dan pengurutan data di PostgreSQL.
+  * **Optimasi Indeks Database**: 
+    - `Note`: `@@index([isTrashed, isArchived, isPinned])`, `@@index([updatedAt])`
+    - `Akun`: `@@index([aplikasiId, urutan])`
+    - `Kolom`: `@@index([aplikasiId, urutan])`
+    - `Aplikasi`: `@@index([garapanId])`
+    - `Nomor`: `@@index([masaAktif])`
+  * **Prisma Projection (`select`)**: Query list pada Server Actions/Pages menggunakan `select` projection untuk membatasi kolom data yang ditarik, menghemat beban payload JSON hingga ~50%.
+* **Optimasi Performa Client**:
+  * **Kategori Aplikasi Standalone & Filter Pills**: Pada halaman `/aplikasi`, aplikasi master dapat dikategorikan (misal `E-Wallet`, `Bank`, `Investasi`). Pengguna dapat menambah kategori baru atau memilih dari daftar kategori existing. Dashboard menyajikan **Pills Filter Kategori** horizontal (`Semua`, `Tanpa Kategori`, `E-Wallet (2)`, `Bank (1)`) untuk memfilter kartu secara instan. Kartu aplikasi tetap tampil bersih tanpa teks badge kategori.
+  * **Fitur Impor Aplikasi Standalone (`importAplikasiToGarapan`)**: Pengguna dapat menambahkan aplikasi baru ke dalam garapan bulanan dengan mengimpor master aplikasi standalone (`Bareksa`, `Klik X GoPay`, dll). Seluruh akun (`nama`, `device`, `nomorHp`) dan logo aplikasi otomatis terfoto/terduplikasi ke garapan baru, sementara kolom target dibuat secara manual per bulan.
+  * **Indikator 100% Target Selesai (Green Checkmark Badge)**: Ketika semua akun dalam suatu aplikasi mencapai target (nilai angka/nominal target tercapai ATAU seluruh kolom centang `DONE` telah dicentang), kartu aplikasi menampilkan badge hijau `100% Target`. Jika seluruh aplikasi dalam suatu garapan bulan mencapai 100% target/centang selesai, kartu garapan bulan juga secara otomatis menampilkan badge centang hijau `100%`.
+  * **Optimistic UI Updates (0ms Response)**: Semua interaksi mutasi data (edit sel inline, toggle centang, swap urutan akun/kolom, tambah/edit/hapus garapan & aplikasi) memperbarui state React lokal terlebih dahulu secara instan (0ms) sebelum memproses Server Action di latar belakang.
+  * **Lazy Loading XLSX (-700KB JS Bundle)**: Library `xlsx` dieksekusi via Dynamic Import (`await import("xlsx")`) hanya ketika pengguna mengekspor data, mengurangi bundle JS awal sebesar 700KB.
+  * **Instant Route Prefetching**: Komponen navigasi utama (`AppNavigation`) menggunakan `prefetch={true}` untuk memuat halaman tujuan di latar belakang saat awal render.
+  * **Non-blocking Font Loading**: Pengaturan font Google (`Inter`, `Plus_Jakarta_Sans`, `IBM_Plex_Mono`) menggunakan `display: "swap"`.
 * **Server Actions**: Interaksi mutasi database (create, update, delete) dilakukan melalui Server Actions di `@/lib/actions/`.
 
 ### 2. Penataan Gaya (Tailwind CSS)
@@ -169,15 +183,14 @@ Model `Nomor` memiliki kolom-kolom berikut di Prisma schema:
 * **Tampilan kosong**: Jika `pulsa === 0` atau tidak ada nilai, tampilkan tanda `-` (bukan `Rp 0`).
 * **Serialisasi Tanggal di Server Action**: Selalu gunakan `masaAktif: Date | string` pada tipe parameter Server Action dan bungkus dengan `new Date(data.masaAktif)` sebelum dikirim ke Prisma. Ini mencegah error serialisasi Next.js ketika `Date` object diubah menjadi string saat melewati batas server-client.
 
-### Fitur Tabel Nomor
+### Fitur Tabel Nomor & Notifikasi PWA
 * **Kolom Sticky "Kartu"**: Kolom pertama menggunakan `sticky left-0` dengan background `bg-bg-surface` — **jangan gunakan `bg-bg-page`** agar konsisten dengan warna header tabel.
-* **Inline Edit Pulsa**: Klik sel Pulsa → langsung masuk mode input; Enter/blur menyimpan; Escape membatalkan. Menggunakan state `editingPulsaId`.
-* **Inline Edit Masa Aktif**: Klik sel Masa Aktif → langsung masuk mode `<input type="date">`. Menggunakan state `editingDateId`.
-* **Klik-untuk-Salin Nomor**: Mengklik sel Nomor langsung menyalin ke clipboard dan menampilkan toast `"[Provider] berhasil disalin!"` dengan ikon 📋. Menggunakan `e.stopPropagation()` agar tidak membuka dialog detail. Kursor berubah menjadi `cursor-copy`.
-* **Highlight Masa Aktif**: Baris diberi warna latar berdasarkan status masa aktif:
-  * 🟢 Hijau (`bg-target-bg`) — masa aktif lebih dari 1 tahun ke depan
-  * 🟡 Kuning (`bg-warning-bg`) — sudah lewat tapi belum 30 hari
-  * 🔴 Merah (`bg-danger-bg`) — sudah lewat lebih dari 30 hari
+* **Inline Edit Pulsa & Masa Aktif**: Klik sel untuk mengedit nilai pulsa/tanggal secara langsung.
+* **Klik-untuk-Salin Nomor**: Mengklik sel Nomor langsung menyalin ke clipboard.
+* **Highlight Masa Aktif**: 🟢 Hijau (>1 thn), 🟡 Kuning (masa tenggang <30 hr), 🔴 Merah (hangus >30 hr).
+* **Aturan Pengiriman Notifikasi PWA Kartu**:
+  1. **Masa Aktif Habis**: Notifikasi PWA dikirim **hanya pada hari H masa aktif habis** (`diffDays === 0`).
+  2. **Masa Tenggang Sisa ≤ 5 Hari**: Notifikasi PWA dikirim **harian secara intensif** saat sisa masa tenggang $\le 5$ hari (sisa 5, 4, 3, 2, 1, 0 hari sebelum kartu hangus permanen).
 
 ---
 

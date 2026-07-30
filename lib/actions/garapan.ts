@@ -12,6 +12,30 @@ const garapanSchema = z.object({
 export async function getGarapanList() {
   try {
     return await db.garapan.findMany({
+      select: {
+        id: true,
+        bulan: true,
+        tahun: true,
+        aplikasi: {
+          select: {
+            id: true,
+            kolom: {
+              select: {
+                id: true,
+                tipeKolom: true,
+                isTarget: true,
+                nilaiTarget: true,
+                rumus: true,
+              },
+            },
+            akun: {
+              select: {
+                customValues: true,
+              },
+            },
+          },
+        },
+      },
       orderBy: [
         { tahun: "desc" },
         { bulan: "desc" },
@@ -56,7 +80,7 @@ export async function createGarapan(formData: { bulan: number; tahun: number }) 
       return { success: false, error: "Garapan untuk bulan ini sudah ada." };
     }
 
-    await db.garapan.create({
+    const newGarapan = await db.garapan.create({
       data: {
         bulan,
         tahun,
@@ -64,7 +88,7 @@ export async function createGarapan(formData: { bulan: number; tahun: number }) 
     });
 
     revalidatePath("/");
-    return { success: true };
+    return { success: true, data: newGarapan };
   } catch (error: any) {
     console.error("Error creating garapan:", error);
     return { success: false, error: "Gagal menambahkan garapan." };
@@ -92,7 +116,7 @@ export async function updateGarapan(id: string, formData: { bulan: number; tahun
       return { success: false, error: "Garapan untuk bulan ini sudah ada." };
     }
 
-    await db.garapan.update({
+    const updatedGarapan = await db.garapan.update({
       where: { id },
       data: {
         bulan,
@@ -101,7 +125,7 @@ export async function updateGarapan(id: string, formData: { bulan: number; tahun
     });
 
     revalidatePath("/");
-    return { success: true };
+    return { success: true, data: updatedGarapan };
   } catch (error) {
     console.error("Error updating garapan:", error);
     return { success: false, error: "Gagal memperbarui garapan." };

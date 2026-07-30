@@ -241,3 +241,58 @@ export function evaluateFormula(
 
   return evaluateMathExpression(replacedFormula);
 }
+
+/**
+ * Checks whether ALL accounts in an application have completed 100% of their target
+ * OR have all checkbox (CENTANG) columns checked.
+ * Returns true if target columns or CENTANG columns exist, accounts exist, and ALL accounts meet the completion criteria.
+ */
+export function checkAppTargetCompleted(app: {
+  kolom?: any[];
+  akun?: any[];
+}): boolean {
+  if (!app.kolom || !app.akun || app.kolom.length === 0 || app.akun.length === 0) return false;
+
+  const targetCols = app.kolom.filter((c) => c.isTarget && c.nilaiTarget !== null && c.nilaiTarget !== "");
+  const centangCols = app.kolom.filter((c) => c.tipeKolom === "CENTANG");
+
+  if (targetCols.length === 0 && centangCols.length === 0) return false;
+
+  // 1. Periksa kolom target spesifik (jika ada)
+  const targetCompleted = targetCols.length > 0 && app.akun.every((acc) => {
+    const customVals = (acc.customValues || {}) as Record<string, any>;
+    return targetCols.every((col) => {
+      if (col.tipeKolom === "RUMUS") {
+        const calcVal = evaluateFormula(col.rumus, customVals, app.kolom || []);
+        if (calcVal === null) return false;
+        return calcVal >= Number(col.nilaiTarget);
+      }
+
+      const val = customVals[col.id];
+      if (val === undefined || val === null || val === "") return false;
+
+      if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
+        return Number(val) >= Number(col.nilaiTarget);
+      } else if (col.tipeKolom === "CENTANG") {
+        const expected = col.nilaiTarget === "true";
+        return Boolean(val) === expected;
+      } else {
+        return String(val).trim().toLowerCase() === String(col.nilaiTarget).trim().toLowerCase();
+      }
+    });
+  });
+
+  // 2. Periksa kolom centang (DONE / checklist columns)
+  const centangCompleted = centangCols.length > 0 && app.akun.every((acc) => {
+    const customVals = (acc.customValues || {}) as Record<string, any>;
+    return centangCols.every((col) => Boolean(customVals[col.id]) === true);
+  });
+
+  if (targetCols.length > 0 && centangCols.length > 0) {
+    return targetCompleted || centangCompleted;
+  }
+  if (targetCols.length > 0) return targetCompleted;
+  if (centangCols.length > 0) return centangCompleted;
+
+  return false;
+}

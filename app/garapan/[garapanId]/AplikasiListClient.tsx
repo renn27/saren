@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -10,11 +11,12 @@ import { AlertDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ChevronLeft, MoreVertical, Edit2, Trash2, AppWindow, Plus, Upload, X, Calendar, Copy } from "lucide-react";
+import { ChevronLeft, MoreVertical, Edit2, Trash2, AppWindow, Plus, Upload, X, Calendar, Copy, CheckCircle2, Sparkles, Download } from "lucide-react";
 import { toast } from "sonner";
-import { createAplikasi, updateAplikasi, deleteAplikasi } from "@/lib/actions/aplikasi";
+import { createAplikasi, updateAplikasi, deleteAplikasi, importAplikasiToGarapan } from "@/lib/actions/aplikasi";
 import { Select } from "@/components/ui/select";
 import { duplicateGarapan } from "@/lib/actions/garapan";
+import { checkAppTargetCompleted } from "@/lib/utils/formulaEvaluator";
 
 interface Garapan {
   id: string;
@@ -22,16 +24,29 @@ interface Garapan {
   tahun: number;
 }
 
+interface StandaloneAplikasiItem {
+  id: string;
+  namaAplikasi: string;
+  logoUrl: string | null;
+  deskripsi: string | null;
+  _count?: { akun: number };
+  akun?: any[];
+}
+
 interface AplikasiItem {
   id: string;
   namaAplikasi: string;
   logoUrl: string | null;
   deskripsi: string | null;
+  kategori?: string | null;
+  kolom?: any[];
+  akun?: any[];
 }
 
 interface AplikasiListClientProps {
   garapan: Garapan;
   initialList: AplikasiItem[];
+  standaloneList?: StandaloneAplikasiItem[];
 }
 
 const MONTH_NAMES = [
@@ -64,7 +79,7 @@ function compressImage(file: File, maxWidth: number, maxHeight: number, quality:
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
-      const img = new Image();
+      const img = new window.Image();
       img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement("canvas");
@@ -106,15 +121,22 @@ function compressImage(file: File, maxWidth: number, maxHeight: number, quality:
           quality
         );
       };
-      img.onerror = (err) => reject(err);
+      img.onerror = (err: any) => reject(err);
     };
-    reader.onerror = (err) => reject(err);
+    reader.onerror = (err: any) => reject(err);
   });
 }
 
-export function AplikasiListClient({ garapan, initialList }: AplikasiListClientProps) {
+export function AplikasiListClient({ garapan, initialList, standaloneList = [] }: AplikasiListClientProps) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // Local optimistic state
+  const [list, setList] = React.useState<AplikasiItem[]>(initialList);
+
+  React.useEffect(() => {
+    setList(initialList);
+  }, [initialList]);
 
   // Route transition state
   const [isExiting, setIsExiting] = React.useState(false);
@@ -133,11 +155,28 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
   // Form states
   const [namaAplikasi, setNamaAplikasi] = React.useState("");
   const [deskripsi, setDeskripsi] = React.useState("");
+  const [kategoriInput, setKategoriInput] = React.useState("");
+  const [isCustomKategori, setIsCustomKategori] = React.useState(false);
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
   const [clearLogo, setClearLogo] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [selectedStandaloneId, setSelectedStandaloneId] = React.useState("");
+
+  // Extract category list from initialList and standaloneList
+  const categories = React.useMemo(() => {
+    const set = new Set<string>();
+    initialList.forEach((item) => {
+      if (item.kategori && item.kategori.trim()) set.add(item.kategori.trim());
+    });
+    if (standaloneList) {
+      standaloneList.forEach((item: any) => {
+        if (item.kategori && item.kategori.trim()) set.add(item.kategori.trim());
+      });
+    }
+    return Array.from(set).sort();
+  }, [initialList, standaloneList]);
 
   // Duplication modal state
   const [isDuplicateOpen, setIsDuplicateOpen] = React.useState(false);
@@ -188,21 +227,41 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
     if (isAddOpen) {
       setNamaAplikasi("");
       setDeskripsi("");
+      setKategoriInput("");
+      setIsCustomKategori(false);
       setLogoFile(null);
       setLogoPreview(null);
       setClearLogo(false);
       setFormError(null);
+      setSelectedStandaloneId("");
     }
   }, [isAddOpen]);
+
+  const handleSelectStandalone = (id: string) => {
+    setSelectedStandaloneId(id);
+    if (!id || !standaloneList) return;
+    const found = standaloneList.find((a) => a.id === id);
+    if (found) {
+      setNamaAplikasi(found.namaAplikasi);
+      setDeskripsi(found.deskripsi || "");
+      setKategoriInput((found as any).kategori || "");
+      setLogoPreview(found.logoUrl || null);
+      setLogoFile(null);
+      setClearLogo(false);
+    }
+  };
 
   React.useEffect(() => {
     if (editingItem) {
       setNamaAplikasi(editingItem.namaAplikasi);
       setDeskripsi(editingItem.deskripsi || "");
+      setKategoriInput(editingItem.kategori || "");
+      setIsCustomKategori(false);
       setLogoFile(null);
       setLogoPreview(editingItem.logoUrl);
       setClearLogo(false);
       setFormError(null);
+      setSelectedStandaloneId("");
     }
   }, [editingItem]);
 
@@ -253,9 +312,27 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
     setIsSubmitting(true);
     setFormError(null);
 
+    // Jika mengimpor dari aplikasi standalone tanpa file logo baru yang diunggah
+    if (!editingItem && selectedStandaloneId && !logoFile) {
+      const res = await importAplikasiToGarapan(selectedStandaloneId, garapan.id);
+      setIsSubmitting(false);
+      if (res.success && res.aplikasi) {
+        toast.success(`Aplikasi "${namaAplikasi}" & daftar akunnya berhasil diimpor!`);
+        setIsAddOpen(false);
+        setSelectedStandaloneId("");
+        router.refresh();
+      } else {
+        setFormError(res.error || "Gagal mengimpor aplikasi.");
+      }
+      return;
+    }
+
     const formData = new FormData();
     formData.append("namaAplikasi", namaAplikasi);
     formData.append("deskripsi", deskripsi);
+    if (kategoriInput.trim()) {
+      formData.append("kategori", kategoriInput.trim());
+    }
     if (logoFile) {
       try {
         const compressedBlob = await compressImage(logoFile, 128, 128, 0.8);
@@ -362,7 +439,7 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
       </Card>
 
       {/* Grid or Empty State */}
-      {initialList.length === 0 ? (
+      {list.length === 0 ? (
         <div className="py-16">
           <EmptyState
             icon={AppWindow}
@@ -374,8 +451,10 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
-          {initialList.map((item) => {
+          {list.map((item) => {
             const colorClass = getAppColor(item.namaAplikasi);
+            const isTargetCompleted = checkAppTargetCompleted(item);
+
             return (
               <Card
                 key={item.id}
@@ -383,15 +462,23 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
                 onClick={() => handleNavigate(`/garapan/${garapan.id}/aplikasi/${item.id}`)}
                 className="card-stagger relative group pr-10 sm:pr-11 flex flex-col justify-between min-h-[116px] sm:min-h-[132px] p-4 sm:p-5 hover:z-10 focus-within:z-10"
               >
+                {/* Target Completed Check Badge */}
+                {isTargetCompleted && (
+                  <div className="absolute top-3 right-8 sm:top-4 sm:right-9 flex items-center justify-center h-6.5 w-6.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 dark:text-emerald-400 select-none shadow-xs" title="Target Selesai">
+                    <CheckCircle2 className="h-4.5 w-4.5 stroke-[2.5] text-emerald-500" />
+                  </div>
+                )}
+
                 {/* App logo or color placeholder */}
                 <div className={`h-10 w-10 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl border border-border-soft overflow-hidden bg-gradient-to-br ${colorClass} flex items-center justify-center select-none mb-3 sm:mb-4`}>
                   {item.logoUrl ? (
-                    <img
+                    <Image
                       src={item.logoUrl}
                       alt={item.namaAplikasi}
+                      width={44}
+                      height={44}
+                      unoptimized={item.logoUrl.startsWith("data:")}
                       className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300 ease-out"
-                      loading="lazy"
-                      decoding="async"
                     />
                   ) : (
                     <span className="text-xs sm:text-sm font-bold font-display group-hover:scale-110 transition-transform duration-300 ease-out">
@@ -444,6 +531,29 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
         }
       >
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {standaloneList && standaloneList.length > 0 && !editingItem && (
+            <div className="flex flex-col gap-2 p-3.5 bg-accent-soft/10 border border-accent/20 rounded-2xl">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-accent tracking-wide select-none">
+                <Sparkles className="h-4 w-4" />
+                <span>Impor dari Master Aplikasi Standalone</span>
+              </div>
+              <p className="text-[11px] text-text-secondary leading-tight select-none">
+                Pilih aplikasi master untuk mengimpor nama, logo, dan seluruh daftar akunnya secara otomatis.
+              </p>
+              <Select
+                value={selectedStandaloneId}
+                onChange={(e) => handleSelectStandalone(e.target.value)}
+              >
+                <option value="">-- Buat Baru dari Awal --</option>
+                {standaloneList.map((app) => (
+                  <option key={app.id} value={app.id}>
+                    📦 {app.namaAplikasi} ({app._count?.akun ?? app.akun?.length ?? 0} Akun)
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-text-secondary tracking-wide">Nama Aplikasi</label>
             <Input
@@ -453,6 +563,54 @@ export function AplikasiListClient({ garapan, initialList }: AplikasiListClientP
               placeholder="Contoh: Shopee, Tokopedia, TikTok"
               required
             />
+          </div>
+
+          {/* Kategori Application Input */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-text-secondary tracking-wide">Kategori Aplikasi (Opsional)</label>
+              {categories.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomKategori(!isCustomKategori);
+                    if (!isCustomKategori) setKategoriInput("");
+                  }}
+                  className="text-[11px] font-semibold text-accent hover:underline cursor-pointer select-none"
+                >
+                  {isCustomKategori ? "Pilih Kategori Ada" : "+ Kategori Baru"}
+                </button>
+              )}
+            </div>
+
+            {categories.length === 0 || isCustomKategori ? (
+              <Input
+                type="text"
+                value={kategoriInput}
+                onChange={(e) => setKategoriInput(e.target.value)}
+                placeholder="Contoh: E-Wallet, Bank, Investasi, Marketplace"
+              />
+            ) : (
+              <Select
+                value={kategoriInput}
+                onChange={(e) => {
+                  if (e.target.value === "__NEW__") {
+                    setIsCustomKategori(true);
+                    setKategoriInput("");
+                  } else {
+                    setKategoriInput(e.target.value);
+                  }
+                }}
+              >
+                <option value="">-- Tanpa Kategori --</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    📁 {cat}
+                  </option>
+                ))}
+                <option value="__NEW__">➕ Tambah Kategori Baru...</option>
+              </Select>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

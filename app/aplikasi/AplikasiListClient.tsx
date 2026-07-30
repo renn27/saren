@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -9,15 +10,21 @@ import { AlertDialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MoreVertical, Edit2, Trash2, AppWindow, Plus, Upload, X, AppWindow as AppIcon, Search } from "lucide-react";
+import { twMerge } from "tailwind-merge";
+import { Select } from "@/components/ui/select";
+import { MoreVertical, Edit2, Trash2, AppWindow, Plus, Upload, X, AppWindow as AppIcon, Search, CheckCircle2, Tag, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { createAplikasi, updateAplikasi, deleteAplikasi } from "@/lib/actions/aplikasi";
+import { checkAppTargetCompleted } from "@/lib/utils/formulaEvaluator";
 
 interface AplikasiItem {
   id: string;
   namaAplikasi: string;
   logoUrl: string | null;
   deskripsi: string | null;
+  kategori?: string | null;
+  kolom?: any[];
+  akun?: any[];
 }
 
 interface AplikasiListClientProps {
@@ -49,7 +56,7 @@ function compressImage(file: File, maxWidth: number, maxHeight: number, quality:
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
-      const img = new Image();
+      const img = new window.Image();
       img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement("canvas");
@@ -91,15 +98,22 @@ function compressImage(file: File, maxWidth: number, maxHeight: number, quality:
           quality
         );
       };
-      img.onerror = (err) => reject(err);
+      img.onerror = (err: any) => reject(err);
     };
-    reader.onerror = (err) => reject(err);
+    reader.onerror = (err: any) => reject(err);
   });
 }
 
 export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // Local optimistic state
+  const [list, setList] = React.useState<AplikasiItem[]>(initialList);
+
+  React.useEffect(() => {
+    setList(initialList);
+  }, [initialList]);
 
   // Route transition state
   const [isExiting, setIsExiting] = React.useState(false);
@@ -118,22 +132,43 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
   // Form states
   const [namaAplikasi, setNamaAplikasi] = React.useState("");
   const [deskripsi, setDeskripsi] = React.useState("");
+  const [kategoriInput, setKategoriInput] = React.useState("");
+  const [isCustomKategori, setIsCustomKategori] = React.useState(false);
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
   const [clearLogo, setClearLogo] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // Search state
+  // Search & Category Filter state
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [selectedCategory, setSelectedCategory] = React.useState("Semua");
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Extract unique category list from list
+  const categories = React.useMemo(() => {
+    const set = new Set<string>();
+    list.forEach((item) => {
+      if (item.kategori && item.kategori.trim()) {
+        set.add(item.kategori.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [list]);
+
+  // Count apps without category
+  const uncategorizedCount = React.useMemo(() => {
+    return list.filter((item) => !item.kategori || !item.kategori.trim()).length;
+  }, [list]);
 
   // Reset form when modals open/close
   React.useEffect(() => {
     if (isAddOpen) {
       setNamaAplikasi("");
       setDeskripsi("");
+      setKategoriInput("");
+      setIsCustomKategori(false);
       setLogoFile(null);
       setLogoPreview(null);
       setClearLogo(false);
@@ -145,6 +180,8 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
     if (editingItem) {
       setNamaAplikasi(editingItem.namaAplikasi);
       setDeskripsi(editingItem.deskripsi || "");
+      setKategoriInput(editingItem.kategori || "");
+      setIsCustomKategori(false);
       setLogoFile(null);
       setLogoPreview(editingItem.logoUrl);
       setClearLogo(false);
@@ -152,30 +189,49 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
     }
   }, [editingItem]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const filteredList = React.useMemo(() => {
+    return list.filter((item) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        item.namaAplikasi.toLowerCase().includes(q) ||
+        (item.deskripsi && item.deskripsi.toLowerCase().includes(q)) ||
+        (item.kategori && item.kategori.toLowerCase().includes(q));
+
+      let matchesCategory = true;
+      if (selectedCategory === "Semua") {
+        matchesCategory = true;
+      } else if (selectedCategory === "__NONE__") {
+        matchesCategory = !item.kategori || !item.kategori.trim();
+      } else {
+        matchesCategory = !!(item.kategori && item.kategori.trim().toLowerCase() === selectedCategory.toLowerCase());
+      }
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [list, searchQuery, selectedCategory]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setFormError("Ukuran logo maksimal 2MB.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file.type.startsWith("image/")) {
+      setFormError("File harus berupa gambar.");
       return;
     }
 
-    const acceptedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!acceptedTypes.includes(file.type)) {
-      setFormError("Format logo harus JPG, PNG, atau WEBP.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError("Ukuran file maksimal 5MB.");
       return;
     }
 
-    setFormError(null);
     setLogoFile(file);
     setClearLogo(false);
+    setFormError(null);
 
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setLogoPreview(reader.result as string);
+    reader.onload = (event) => {
+      setLogoPreview(event.target?.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -202,6 +258,9 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
     const formData = new FormData();
     formData.append("namaAplikasi", namaAplikasi);
     formData.append("deskripsi", deskripsi);
+    if (kategoriInput.trim()) {
+      formData.append("kategori", kategoriInput.trim());
+    }
     if (logoFile) {
       try {
         const compressedBlob = await compressImage(logoFile, 128, 128, 0.8);
@@ -220,8 +279,10 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
     if (editingItem) {
       const res = await updateAplikasi(editingItem.id, null, formData);
       setIsSubmitting(false);
-      if (res.success) {
+      if (res.success && res.data) {
         toast.success("Aplikasi diperbarui");
+        const updated = res.data;
+        setList((prev) => prev.map((item) => (item.id === editingItem.id ? updated : item)));
         setEditingItem(null);
         router.refresh();
       } else {
@@ -230,8 +291,10 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
     } else {
       const res = await createAplikasi(null, formData);
       setIsSubmitting(false);
-      if (res.success) {
+      if (res.success && res.data) {
         toast.success("Aplikasi ditambahkan");
+        const newItem = res.data;
+        setList((prev) => [newItem, ...prev]);
         setIsAddOpen(false);
         router.refresh();
       } else {
@@ -242,20 +305,20 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
 
   const handleDelete = async () => {
     if (!deletingItem) return;
-    const res = await deleteAplikasi(deletingItem.id, null);
+    const targetId = deletingItem.id;
+    const prevList = [...list];
+    setList((prev) => prev.filter((item) => item.id !== targetId));
+    setDeletingItem(null);
+
+    const res = await deleteAplikasi(targetId, null);
     if (res.success) {
       toast.success("Aplikasi dihapus");
-      setDeletingItem(null);
       router.refresh();
     } else {
+      setList(prevList);
       toast.error(res.error || "Gagal menghapus aplikasi.");
     }
   };
-
-  // Filtered applications list
-  const filteredList = initialList.filter((item) =>
-    item.namaAplikasi.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
@@ -271,9 +334,9 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
                 Daftar Aplikasi
               </h2>
               <p className="text-xs text-text-secondary font-sans mt-0.5">
-                {filteredList.length !== initialList.length
-                  ? `${filteredList.length} dari ${initialList.length} aplikasi`
-                  : `${initialList.length} aplikasi mandiri`}
+                {filteredList.length !== list.length
+                  ? `${filteredList.length} dari ${list.length} aplikasi`
+                  : `${list.length} aplikasi mandiri`}
               </p>
             </div>
           </div>
@@ -311,6 +374,65 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
             <span>Tambah Aplikasi</span>
           </Button>
         </div>
+
+        {/* Category Filter Pills Bar */}
+        {(categories.length > 0 || uncategorizedCount > 0) && list.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-2 no-scrollbar w-full select-none border-t border-border-soft/60">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory("Semua")}
+              className={twMerge(
+                "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border",
+                selectedCategory === "Semua"
+                  ? "bg-accent text-white border-accent shadow-xs"
+                  : "bg-bg-page/70 text-text-secondary border-border-soft hover:border-accent/40"
+              )}
+            >
+              Semua ({list.length})
+            </button>
+
+            {uncategorizedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("__NONE__")}
+                className={twMerge(
+                  "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
+                  selectedCategory === "__NONE__"
+                    ? "bg-accent text-white border-accent shadow-xs"
+                    : "bg-bg-page/70 text-text-secondary border-border-soft hover:border-accent/40"
+                )}
+              >
+                <span>Tanpa Kategori</span>
+                <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedCategory === "__NONE__" ? "bg-white/20 text-white" : "bg-bg-surface text-text-secondary border border-border-soft/40")}>
+                  {uncategorizedCount}
+                </span>
+              </button>
+            )}
+
+            {categories.map((cat) => {
+              const count = list.filter((i) => i.kategori?.trim().toLowerCase() === cat.toLowerCase()).length;
+              const isSelected = selectedCategory.toLowerCase() === cat.toLowerCase();
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={twMerge(
+                    "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
+                    isSelected
+                      ? "bg-accent text-white border-accent shadow-xs"
+                      : "bg-bg-page/70 text-text-secondary border-border-soft hover:border-accent/40"
+                  )}
+                >
+                  <span>{cat}</span>
+                  <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", isSelected ? "bg-white/20 text-white" : "bg-bg-surface text-text-secondary border border-border-soft/40")}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
       {/* Grid or Empty State */}
@@ -334,6 +456,8 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {filteredList.map((item) => {
             const colorClass = getAppColor(item.namaAplikasi);
+            const isTargetCompleted = checkAppTargetCompleted(item);
+
             return (
               <Card
                 key={item.id}
@@ -341,15 +465,23 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
                 onClick={() => handleNavigate(`/aplikasi/${item.id}`)}
                 className="card-stagger relative group pr-10 sm:pr-11 flex flex-col justify-between min-h-[116px] sm:min-h-[132px] p-4 sm:p-5 hover:z-10 focus-within:z-10"
               >
+                {/* Target Completed Check Badge */}
+                {isTargetCompleted && (
+                  <div className="absolute top-3 right-8 sm:top-4 sm:right-9 flex items-center justify-center h-6.5 w-6.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 dark:text-emerald-400 select-none shadow-xs" title="Target Selesai">
+                    <CheckCircle2 className="h-4.5 w-4.5 stroke-[2.5] text-emerald-500" />
+                  </div>
+                )}
+
                 {/* App logo or color placeholder */}
                 <div className={`h-10 w-10 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl border border-border-soft overflow-hidden bg-gradient-to-br ${colorClass} flex items-center justify-center select-none mb-3 sm:mb-4`}>
                   {item.logoUrl ? (
-                    <img
+                    <Image
                       src={item.logoUrl}
                       alt={item.namaAplikasi}
+                      width={44}
+                      height={44}
+                      unoptimized={item.logoUrl.startsWith("data:")}
                       className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300 ease-out"
-                      loading="lazy"
-                      decoding="async"
                     />
                   ) : (
                     <span className="text-xs sm:text-sm font-bold font-display group-hover:scale-110 transition-transform duration-300 ease-out">
@@ -367,7 +499,7 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
                   <DropdownMenu
                     trigger={
                       <button 
-                        onClick={(e) => e.stopPropagation()} 
+                        type="button"
                         className="p-1.5 rounded-xl text-text-secondary hover:bg-accent-soft/80 hover:text-text-primary transition-all duration-150 cursor-pointer"
                       >
                         <MoreVertical className="h-4 w-4" />
@@ -416,6 +548,54 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
             />
           </div>
 
+          {/* Kategori Application Input */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-text-secondary tracking-wide">Kategori Aplikasi (Opsional)</label>
+              {categories.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCustomKategori(!isCustomKategori);
+                    if (!isCustomKategori) setKategoriInput("");
+                  }}
+                  className="text-[11px] font-semibold text-accent hover:underline cursor-pointer select-none"
+                >
+                  {isCustomKategori ? "Pilih Kategori Ada" : "+ Kategori Baru"}
+                </button>
+              )}
+            </div>
+
+            {categories.length === 0 || isCustomKategori ? (
+              <Input
+                type="text"
+                value={kategoriInput}
+                onChange={(e) => setKategoriInput(e.target.value)}
+                placeholder="Contoh: E-Wallet, Bank, Investasi, Marketplace"
+              />
+            ) : (
+              <Select
+                value={kategoriInput}
+                onChange={(e) => {
+                  if (e.target.value === "__NEW__") {
+                    setIsCustomKategori(true);
+                    setKategoriInput("");
+                  } else {
+                    setKategoriInput(e.target.value);
+                  }
+                }}
+              >
+                <option value="">-- Tanpa Kategori --</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    📁 {cat}
+                  </option>
+                ))}
+                <option value="__NEW__">➕ Tambah Kategori Baru...</option>
+              </Select>
+            )}
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-text-secondary tracking-wide">Deskripsi (Opsional)</label>
             <textarea
@@ -436,7 +616,7 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 ref={fileInputRef}
-                onChange={handleFileChange}
+                onChange={handleFileSelect}
                 className="hidden"
                 id="logo-upload"
               />

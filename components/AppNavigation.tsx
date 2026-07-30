@@ -51,6 +51,7 @@ export function AppNavigationSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               className={twMerge(
                 "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group",
                 active
@@ -87,6 +88,7 @@ export function AppNavigationBottom() {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               className={twMerge(
                 "flex flex-col items-center justify-center w-20 h-full gap-1 transition-colors select-none cursor-pointer active:scale-95",
                 active ? "text-accent" : "text-text-secondary"
