@@ -1,3 +1,5 @@
+import * as React from "react";
+
 // Konstanta dan helper functions yang dipakai bersama oleh NoteClient dan NoteCard
 
 // ── Palet warna Google Keep Premium ──────────────────────────────────────────
@@ -101,6 +103,41 @@ export function extractUrls(text: string | null): string[] {
   return matches
     .map((url) => url.replace(/[.,\)\(\]\[!\?]+$/, ""))
     .filter((value, index, self) => self.indexOf(value) === index);
+}
+
+// ── Helper: render text with clickable URLs ───────────────────────────────────
+
+export function renderTextWithLinks(text: string | null) {
+  if (!text) return null;
+
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(/^https?:\/\//i) || part.match(/^www\./i)) {
+      const matchClean = part.match(/^([^\s]+?)([\.,\)\(\]\[!\?]*)$/);
+      const cleanUrl = matchClean ? matchClean[1] : part;
+      const trailingPunct = matchClean ? matchClean[2] : "";
+
+      const href = cleanUrl.startsWith("www.") ? `https://${cleanUrl}` : cleanUrl;
+
+      return (
+        <React.Fragment key={index}>
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-accent underline font-medium hover:opacity-80 break-all cursor-pointer transition-opacity"
+          >
+            {cleanUrl}
+          </a>
+          {trailingPunct}
+        </React.Fragment>
+      );
+    }
+    return part;
+  });
 }
 
 // ── Helper: parse nilai numerik dari string ───────────────────────────────────

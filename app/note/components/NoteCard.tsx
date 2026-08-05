@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 import { fetchLinkMetadata } from "@/lib/actions/note";
-import { colorMap, extractUrls, calculateColumnTotal } from "@/app/note/constants";
+import { colorMap, extractUrls, calculateColumnTotal, renderTextWithLinks } from "@/app/note/constants";
 import type { Note, Label, FolderItem } from "@/app/note/types";
 
 // ── NoteCard Props ────────────────────────────────────────────────────────────
@@ -355,7 +355,7 @@ export const NoteCard = React.memo(function NoteCard({
               note.color !== "default" && "text-text-primary/80 opacity-90"
             )}
           >
-            {note.content || <em className="opacity-40 text-[11px] font-sans">Kosong</em>}
+            {note.content ? renderTextWithLinks(note.content) : <em className="opacity-40 text-[11px] font-sans">Kosong</em>}
           </p>
         ) : (
           /* Checklist preview */
@@ -377,7 +377,7 @@ export const NoteCard = React.memo(function NoteCard({
                     note.color !== "default" && colorMap[note.color]?.textClass
                   )}
                 >
-                  {item.text}
+                  {renderTextWithLinks(item.text)}
                 </span>
               </div>
             ))}

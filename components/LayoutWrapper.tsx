@@ -28,7 +28,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
         {/* Global Navigation Header with Glassmorphism */}
         {!isNoteDetailPage && (
           <header className="relative md:sticky md:top-0 z-40 w-full border-b border-border-soft/50 bg-bg-surface/80 backdrop-blur-xl transition-all duration-200 shrink-0">
-            <div className="max-w-7xl mx-auto w-full px-4 h-16 flex items-center justify-between md:px-8">
+            <div className="w-full px-4 h-16 flex items-center justify-between md:px-6">
               <Link href="/" prefetch={true} className="flex items-center gap-2.5 group">
                 {/* Logo dark mode */}
                 <img
@@ -47,9 +47,6 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
                 </span>
               </Link>
               <div className="flex items-center gap-2.5">
-                <span className="text-[11px] font-semibold text-accent bg-accent-soft px-3 py-1 rounded-full font-sans select-none tracking-wide hidden sm:inline">
-                  Super App Rendi
-                </span>
                 <ThemeToggle />
                 <HeaderSettings />
               </div>

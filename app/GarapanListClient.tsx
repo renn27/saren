@@ -10,7 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MoreVertical, Edit2, Trash2, Calendar, Plus, List, CheckCircle2 } from "lucide-react";
+import { MoreVertical, Edit2, Trash2, Calendar, Plus, List, CheckCircle2, AppWindow, Users } from "lucide-react";
 import { toast } from "sonner";
 import { createGarapan, updateGarapan, deleteGarapan } from "@/lib/actions/garapan";
 import { checkAppTargetCompleted } from "@/lib/utils/formulaEvaluator";
@@ -66,6 +66,60 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
       router.push(url);
     }, 250);
   };
+
+  // Search / Filter Year state
+  const [selectedYear, setSelectedYear] = React.useState<string>("Semua");
+
+  const currentMonth = React.useMemo(() => new Date().getMonth() + 1, []);
+  const currentYear = React.useMemo(() => new Date().getFullYear(), []);
+
+  // Extract unique year list from list sorted descending
+  const uniqueYears = React.useMemo(() => {
+    const set = new Set<number>();
+    list.forEach((item) => set.add(item.tahun));
+    return Array.from(set).sort((a, b) => b - a);
+  }, [list]);
+
+  // Count garapan items per year
+  const yearCounts = React.useMemo(() => {
+    const counts: Record<number, number> = {};
+    list.forEach((item) => {
+      counts[item.tahun] = (counts[item.tahun] || 0) + 1;
+    });
+    return counts;
+  }, [list]);
+
+  // Filtered list based on selected year
+  const filteredList = React.useMemo(() => {
+    if (selectedYear === "Semua") return list;
+    return list.filter((item) => item.tahun === Number(selectedYear));
+  }, [list, selectedYear]);
+
+  // Total apps count across current filtered list
+  const totalAppsCount = React.useMemo(() => {
+    return filteredList.reduce((acc, item) => acc + (item.aplikasi?.length || 0), 0);
+  }, [filteredList]);
+
+  // Total accounts count across current filtered list
+  const totalAccountsCount = React.useMemo(() => {
+    return filteredList.reduce((acc, item) => {
+      if (!item.aplikasi) return acc;
+      return acc + item.aplikasi.reduce((appAcc: number, app: any) => appAcc + (app.akun?.length || 0), 0);
+    }, 0);
+  }, [filteredList]);
+
+  // Completed applications count (100% target met)
+  const completedAppsCount = React.useMemo(() => {
+    let completed = 0;
+    filteredList.forEach((item) => {
+      item.aplikasi?.forEach((app) => {
+        if (checkAppTargetCompleted(app)) {
+          completed++;
+        }
+      });
+    });
+    return completed;
+  }, [filteredList]);
 
   // Modals state
   const [isAddOpen, setIsAddOpen] = React.useState(false);
@@ -155,29 +209,85 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
   return (
     <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
       {/* Header Card */}
-      <Card className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 p-4 sm:p-5">
-        <div className="flex items-center gap-3.5">
-          <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/10">
+      <Card className="relative flex flex-row items-center justify-between gap-3 mb-3.5 p-4 sm:p-5 overflow-hidden">
+        {/* Subtle decorative accent glow */}
+        <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-accent/10 blur-xl pointer-events-none" />
+
+        <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+          <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft via-accent-soft/40 to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/15 shadow-2xs">
             <List className="h-5 w-5" />
           </div>
-          <div className="flex flex-col">
-            <h2 className="text-[19px] sm:text-[21px] font-semibold tracking-tight text-text-primary font-display leading-tight select-none">
+          <div className="flex flex-col min-w-0">
+            <h2 className="text-[18px] sm:text-[21px] font-bold tracking-tight text-text-primary font-display leading-snug truncate select-none">
               Daftar Garapan
             </h2>
-            <p className="text-xs text-text-secondary font-sans mt-0.5">
-              {list.length} bulan tercatat
+            <p className="text-xs text-text-secondary font-sans mt-0.5 truncate">
+              {filteredList.length !== list.length
+                ? `${filteredList.length} dari ${list.length} bulan tercatat`
+                : `${list.length} bulan tercatat`}
             </p>
           </div>
         </div>
+
         <Button
           variant="primary"
           onClick={() => setIsAddOpen(true)}
-          className="gap-2 font-semibold text-xs px-4 h-10 rounded-xl"
+          className="gap-1.5 font-semibold text-xs px-3.5 sm:px-4 h-10 rounded-xl shrink-0 shadow-xs active:scale-[0.97] transition-all whitespace-nowrap"
         >
           <Plus className="h-4 w-4 shrink-0" />
           <span>Tambah Garapan</span>
         </Button>
       </Card>
+
+      {/* Filter Pills Tahun */}
+      {uniqueYears.length > 0 && list.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-3.5 no-scrollbar w-full select-none">
+          <button
+            type="button"
+            onClick={() => setSelectedYear("Semua")}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 ${
+              selectedYear === "Semua"
+                ? "bg-accent text-white border-accent shadow-xs"
+                : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
+            }`}
+          >
+            <span>Semua</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                selectedYear === "Semua"
+                  ? "bg-white/20 text-white"
+                  : "bg-bg-page text-text-secondary border border-border-soft/40"
+              }`}
+            >
+              {list.length}
+            </span>
+          </button>
+
+          {uniqueYears.map((yr) => (
+            <button
+              type="button"
+              key={yr}
+              onClick={() => setSelectedYear(String(yr))}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 ${
+                selectedYear === String(yr)
+                  ? "bg-accent text-white border-accent shadow-xs"
+                  : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
+              }`}
+            >
+              <span>{yr}</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  selectedYear === String(yr)
+                    ? "bg-white/20 text-white"
+                    : "bg-bg-page text-text-secondary border border-border-soft/40"
+                }`}
+              >
+                {yearCounts[yr]}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* List Grid */}
       {list.length === 0 ? (
@@ -188,60 +298,86 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
           actionLabel="Tambah Garapan Pertama"
           onAction={() => setIsAddOpen(true)}
         />
+      ) : filteredList.length === 0 ? (
+        <EmptyState
+          icon={Calendar}
+          title={`Tidak ada garapan tahun ${selectedYear}`}
+          description={`Belum ada garapan yang tercatat di tahun ${selectedYear}. Silakan ubah filter atau tambah garapan baru.`}
+          actionLabel="Tampilkan Semua Garapan"
+          onAction={() => setSelectedYear("Semua")}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {list.map((item) => {
+          {filteredList.map((item) => {
             const monthAccent = MONTH_ACCENTS[(item.bulan - 1) % 12];
             const monthName = MONTH_NAMES[item.bulan - 1];
+
+            const isCurrentMonth = item.bulan === currentMonth && item.tahun === currentYear;
 
             const isGarapanCompleted =
               Boolean(item.aplikasi && item.aplikasi.length > 0) &&
               item.aplikasi!.every((app) => checkAppTargetCompleted(app));
 
+            const appCount = item.aplikasi?.length || 0;
+
             return (
               <Card
                 key={item.id}
                 onClick={() => handleNavigate(`/garapan/${item.id}`)}
-                className="card-stagger group relative flex items-center gap-3.5 p-4 sm:p-5 pr-12 cursor-pointer hover:border-accent/40 transition-all duration-200 min-h-[80px]"
+                className={`card-stagger group relative flex items-center gap-3.5 p-4 sm:p-5 pr-12 cursor-pointer transition-all duration-200 min-h-[80px] ${
+                  isCurrentMonth
+                    ? "bg-bg-surface border-accent/40 shadow-xs hover:border-accent/60"
+                    : "bg-bg-surface/75 border-border-soft hover:bg-bg-surface hover:border-accent/30"
+                }`}
               >
                 {/* Month color icon */}
                 <div className={`h-11 w-11 rounded-2xl bg-gradient-to-br ${monthAccent} text-accent flex items-center justify-center shrink-0 border border-accent/10 relative`}>
                   <Calendar className="h-5 w-5 group-hover:scale-110 transition-transform duration-300 ease-out" />
                 </div>
-                {/* Title & Year */}
-                <div className="flex-1 min-w-0 flex flex-row items-center gap-2 font-display">
-                  <h3 className="text-[17px] font-bold text-text-primary truncate leading-none">
-                    {monthName}
-                  </h3>
-                  <span className="inline-flex items-center rounded-md bg-bg-page px-2 py-0.5 text-[11px] font-semibold text-text-secondary border border-border-soft shrink-0">
-                    {item.tahun}
-                  </span>
-                  {isGarapanCompleted && (
-                    <span className="inline-flex items-center justify-center h-5.5 w-5.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-500 shrink-0 select-none" title="Garapan Selesai">
-                      <CheckCircle2 className="h-3.5 w-3.5 stroke-[2.5]" />
-                    </span>
+                {/* Title, Year, Badge & Metadata */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-1 font-display">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-[17px] font-bold text-text-primary truncate leading-snug py-0.5">
+                      {monthName}
+                    </h3>
+                    {isCurrentMonth && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft text-accent border border-accent/30 px-2 py-0.5 text-[10px] font-bold shrink-0 select-none">
+                        <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                        Bulan Ini
+                      </span>
+                    )}
+                    {isGarapanCompleted && (
+                      <span className="inline-flex items-center justify-center h-5.5 w-5.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-500 shrink-0 select-none" title="Garapan Selesai">
+                        <CheckCircle2 className="h-3.5 w-3.5 stroke-[2.5]" />
+                      </span>
+                    )}
+                  </div>
+                  {appCount > 0 && (
+                    <p className="text-[11.5px] text-text-secondary font-sans font-medium leading-normal">
+                      {appCount} aplikasi tercatat
+                    </p>
                   )}
                 </div>
 
-              {/* Dropdown Action Menu */}
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <DropdownMenu
-                  trigger={
-                    <button className="p-1.5 rounded-xl text-text-secondary hover:bg-accent-soft/80 hover:text-text-primary transition-all duration-150 cursor-pointer">
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
-                  }
-                >
-                  <DropdownMenuItem onClick={() => setEditingItem(item)}>
-                    <Edit2 className="h-3.5 w-3.5" />
-                    <span>Edit</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem isDanger onClick={() => setDeletingItem(item)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Hapus</span>
-                  </DropdownMenuItem>
-                </DropdownMenu>
-              </div>
+                {/* Dropdown Action Menu */}
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <DropdownMenu
+                    trigger={
+                      <button className="p-1.5 rounded-xl text-text-secondary hover:bg-accent-soft/80 hover:text-text-primary transition-all duration-150 cursor-pointer">
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    }
+                  >
+                    <DropdownMenuItem onClick={() => setEditingItem(item)}>
+                      <Edit2 className="h-3.5 w-3.5" />
+                      <span>Edit</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem isDanger onClick={() => setDeletingItem(item)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Hapus</span>
+                    </DropdownMenuItem>
+                  </DropdownMenu>
+                </div>
               </Card>
             );
           })}

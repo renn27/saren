@@ -52,6 +52,7 @@ import { createAkun, updateAkun, deleteAkun, getAllAccountsForAutofill, swapAkun
 import { updateAplikasi } from "@/lib/actions/aplikasi";
 import { TipeKolom } from "@prisma/client";
 import { evaluateFormula } from "@/lib/utils/formulaEvaluator";
+import { twMerge } from "tailwind-merge";
 
 interface KolomItem {
   id: string;
@@ -140,6 +141,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
   const [deletingAccount, setDeletingAccount] = React.useState<AkunItem | null>(null);
   const [selectedDetailAccount, setSelectedDetailAccount] = React.useState<AkunItem | null>(null);
   const [editingCell, setEditingCell] = React.useState<{ accountId: string; columnId: "nama" | string } | null>(null);
+  const [selectedCell, setSelectedCell] = React.useState<{ accountId: string; columnId: string } | null>(null);
 
   // Column form states
   const [namaKolom, setNamaKolom] = React.useState("");
@@ -310,10 +312,36 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
     setKolomList(aplikasi.kolom);
   }, [aplikasi.kolom]);
 
+  // Device Filter State
+  const [selectedDevice, setSelectedDevice] = React.useState("Semua");
+
+  const devices = React.useMemo(() => {
+    const set = new Set<string>();
+    akunList.forEach((acc) => {
+      if (acc.device && acc.device.trim()) {
+        set.add(acc.device.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [akunList]);
+
+  const uncategorizedDeviceCount = React.useMemo(() => {
+    return akunList.filter((acc) => !acc.device || !acc.device.trim()).length;
+  }, [akunList]);
+
   const filteredAkun = React.useMemo(() => {
-    if (!searchQuery.trim()) return akunList;
+    let list = akunList;
+    if (selectedDevice !== "Semua") {
+      if (selectedDevice === "__NONE__") {
+        list = list.filter((acc) => !acc.device || !acc.device.trim());
+      } else {
+        list = list.filter((acc) => acc.device?.trim().toLowerCase() === selectedDevice.toLowerCase());
+      }
+    }
+
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
-    return akunList.filter((acc) => {
+    return list.filter((acc) => {
       const matchName = acc.nama.toLowerCase().includes(q);
       const matchDevice = (acc.device || "").toLowerCase().includes(q);
       const matchHp = (acc.nomorHp || "").toLowerCase().includes(q);
@@ -328,7 +356,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
       });
       return matchName || matchDevice || matchHp || matchCustom;
     });
-  }, [akunList, kolomList, searchQuery]);
+  }, [akunList, kolomList, searchQuery, selectedDevice]);
 
   const checkAkunMeetsTarget = React.useCallback((acc: AkunItem) => {
     const targetCols = kolomList.filter((c) => c.isTarget && c.nilaiTarget !== null && c.nilaiTarget !== "");
@@ -1096,6 +1124,73 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
             </div>
           )}
         </div>
+
+        {/* Device Filter Pills Bar */}
+        {(devices.length > 0 || uncategorizedDeviceCount > 0) && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-2 no-scrollbar w-full select-none border-t border-border-soft/60">
+            <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+              <Smartphone className="h-3.5 w-3.5 text-accent" />
+              <span>Device:</span>
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setSelectedDevice("Semua")}
+              className={twMerge(
+                "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
+                selectedDevice === "Semua"
+                  ? "bg-accent text-white border-accent shadow-2xs"
+                  : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
+              )}
+            >
+              <span>Semua</span>
+              <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedDevice === "Semua" ? "bg-white/20 text-white" : "bg-bg-page text-text-secondary border border-border-soft/40")}>
+                {akunList.length}
+              </span>
+            </button>
+
+            {uncategorizedDeviceCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedDevice("__NONE__")}
+                className={twMerge(
+                  "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
+                  selectedDevice === "__NONE__"
+                    ? "bg-accent text-white border-accent shadow-2xs"
+                    : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
+                )}
+              >
+                <span>Tanpa Device</span>
+                <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedDevice === "__NONE__" ? "bg-white/20 text-white" : "bg-bg-page text-text-secondary border border-border-soft/40")}>
+                  {uncategorizedDeviceCount}
+                </span>
+              </button>
+            )}
+
+            {devices.map((dev) => {
+              const count = akunList.filter((a) => a.device?.trim().toLowerCase() === dev.toLowerCase()).length;
+              const isSelected = selectedDevice.toLowerCase() === dev.toLowerCase();
+              return (
+                <button
+                  key={dev}
+                  type="button"
+                  onClick={() => setSelectedDevice(dev)}
+                  className={twMerge(
+                    "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
+                    isSelected
+                      ? "bg-accent text-white border-accent shadow-2xs"
+                      : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
+                  )}
+                >
+                  <span>{dev}</span>
+                  <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", isSelected ? "bg-white/20 text-white" : "bg-bg-page text-text-secondary border border-border-soft/40")}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
             {/* Main Content: Search, Views, and Empty States */}
       {aplikasi.akun.length === 0 ? (
@@ -1140,8 +1235,12 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                                     ? "min-w-[90px] sm:min-w-[120px]"
                                     : "min-w-[130px] sm:min-w-[180px]"
                                 }`
-                              : "p-0 select-none min-w-[100px] sm:min-w-[150px]"
-                          }`}
+                              : `p-0 select-none ${
+                                  col.tipeKolom === "CENTANG"
+                                    ? "min-w-[70px] sm:min-w-[90px]"
+                                    : "min-w-[90px] sm:min-w-[130px]"
+                                }`
+                            }`}
                         >
                           {isReorderMode ? (
                             <div className="flex items-center gap-1.5 justify-center text-nowrap py-3 px-3.5 sm:px-6 sm:py-4">
@@ -1290,7 +1389,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                           return (
                             <TableCell
                               key={col.id}
-                              className="select-none text-nowrap min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50 font-mono"
+                              className="select-none text-nowrap px-3 py-2 border-r border-border-soft/50 font-mono text-right"
                               title={`Rumus: ${col.rumus || ""}`}
                             >
                               {formatValue(formulaVal, col.tipeKolom)}
@@ -1304,10 +1403,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                           return (
                             <TableCell
                               key={col.id}
-                              className={`align-middle py-2 border-r border-border-soft/50 ${col.tipeKolom === "CENTANG"
-                                  ? "min-w-[70px] sm:min-w-[100px]"
-                                  : "min-w-[110px] sm:min-w-[160px]"
-                                }`}
+                              className="align-middle py-2 border-r border-border-soft/50"
                             >
                               <div className="flex justify-center w-full">
                                 <Checkbox
@@ -1326,13 +1422,13 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                             return (
                               <TableCell
                                 key={col.id}
-                                className="p-1 min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
+                                className="p-1 border-r border-border-soft/50"
                               >
                                 <input
                                   type="date"
                                   defaultValue={val || ""}
                                   autoFocus
-                                  className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans"
+                                  className="w-full box-border h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans"
                                   onBlur={(e) => {
                                     const finalVal = e.target.value || null;
                                     if (finalVal !== val) {
@@ -1359,7 +1455,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                           return (
                             <TableCell
                               key={col.id}
-                              className="p-1 min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
+                              className="p-1 w-[130px] min-w-[130px] border-r border-border-soft/50"
                             >
                               <input
                                 type="text"
@@ -1372,7 +1468,9 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                                     : ""
                                 }
                                 autoFocus
-                                className="w-full h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans"
+                                className={`w-full min-w-0 box-border h-9 px-2 text-sm bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans ${
+                                  col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL" ? "text-right font-mono" : "text-left"
+                                }`}
                                 onChange={(e) => {
                                   if (col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL") {
                                     const parsed = parseNumberInput(e.target.value);
@@ -1416,14 +1514,39 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                           );
                         }
     
+                        const isCellSelected = selectedCell?.accountId === acc.id && selectedCell?.columnId === col.id;
+
                         return (
                           <TableCell
                             key={col.id}
-                            className="cursor-pointer hover:bg-accent-soft/30 transition-colors select-none text-nowrap min-w-[110px] sm:min-w-[160px] border-r border-border-soft/50"
-                            onClick={() => setEditingCell({ accountId: acc.id, columnId: col.id })}
-                            title="Klik untuk mengedit"
+                            className="p-1 w-[130px] min-w-[130px] border-r border-border-soft/50 cursor-pointer select-none"
+                            onClick={() => {
+                              if (isCellSelected) {
+                                // 2nd click on same cell -> edit mode
+                                setEditingCell({ accountId: acc.id, columnId: col.id });
+                              } else {
+                                // 1st click -> select & highlight cell
+                                setSelectedCell({ accountId: acc.id, columnId: col.id });
+                              }
+                            }}
+                            onDoubleClick={() => {
+                              // Double click -> edit mode immediately
+                              setSelectedCell({ accountId: acc.id, columnId: col.id });
+                              setEditingCell({ accountId: acc.id, columnId: col.id });
+                            }}
+                            title={isCellSelected ? "Klik lagi atau Double-click untuk mengedit" : "Klik 1x untuk memilih sel"}
                           >
-                            {formatValue(val, col.tipeKolom)}
+                            <div
+                              className={`w-full min-w-0 box-border h-9 px-2 text-sm font-sans flex items-center transition-all rounded-lg ${
+                                col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL" ? "justify-end font-mono" : "justify-start"
+                              } ${
+                                isCellSelected
+                                  ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs"
+                                  : "hover:bg-accent-soft/30 text-text-primary"
+                              }`}
+                            >
+                              {formatValue(val, col.tipeKolom)}
+                            </div>
                           </TableCell>
                         );
                       })}

@@ -382,13 +382,16 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
               type="button"
               onClick={() => setSelectedCategory("Semua")}
               className={twMerge(
-                "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border",
+                "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
                 selectedCategory === "Semua"
                   ? "bg-accent text-white border-accent shadow-xs"
-                  : "bg-bg-page/70 text-text-secondary border-border-soft hover:border-accent/40"
+                  : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
               )}
             >
-              Semua ({list.length})
+              <span>Semua</span>
+              <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedCategory === "Semua" ? "bg-white/20 text-white" : "bg-bg-page text-text-secondary border border-border-soft/40")}>
+                {list.length}
+              </span>
             </button>
 
             {uncategorizedCount > 0 && (
@@ -399,11 +402,11 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
                   "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
                   selectedCategory === "__NONE__"
                     ? "bg-accent text-white border-accent shadow-xs"
-                    : "bg-bg-page/70 text-text-secondary border-border-soft hover:border-accent/40"
+                    : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
                 )}
               >
                 <span>Tanpa Kategori</span>
-                <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedCategory === "__NONE__" ? "bg-white/20 text-white" : "bg-bg-surface text-text-secondary border border-border-soft/40")}>
+                <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedCategory === "__NONE__" ? "bg-white/20 text-white" : "bg-bg-page text-text-secondary border border-border-soft/40")}>
                   {uncategorizedCount}
                 </span>
               </button>
@@ -421,11 +424,16 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
                     "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
                     isSelected
                       ? "bg-accent text-white border-accent shadow-xs"
-                      : "bg-bg-page/70 text-text-secondary border-border-soft hover:border-accent/40"
+                      : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
                   )}
                 >
                   <span>{cat}</span>
-                  <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", isSelected ? "bg-white/20 text-white" : "bg-bg-surface text-text-secondary border border-border-soft/40")}>
+                  <span
+                    className={twMerge(
+                      "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                      isSelected ? "bg-white/20 text-white" : "bg-bg-page text-text-secondary border border-border-soft/40"
+                    )}
+                  >
                     {count}
                   </span>
                 </button>

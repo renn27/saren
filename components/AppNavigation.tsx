@@ -1,8 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Hash, StickyNote, AppWindow } from "lucide-react";
+import { Briefcase, Hash, StickyNote, AppWindow, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 
 function getNavItems(pathname: string) {
@@ -37,13 +38,65 @@ function getNavItems(pathname: string) {
 export function AppNavigationSidebar() {
   const pathname = usePathname();
   const navItems = getNavItems(pathname);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const saved = localStorage.getItem("saren_sidebar_collapsed");
+    if (saved !== null) {
+      setIsCollapsed(saved === "true");
+    }
+  }, []);
+
+  const toggleCollapse = () => {
+    const nextState = !isCollapsed;
+    setIsCollapsed(nextState);
+    localStorage.setItem("saren_sidebar_collapsed", String(nextState));
+  };
+
+  if (!isMounted) {
+    return (
+      <aside className="hidden md:flex flex-col w-64 shrink-0 border-r border-border-soft bg-bg-surface/50 backdrop-blur-md h-full transition-all duration-300">
+        <nav className="flex flex-col gap-2 p-4 h-full overflow-y-auto">
+          <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2 px-3">
+            Menu Utama
+          </div>
+        </nav>
+      </aside>
+    );
+  }
 
   return (
-    <aside className="hidden md:flex flex-col w-64 shrink-0 border-r border-border-soft bg-bg-surface/50 backdrop-blur-md h-full">
-      <nav className="flex flex-col gap-2 p-4 h-full overflow-y-auto">
-        <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2 px-3">
-          Menu Utama
-        </div>
+    <aside
+      className={twMerge(
+        "hidden md:flex flex-col shrink-0 border-r border-border-soft bg-bg-surface/50 backdrop-blur-md h-full transition-all duration-300 ease-in-out relative select-none",
+        isCollapsed ? "w-16" : "w-64"
+      )}
+    >
+      <div className="flex items-center justify-between pt-4 pb-2 px-3.5">
+        {!isCollapsed && (
+          <span className="text-[10px] font-bold text-text-secondary/70 uppercase tracking-wider px-1">
+            Menu Utama
+          </span>
+        )}
+        <button
+          onClick={toggleCollapse}
+          className={twMerge(
+            "p-1.5 rounded-lg text-text-secondary hover:text-accent hover:bg-accent-soft/50 transition-colors cursor-pointer",
+            isCollapsed && "mx-auto"
+          )}
+          title={isCollapsed ? "Buka Sidebar (Expand)" : "Ciutkan Sidebar (Collapse)"}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-4 w-4" />
+          ) : (
+            <PanelLeftClose className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+
+      <nav className="flex flex-col gap-1.5 p-2.5 h-full overflow-y-auto overflow-x-hidden no-scrollbar">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = item.isActive;
@@ -52,8 +105,10 @@ export function AppNavigationSidebar() {
               key={item.href}
               href={item.href}
               prefetch={true}
+              title={isCollapsed ? item.name : undefined}
               className={twMerge(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group",
+                "flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative",
+                isCollapsed ? "justify-center px-0" : "px-3",
                 active
                   ? "bg-accent-soft text-accent border border-accent/20 [box-shadow:var(--shadow-card)]"
                   : "text-text-secondary hover:bg-bg-page hover:text-text-primary border border-transparent"
@@ -65,7 +120,9 @@ export function AppNavigationSidebar() {
                   active ? "text-accent" : "text-text-secondary group-hover:text-text-primary"
                 )}
               />
-              <span>{item.name}</span>
+              {!isCollapsed && (
+                <span className="truncate">{item.name}</span>
+              )}
             </Link>
           );
         })}

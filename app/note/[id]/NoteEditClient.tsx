@@ -287,7 +287,7 @@ async function compressImage(file: File): Promise<File> {
 
 const extractUrls = (text: string | null): string[] => {
   if (!text) return [];
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
   const matches = text.match(urlRegex) || [];
   return matches
     .map((url) => url.replace(/[\.,\)\(\]\[!\?]+$/, ""))
@@ -401,23 +401,53 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
   const statusText = React.useMemo(() => {
     if (isSaving) return "Menyimpan...";
     if (!note.updatedAt) return "";
-    
+
     const date = new Date(note.updatedAt);
     const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-    
-    if (isToday) {
-      return `Diedit ${date.toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      })}`;
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    let relativeStr = "";
+    if (diffInSeconds < 0 || diffInSeconds < 5) {
+      relativeStr = "baru saja";
+    } else if (diffInSeconds < 60) {
+      relativeStr = `${diffInSeconds} detik lalu`;
+    } else {
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      if (diffInMinutes < 60) {
+        relativeStr = `${diffInMinutes} menit lalu`;
+      } else {
+        const diffInHours = Math.floor(diffInMinutes / 60);
+        if (diffInHours < 24) {
+          relativeStr = `${diffInHours} jam lalu`;
+        } else {
+          const diffInDays = Math.floor(diffInHours / 24);
+          if (diffInDays < 7) {
+            relativeStr = `${diffInDays} hari lalu`;
+          } else {
+            const diffInWeeks = Math.floor(diffInDays / 7);
+            if (diffInDays < 30) {
+              relativeStr = `${diffInWeeks} minggu lalu`;
+            } else {
+              const diffInMonths = Math.floor(diffInDays / 30);
+              if (diffInMonths < 12) {
+                relativeStr = `${Math.max(1, diffInMonths)} bulan lalu`;
+              } else {
+                const diffInYears = Math.floor(diffInDays / 365);
+                relativeStr = `${Math.max(1, diffInYears)} tahun lalu`;
+              }
+            }
+          }
+        }
+      }
     }
-    
-    return `Diedit ${date.toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "short",
-    })}`;
+
+    const timeFormatted = date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).replace(":", ".");
+
+    return `Diedit ${timeFormatted} (${relativeStr})`;
   }, [isSaving, note.updatedAt]);
 
   // Close popover on outside click
@@ -1299,47 +1329,63 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
             <ChecklistEditor note={note} setNote={setNote} newItem={newItem} setNewItem={setNewItem} />
           )}
 
-          {/* Link Previews */}
-          {linkPreviews.length > 0 && (
-            <div className="flex flex-col gap-3 mt-6 border-t border-black/5 dark:border-white/5 pt-4">
-              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider select-none">Tautan Terdeteksi</span>
-              <div className="flex flex-col gap-2">
-                {linkPreviews.map((preview, idx) => (
-                  <a
-                    key={idx}
-                    href={preview.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-stretch rounded-xl border border-border-soft hover:border-accent/40 bg-bg-surface hover:bg-accent-soft/5 transition-all duration-200 overflow-hidden group/link cursor-pointer max-w-xl"
-                  >
-                    <div className="flex-1 p-3 flex flex-col gap-1 min-w-0">
-                      <span className="text-[12.5px] font-semibold text-text-primary group-hover/link:text-accent transition-colors truncate">
-                        {preview.title}
-                      </span>
-                      {preview.description && (
-                        <p className="text-[11.5px] text-text-secondary line-clamp-2 leading-relaxed">
-                          {preview.description}
-                        </p>
-                      )}
-                      <span className="text-[10px] text-text-secondary/60 truncate mt-auto">
-                        {new URL(preview.url).hostname}
-                      </span>
-                    </div>
-                    {preview.image && (
-                      <div className="w-20 sm:w-24 bg-black/5 dark:bg-white/5 border-l border-border-soft flex-shrink-0 relative">
-                        <img
-                          src={preview.image}
-                          alt="Pratinjau tautan"
-                          className="w-full h-full object-cover group-hover/link:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                        />
-                      </div>
-                    )}
-                  </a>
-                ))}
+          {/* Link Previews & Clickable Links */}
+          {(() => {
+            const detectedUrls = extractUrls(note.content);
+            if (detectedUrls.length === 0) return null;
+            return (
+              <div className="flex flex-col gap-3 mt-6 border-t border-black/5 dark:border-white/5 pt-4 select-none">
+                <span className="text-[10px] font-bold text-accent uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🔗</span>
+                  <span>Tautan Terdeteksi ({detectedUrls.length})</span>
+                </span>
+                <div className="flex flex-col gap-2">
+                  {detectedUrls.map((url, idx) => {
+                    const preview = linkPreviews.find((p) => p.url === url);
+                    const href = url.startsWith("http") ? url : `https://${url}`;
+                    let hostname = url;
+                    try {
+                      hostname = new URL(href).hostname;
+                    } catch (e) {}
+
+                    return (
+                      <a
+                        key={idx}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-stretch rounded-xl border border-accent/25 hover:border-accent bg-bg-surface hover:bg-accent-soft/10 transition-all duration-200 overflow-hidden group/link cursor-pointer max-w-xl shadow-2xs"
+                      >
+                        <div className="flex-1 p-3 flex flex-col gap-1 min-w-0">
+                          <span className="text-[13px] font-semibold text-accent group-hover:underline transition-colors truncate">
+                            {preview?.title || url}
+                          </span>
+                          {preview?.description && (
+                            <p className="text-[11.5px] text-text-secondary line-clamp-2 leading-relaxed">
+                              {preview.description}
+                            </p>
+                          )}
+                          <span className="text-[10px] text-text-secondary/70 font-mono truncate mt-auto">
+                            {hostname}
+                          </span>
+                        </div>
+                        {preview?.image && (
+                          <div className="w-20 sm:w-24 bg-black/5 dark:bg-white/5 border-l border-border-soft flex-shrink-0 relative">
+                            <img
+                              src={preview.image}
+                              alt="Pratinjau tautan"
+                              className="w-full h-full object-cover group-hover/link:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                            />
+                          </div>
+                        )}
+                      </a>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Metadata pills (Folder, Reminder, Labels) */}
           {(note.folder || note.reminderAt || note.labels.length > 0) && (

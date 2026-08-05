@@ -19,6 +19,7 @@ model Garapan {
   updatedAt DateTime   @updatedAt
 
   @@unique([bulan, tahun]) // cegah duplikat bulan+tahun yang sama
+  @@index([tahun, bulan])
   @@map("garapan")
 }
 
@@ -36,6 +37,8 @@ model Aplikasi {
   updatedAt    DateTime @updatedAt
 
   @@index([garapanId])
+  @@index([garapanId, kategori])
+  @@index([kategori])
   @@map("aplikasi")
 }
 
@@ -119,6 +122,7 @@ model Note {
   @@index([isTrashed, isArchived, isPinned])
   @@index([updatedAt])
   @@index([reminderSent, reminderAt])
+  @@index([folderId, isTrashed, isArchived])
   @@map("note")
 }
 

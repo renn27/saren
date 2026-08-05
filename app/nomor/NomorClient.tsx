@@ -53,6 +53,9 @@ export function NomorClient({ initialData }: NomorClientProps) {
   // Inline Pulsa Edit State
   const [editingPulsaId, setEditingPulsaId] = useState<string | null>(null);
 
+  // Selected Cell State for 2-step Edit
+  const [selectedNomorCell, setSelectedNomorCell] = useState<{ id: string; field: "pulsa" | "masaAktif" } | null>(null);
+
   // Sort State
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
@@ -317,6 +320,33 @@ export function NomorClient({ initialData }: NomorClientProps) {
     return `${dateFormatted}, ${timeFormatted}`;
   };
 
+  const formatTimeAgo = (dateInput: Date | string) => {
+    const d = new Date(dateInput);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - d.getTime()) / 1000);
+
+    if (diffInSeconds < 0 || diffInSeconds < 5) return "Baru saja";
+    if (diffInSeconds < 60) return `${diffInSeconds} detik lalu`;
+
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) return `${diffInMinutes} menit lalu`;
+
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours} jam lalu`;
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays} hari lalu`;
+
+    const diffInWeeks = Math.floor(diffInDays / 7);
+    if (diffInDays < 30) return `${diffInWeeks} minggu lalu`;
+
+    const diffInMonths = Math.floor(diffInDays / 30);
+    if (diffInMonths < 12) return `${Math.max(1, diffInMonths)} bulan lalu`;
+
+    const diffInYears = Math.floor(diffInDays / 365);
+    return `${Math.max(1, diffInYears)} tahun lalu`;
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto p-4 md:p-6 flex flex-col gap-4 relative">
       {/* Header section matching Garapan page */}
@@ -435,6 +465,9 @@ export function NomorClient({ initialData }: NomorClientProps) {
                           )}
                         </div>
                       </TableHead>
+                      <TableHead className="border-r border-border-soft/50 w-0 whitespace-nowrap px-4">
+                        Terakhir Diedit
+                      </TableHead>
                       <TableHead className="w-14 px-1 text-center whitespace-nowrap">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -464,91 +497,138 @@ export function NomorClient({ initialData }: NomorClientProps) {
                           >
                             {item.nomorKartu}
                           </TableCell>
-                          <TableCell 
-                            className={`text-text-primary border-r border-border-soft/50 whitespace-nowrap px-4 font-mono font-medium ${
-                              editingPulsaId === item.id ? "p-1 px-4" : "py-3"
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingPulsaId(item.id);
-                            }}
-                          >
-                            {editingPulsaId === item.id ? (
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <input
-                                  type="text"
-                                  defaultValue={item.pulsa || ""}
-                                  autoFocus
-                                  className="h-8 px-2 text-xs bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-mono w-full max-w-[120px]"
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      handleSaveInlinePulsa(item, (e.target as HTMLInputElement).value);
-                                    } else if (e.key === "Escape") {
-                                      setEditingPulsaId(null);
-                                    }
-                                  }}
-                                  onBlur={(e) => {
-                                    handleSaveInlinePulsa(item, e.target.value);
-                                  }}
-                                />
-                              </div>
-                            ) : (
-                              <span>
-                                {item.pulsa && item.pulsa > 0 ? formatRupiah(item.pulsa) : "-"}
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell 
-                            className={`border-r border-border-soft/50 whitespace-nowrap px-4 cursor-pointer hover:bg-accent-soft/20 transition-colors ${
-                              editingDateId === item.id ? "p-1 px-4" : "py-3"
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingDateId(item.id);
-                            }}
-                          >
-                            {editingDateId === item.id ? (
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <input
-                                  type="date"
-                                  defaultValue={formatDateInput(item.masaAktif)}
-                                  autoFocus
-                                  className="h-8 px-2 text-xs bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans w-full max-w-[140px]"
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      handleSaveInlineDate(item, (e.target as HTMLInputElement).value);
-                                    } else if (e.key === "Escape") {
-                                      setEditingDateId(null);
-                                    }
-                                  }}
-                                  onBlur={(e) => {
-                                    handleSaveInlineDate(item, e.target.value);
-                                  }}
-                                />
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span className="text-text-primary">{formatDateDisplay(item.masaAktif)}</span>
-                                {(() => {
-                                  const now = new Date();
-                                  now.setHours(0, 0, 0, 0);
-                                  const masa = new Date(item.masaAktif);
-                                  masa.setHours(0, 0, 0, 0);
-                                  const diffTime = now.getTime() - masa.getTime();
-                                  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                                  
-                                  if (masa < now && diffDays <= 30 && diffDays >= 0) {
-                                    const daysLeft = 30 - diffDays;
-                                    return (
-                                      <span className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] font-bold rounded-full bg-warning-hover text-warning-text">
-                                        -{daysLeft}
-                                      </span>
-                                    );
+                          {/* Pulsa Cell */}
+                          {(() => {
+                            const isPulsaSelected = selectedNomorCell?.id === item.id && selectedNomorCell?.field === "pulsa";
+                            return (
+                              <TableCell 
+                                className="p-1 border-r border-border-soft/50 whitespace-nowrap cursor-pointer select-none font-mono font-medium min-w-[110px]"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isPulsaSelected) {
+                                    setEditingPulsaId(item.id);
+                                  } else {
+                                    setSelectedNomorCell({ id: item.id, field: "pulsa" });
                                   }
-                                  return null;
-                                })()}
-                              </div>
-                            )}
+                                }}
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedNomorCell({ id: item.id, field: "pulsa" });
+                                  setEditingPulsaId(item.id);
+                                }}
+                                title={isPulsaSelected ? "Klik lagi atau Double-click untuk mengedit" : "Klik 1x untuk memilih sel"}
+                              >
+                                {editingPulsaId === item.id ? (
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="text"
+                                      defaultValue={item.pulsa || ""}
+                                      autoFocus
+                                      className="h-8 px-2 text-xs bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-mono w-full max-w-[120px]"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          handleSaveInlinePulsa(item, (e.target as HTMLInputElement).value);
+                                        } else if (e.key === "Escape") {
+                                          setEditingPulsaId(null);
+                                        }
+                                      }}
+                                      onBlur={(e) => {
+                                        handleSaveInlinePulsa(item, e.target.value);
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div
+                                    className={`w-full h-8 px-2 text-xs font-mono flex items-center transition-all rounded-lg ${
+                                      isPulsaSelected
+                                        ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs"
+                                        : "hover:bg-accent-soft/30 text-text-primary"
+                                    }`}
+                                  >
+                                    {item.pulsa && item.pulsa > 0 ? formatRupiah(item.pulsa) : "-"}
+                                  </div>
+                                )}
+                              </TableCell>
+                            );
+                          })()}
+
+                          {/* Masa Aktif Cell */}
+                          {(() => {
+                            const isDateSelected = selectedNomorCell?.id === item.id && selectedNomorCell?.field === "masaAktif";
+                            return (
+                              <TableCell 
+                                className="p-1 border-r border-border-soft/50 whitespace-nowrap cursor-pointer select-none font-sans min-w-[140px]"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isDateSelected) {
+                                    setEditingDateId(item.id);
+                                  } else {
+                                    setSelectedNomorCell({ id: item.id, field: "masaAktif" });
+                                  }
+                                }}
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedNomorCell({ id: item.id, field: "masaAktif" });
+                                  setEditingDateId(item.id);
+                                }}
+                                title={isDateSelected ? "Klik lagi atau Double-click untuk mengedit" : "Klik 1x untuk memilih sel"}
+                              >
+                                {editingDateId === item.id ? (
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="date"
+                                      defaultValue={formatDateInput(item.masaAktif)}
+                                      autoFocus
+                                      className="h-8 px-2 text-xs bg-bg-surface border border-accent rounded-lg text-text-primary focus:outline-none focus:ring-1 focus:ring-accent font-sans w-full max-w-[140px]"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          handleSaveInlineDate(item, (e.target as HTMLInputElement).value);
+                                        } else if (e.key === "Escape") {
+                                          setEditingDateId(null);
+                                        }
+                                      }}
+                                      onBlur={(e) => {
+                                        handleSaveInlineDate(item, e.target.value);
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div
+                                    className={`w-full h-8 px-2 text-xs font-sans flex items-center gap-2 transition-all rounded-lg ${
+                                      isDateSelected
+                                        ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs"
+                                        : "hover:bg-accent-soft/30 text-text-primary"
+                                    }`}
+                                  >
+                                    <span>{formatDateDisplay(item.masaAktif)}</span>
+                                    {(() => {
+                                      const now = new Date();
+                                      now.setHours(0, 0, 0, 0);
+                                      const masa = new Date(item.masaAktif);
+                                      masa.setHours(0, 0, 0, 0);
+                                      const diffTime = now.getTime() - masa.getTime();
+                                      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                                      
+                                      if (masa < now && diffDays <= 30 && diffDays >= 0) {
+                                        const daysLeft = 30 - diffDays;
+                                        return (
+                                          <span className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] font-bold rounded-full bg-warning-hover text-warning-text">
+                                            -{daysLeft}
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
+                                )}
+                              </TableCell>
+                            );
+                          })()}
+                          <TableCell 
+                            className="border-r border-border-soft/50 whitespace-nowrap px-4 text-xs text-text-secondary font-sans py-3"
+                            title={`Diedit pada: ${formatDateTimeDisplay(item.updatedAt)}`}
+                          >
+                            {formatTimeAgo(item.updatedAt)}
                           </TableCell>
                           <TableCell className="text-center py-1 px-1 w-14" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center">
@@ -593,6 +673,7 @@ export function NomorClient({ initialData }: NomorClientProps) {
                       <TableCell className="text-accent border-r border-border-soft/50 whitespace-nowrap px-4 font-mono font-bold">
                         {totalPulsa > 0 ? formatRupiah(totalPulsa) : "-"}
                       </TableCell>
+                      <TableCell className="border-r border-border-soft/50 whitespace-nowrap px-4" />
                       <TableCell className="border-r border-border-soft/50 whitespace-nowrap px-4" />
                       <TableCell className="w-14 px-1" />
                     </TableRow>
