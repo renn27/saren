@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Nomor } from "@prisma/client";
 import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, ArrowUpDown, ArrowDown, ArrowUp, Coins, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -62,39 +62,52 @@ export function NomorClient({ initialData }: NomorClientProps) {
   // Active Filter state
   const [activeFilter, setActiveFilter] = useState<"all" | "warning" | "expired">("all");
 
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
+  const { expiredCount, warningCount, filteredData, totalPulsa } = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
 
-  const expiredCount = data.filter((item) => new Date(item.masaAktif) < now).length;
-  
-  const warningCount = data.filter((item) => {
-    const masa = new Date(item.masaAktif);
-    const diffTime = masa.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return masa >= now && diffDays <= 30;
-  }).length;
+    let expired = 0;
+    let warning = 0;
 
-  const sortedData = [...data].sort((a, b) => {
-    const dateA = new Date(a.masaAktif).getTime();
-    const dateB = new Date(b.masaAktif).getTime();
-    if (sortOrder === "asc") return dateA - dateB;
-    return dateB - dateA;
-  });
+    data.forEach((item) => {
+      const masa = new Date(item.masaAktif);
+      if (masa < now) {
+        expired++;
+      } else {
+        const diffTime = masa.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays <= 30) {
+          warning++;
+        }
+      }
+    });
 
-  const filteredData = sortedData.filter((item) => {
-    const masa = new Date(item.masaAktif);
-    if (activeFilter === "expired") {
-      return masa < now;
-    }
-    if (activeFilter === "warning") {
-      const diffTime = masa.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return masa >= now && diffDays <= 30;
-    }
-    return true;
-  });
+    const sorted = [...data].sort((a, b) => {
+      const dateA = new Date(a.masaAktif).getTime();
+      const dateB = new Date(b.masaAktif).getTime();
+      return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+    });
 
-  const totalPulsa = filteredData.reduce((sum, item) => sum + (item.pulsa || 0), 0);
+    const filtered = sorted.filter((item) => {
+      const masa = new Date(item.masaAktif);
+      if (activeFilter === "expired") return masa < now;
+      if (activeFilter === "warning") {
+        const diffTime = masa.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return masa >= now && diffDays <= 30;
+      }
+      return true;
+    });
+
+    const pulsaSum = filtered.reduce((sum, item) => sum + (item.pulsa || 0), 0);
+
+    return {
+      expiredCount: expired,
+      warningCount: warning,
+      filteredData: filtered,
+      totalPulsa: pulsaSum,
+    };
+  }, [data, sortOrder, activeFilter]);
 
   const getRowHighlight = (masaAktifDate: Date) => {
     const now = new Date();

@@ -358,13 +358,28 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
     });
   }, [akunList, kolomList, searchQuery, selectedDevice]);
 
+  // 🚀 Memoized formula evaluation map (O(1) lookup per account & column, 0ms formula recalculation lag)
+  const evaluatedFormulasMap = React.useMemo(() => {
+    const map: Record<string, Record<string, number | null>> = {};
+    const rumusCols = kolomList.filter((c) => c.tipeKolom === "RUMUS");
+    if (rumusCols.length === 0) return map;
+
+    akunList.forEach((acc) => {
+      map[acc.id] = {};
+      rumusCols.forEach((col) => {
+        map[acc.id][col.id] = evaluateFormula(col.rumus, acc.customValues, kolomList);
+      });
+    });
+    return map;
+  }, [akunList, kolomList]);
+
   const checkAkunMeetsTarget = React.useCallback((acc: AkunItem) => {
     const targetCols = kolomList.filter((c) => c.isTarget && c.nilaiTarget !== null && c.nilaiTarget !== "");
     if (targetCols.length === 0) return false;
 
     return targetCols.some((col) => {
       if (col.tipeKolom === "RUMUS") {
-        const calcVal = evaluateFormula(col.rumus, acc.customValues, kolomList);
+        const calcVal = evaluatedFormulasMap[acc.id]?.[col.id] ?? evaluateFormula(col.rumus, acc.customValues, kolomList);
         if (calcVal === null) return false;
         return calcVal >= Number(col.nilaiTarget);
       }
@@ -1385,7 +1400,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                       {/* Render Dynamic custom values */}
                       {aplikasi.kolom.map((col) => {
                         if (col.tipeKolom === "RUMUS") {
-                          const formulaVal = evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
+                          const formulaVal = evaluatedFormulasMap[acc.id]?.[col.id] ?? evaluateFormula(col.rumus, acc.customValues, aplikasi.kolom);
                           return (
                             <TableCell
                               key={col.id}
@@ -1595,7 +1610,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                       
                       const sum = filteredAkun.reduce((acc, curr) => {
                         if (col.tipeKolom === "RUMUS") {
-                          const calcVal = evaluateFormula(col.rumus, curr.customValues, aplikasi.kolom);
+                          const calcVal = evaluatedFormulasMap[curr.id]?.[col.id] ?? evaluateFormula(col.rumus, curr.customValues, aplikasi.kolom);
                           return acc + (calcVal || 0);
                         }
                         const val = curr.customValues[col.id];

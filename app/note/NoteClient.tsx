@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
@@ -995,8 +995,8 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
 
 
 
-  // Filter notes in memory
-  const getFilteredNotes = () => {
+  // Filter notes in memory with useMemo for 0ms render response
+  const filteredNotes = React.useMemo(() => {
     let filtered = notes;
 
     // First filter by active tab / label
@@ -1051,11 +1051,14 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
     }
 
     return filtered;
-  };
+  }, [notes, activeFilter, selectedFolderId, searchQuery, sortBy]);
 
-  const filteredNotes = getFilteredNotes();
-  const pinnedNotes = filteredNotes.filter((n) => n.isPinned);
-  const otherNotes = filteredNotes.filter((n) => !n.isPinned);
+  const { pinnedNotes, otherNotes } = React.useMemo(() => {
+    return {
+      pinnedNotes: filteredNotes.filter((n) => n.isPinned),
+      otherNotes: filteredNotes.filter((n) => !n.isPinned),
+    };
+  }, [filteredNotes]);
 
   return (
     <div className="flex flex-col md:flex-row h-full min-h-0 bg-bg-page select-none">

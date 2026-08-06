@@ -27,6 +27,9 @@ Aplikasi SAREN dirancang dan dioptimalkan secara penuh untuk **perangkat layar s
 3. **Ukuran Target Sentuh (Touch Targets)**:
    * Pastikan semua tombol memiliki jarak sentuh (*padding* / *gap*) yang cukup renggang dan ukuran ikon yang memadai agar tidak terjadi salah sentuh (*fat-finger errors*) di ponsel.
 
+4. **Dilarang Melakukan Git Push Tanpa Perintah Eksplisit**:
+   * AI Agent **DILARANG KERAS** menjalankan `git push origin main` atau perintah push lainnya secara otomatis tanpa permintaan/perintah langsung dari pengguna.
+
 ---
 
 ## 🛠️ Stack Teknologi & Desain Sistem
