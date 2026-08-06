@@ -10,6 +10,9 @@ export interface DialogProps {
   title: string;
   description?: string;
   children: React.ReactNode;
+  maxWidthClassName?: string;
+  contentClassName?: string;
+  hideHeader?: boolean;
 }
 
 export function Dialog({
@@ -18,6 +21,9 @@ export function Dialog({
   title,
   description,
   children,
+  maxWidthClassName,
+  contentClassName,
+  hideHeader = false,
 }: DialogProps) {
   const [shouldRender, setShouldRender] = React.useState(isOpen);
   const [isAnimating, setIsAnimating] = React.useState(false);
@@ -83,6 +89,7 @@ export function Dialog({
       <div
         className={twMerge(
           "relative w-full max-w-lg bg-bg-surface border border-border-soft rounded-3xl shadow-xl flex flex-col max-h-[85vh] md:max-h-[90vh] overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] z-10 font-sans",
+          maxWidthClassName,
           isAnimating
             ? "opacity-100 translate-y-0 scale-100"
             : "opacity-0 translate-y-8 scale-95"
@@ -90,23 +97,25 @@ export function Dialog({
       >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 p-1.5 rounded-lg text-text-secondary hover:bg-accent-soft/50 transition-colors cursor-pointer z-10"
+          className="absolute right-4 top-4 p-1.5 rounded-lg text-text-secondary hover:bg-accent-soft/50 transition-colors cursor-pointer z-20"
         >
           <X className="h-4 w-4" />
         </button>
 
-        <div className="flex flex-col gap-2 p-6 md:p-8 pb-4 md:pb-4 shrink-0 pr-12">
-          <h2 className="text-[18px] sm:text-[20px] font-semibold text-text-primary font-display leading-tight">
-            {displayContent.title}
-          </h2>
-          {displayContent.description && (
-            <p className="text-[12px] sm:text-[13px] text-text-secondary leading-relaxed mt-0.5">
-              {displayContent.description}
-            </p>
-          )}
-        </div>
+        {!hideHeader && (
+          <div className="flex flex-col gap-2 p-6 md:p-8 pb-4 md:pb-4 shrink-0 pr-12">
+            <h2 className="text-[18px] sm:text-[20px] font-semibold text-text-primary font-display leading-tight">
+              {displayContent.title}
+            </h2>
+            {displayContent.description && (
+              <p className="text-[12px] sm:text-[13px] text-text-secondary leading-relaxed mt-0.5">
+                {displayContent.description}
+              </p>
+            )}
+          </div>
+        )}
 
-        <div className="flex-1 overflow-y-auto px-6 md:px-8 pb-6 md:pb-8 pt-0 min-h-0">
+        <div className={twMerge("flex-1 overflow-y-auto px-6 md:px-8 pb-6 md:pb-8 pt-0 min-h-0", hideHeader ? "p-4 sm:p-5" : "", contentClassName)}>
           {displayContent.children}
         </div>
       </div>

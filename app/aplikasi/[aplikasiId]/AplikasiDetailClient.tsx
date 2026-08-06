@@ -45,7 +45,10 @@ import {
   LayoutGrid,
   CheckSquare,
   Square,
+  Calculator,
+  GripVertical,
 } from "lucide-react";
+import { CalculatorPopover } from "@/components/ui/calculator-popover";
 import { toast } from "sonner";
 import { createKolom, deleteKolom, swapKolomUrutan, updateKolom, clearKolomData } from "@/lib/actions/kolom";
 import { createAkun, updateAkun, deleteAkun, getAllAccountsForAutofill, swapAkunUrutan, bulkUpdateCentang } from "@/lib/actions/akun";
@@ -142,6 +145,21 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
   const [selectedDetailAccount, setSelectedDetailAccount] = React.useState<AkunItem | null>(null);
   const [editingCell, setEditingCell] = React.useState<{ accountId: string; columnId: "nama" | string } | null>(null);
   const [selectedCell, setSelectedCell] = React.useState<{ accountId: string; columnId: string } | null>(null);
+
+  // Floating Calculator Popover State
+  const [calcCellState, setCalcCellState] = React.useState<{
+    isOpen: boolean;
+    initialVal: number;
+    accountId: string;
+    columnId: string;
+    colName: string;
+  }>({
+    isOpen: false,
+    initialVal: 0,
+    accountId: "",
+    columnId: "",
+    colName: "",
+  });
 
   // Column form states
   const [namaKolom, setNamaKolom] = React.useState("");
@@ -594,6 +612,38 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
       setKolomList(previousKolomList);
       toast.error(res.error || "Gagal memindahkan kolom.");
     }
+  };
+
+  // Drag and Drop Column Reordering Handlers
+  const [draggedColIndex, setDraggedColIndex] = React.useState<number | null>(null);
+  const [dragOverColIndex, setDragOverColIndex] = React.useState<number | null>(null);
+
+  const handleDragColumnStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData("text/plain", String(index));
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedColIndex(index);
+  };
+
+  const handleDragColumnOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (draggedColIndex !== null && draggedColIndex !== index) {
+      setDragOverColIndex(index);
+    }
+  };
+
+  const handleDropColumn = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedColIndex !== null && draggedColIndex !== targetIndex) {
+      handleSwapKolom(draggedColIndex, targetIndex);
+    }
+    setDraggedColIndex(null);
+    setDragOverColIndex(null);
+  };
+
+  const handleDragColumnEnd = () => {
+    setDraggedColIndex(null);
+    setDragOverColIndex(null);
   };
 
   const handleBulkCentang = async (columnId: string, newValue: boolean) => {
@@ -1240,12 +1290,24 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
      
                     {/* Render Dynamic Custom Column Headers */}
                     {aplikasi.kolom.map((col, colIndex) => {
+                      const isDragging = draggedColIndex === colIndex;
+                      const isDragOver = dragOverColIndex === colIndex;
+
                       return (
                         <TableHead
                           key={col.id}
-                          className={`text-center border-r border-border-soft/50 ${
+                          draggable={isReorderMode}
+                          onDragStart={(e) => handleDragColumnStart(e, colIndex)}
+                          onDragOver={(e) => handleDragColumnOver(e, colIndex)}
+                          onDrop={(e) => handleDropColumn(e, colIndex)}
+                          onDragEnd={handleDragColumnEnd}
+                          className={`text-center border-r border-border-soft/50 transition-all ${
+                            isDragging ? "opacity-40 bg-accent-soft/30 scale-95" : ""
+                          } ${
+                            isDragOver ? "border-2 border-accent border-dashed bg-accent-soft/40" : ""
+                          } ${
                             isReorderMode
-                              ? `group relative pr-12 sm:pr-14 ${
+                              ? `group relative pr-12 sm:pr-14 cursor-grab active:cursor-grabbing select-none ${
                                   col.tipeKolom === "CENTANG"
                                     ? "min-w-[90px] sm:min-w-[120px]"
                                     : "min-w-[130px] sm:min-w-[180px]"
@@ -1255,10 +1317,11 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                                     ? "min-w-[70px] sm:min-w-[90px]"
                                     : "min-w-[90px] sm:min-w-[130px]"
                                 }`
-                            }`}
+                          }`}
                         >
                           {isReorderMode ? (
                             <div className="flex items-center gap-1.5 justify-center text-nowrap py-3 px-3.5 sm:px-6 sm:py-4">
+                              <GripVertical className="h-4 w-4 text-text-secondary/60 shrink-0 mr-0.5" />
                               <span>{col.namaKolom}</span>
                               <Badge variant="circle" className="shrink-0">
                                 {col.tipeKolom === "TEKS" && "Aa"}
@@ -1552,15 +1615,36 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                             title={isCellSelected ? "Klik lagi atau Double-click untuk mengedit" : "Klik 1x untuk memilih sel"}
                           >
                             <div
-                              className={`w-full min-w-0 box-border h-9 px-2 text-sm font-sans flex items-center transition-all rounded-lg ${
-                                col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL" ? "justify-end font-mono" : "justify-start"
+                              className={`w-full min-w-0 box-border h-9 px-2 text-sm font-sans flex items-center justify-between transition-all rounded-lg ${
+                                col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL" ? "font-mono" : ""
                               } ${
                                 isCellSelected
                                   ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs"
                                   : "hover:bg-accent-soft/30 text-text-primary"
                               }`}
                             >
-                              {formatValue(val, col.tipeKolom)}
+                              <div className={col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL" ? "text-right w-full" : ""}>
+                                {formatValue(val, col.tipeKolom)}
+                              </div>
+                              {isCellSelected && (col.tipeKolom === "NOMINAL" || col.tipeKolom === "NOMOR") && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCalcCellState({
+                                      isOpen: true,
+                                      initialVal: Number(val) || 0,
+                                      accountId: acc.id,
+                                      columnId: col.id,
+                                      colName: col.namaKolom,
+                                    });
+                                  }}
+                                  className="p-1 rounded-md bg-accent-soft text-accent hover:bg-accent hover:text-white transition-all cursor-pointer shrink-0 ml-1"
+                                  title="Buka Kalkulator Melayang"
+                                >
+                                  <Calculator className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                             </div>
                           </TableCell>
                         );
@@ -2466,6 +2550,19 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
           </div>
         </form>
       </Dialog>
+
+      {/* Floating Calculator Popover for Nominal/Nomor Cells */}
+      {calcCellState.isOpen && (
+        <CalculatorPopover
+          isOpen={calcCellState.isOpen}
+          title={`Kalkulator ${calcCellState.colName}`}
+          initialValue={calcCellState.initialVal}
+          onClose={() => setCalcCellState((prev) => ({ ...prev, isOpen: false }))}
+          onApply={(val) => {
+            handleInlineSave(calcCellState.accountId, calcCellState.columnId, val);
+          }}
+        />
+      )}
     </div>
   );
 }

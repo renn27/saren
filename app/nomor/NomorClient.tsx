@@ -2,7 +2,8 @@
 
 import { useState, useMemo } from "react";
 import { Nomor } from "@prisma/client";
-import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, ArrowUpDown, ArrowDown, ArrowUp, Coins, Clock } from "lucide-react";
+import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, ArrowUpDown, ArrowDown, ArrowUp, Coins, Clock, Calculator } from "lucide-react";
+import { CalculatorPopover } from "@/components/ui/calculator-popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
@@ -55,6 +56,13 @@ export function NomorClient({ initialData }: NomorClientProps) {
 
   // Selected Cell State for 2-step Edit
   const [selectedNomorCell, setSelectedNomorCell] = useState<{ id: string; field: "pulsa" | "masaAktif" } | null>(null);
+
+  // Floating Calculator Popover State
+  const [calcState, setCalcState] = useState<{ isOpen: boolean; initialVal: number; item: Nomor | null }>({
+    isOpen: false,
+    initialVal: 0,
+    item: null,
+  });
 
   // Sort State
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -552,13 +560,30 @@ export function NomorClient({ initialData }: NomorClientProps) {
                                   </div>
                                 ) : (
                                   <div
-                                    className={`w-full h-8 px-2 text-xs font-mono flex items-center transition-all rounded-lg ${
+                                    className={`w-full h-8 px-2 text-xs font-mono flex items-center justify-between transition-all rounded-lg ${
                                       isPulsaSelected
                                         ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs"
                                         : "hover:bg-accent-soft/30 text-text-primary"
                                     }`}
                                   >
-                                    {item.pulsa && item.pulsa > 0 ? formatRupiah(item.pulsa) : "-"}
+                                    <span>{item.pulsa && item.pulsa > 0 ? formatRupiah(item.pulsa) : "-"}</span>
+                                    {isPulsaSelected && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCalcState({
+                                            isOpen: true,
+                                            initialVal: item.pulsa || 0,
+                                            item,
+                                          });
+                                        }}
+                                        className="p-1 rounded-md bg-accent-soft text-accent hover:bg-accent hover:text-white transition-all cursor-pointer shrink-0 ml-1"
+                                        title="Buka Kalkulator Melayang"
+                                      >
+                                        <Calculator className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 )}
                               </TableCell>
@@ -888,6 +913,21 @@ export function NomorClient({ initialData }: NomorClientProps) {
           </div>
         )}
       </Dialog>
+
+      {/* Floating Calculator Popover for SIM Pulsa */}
+      {calcState.isOpen && calcState.item && (
+        <CalculatorPopover
+          isOpen={calcState.isOpen}
+          title={`Kalkulator Pulsa (${calcState.item.provider})`}
+          initialValue={calcState.initialVal}
+          onClose={() => setCalcState((prev) => ({ ...prev, isOpen: false }))}
+          onApply={(val) => {
+            if (calcState.item) {
+              handleSaveInlinePulsa(calcState.item, String(val));
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
