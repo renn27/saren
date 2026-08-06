@@ -187,8 +187,10 @@ export async function swapKolomUrutan(
   kolomId2: string
 ) {
   try {
-    let col1 = await db.kolom.findUnique({ where: { id: kolomId1 } });
-    let col2 = await db.kolom.findUnique({ where: { id: kolomId2 } });
+    let [col1, col2] = await Promise.all([
+      db.kolom.findUnique({ where: { id: kolomId1 } }),
+      db.kolom.findUnique({ where: { id: kolomId2 } }),
+    ]);
 
     if (!col1 || !col2) {
       return { success: false, error: "Kolom tidak ditemukan." };
@@ -210,8 +212,10 @@ export async function swapKolomUrutan(
         )
       );
 
-      const u1 = await db.kolom.findUnique({ where: { id: kolomId1 } });
-      const u2 = await db.kolom.findUnique({ where: { id: kolomId2 } });
+      const [u1, u2] = await Promise.all([
+        db.kolom.findUnique({ where: { id: kolomId1 } }),
+        db.kolom.findUnique({ where: { id: kolomId2 } }),
+      ]);
       if (u1 && u2) {
         col1 = u1;
         col2 = u2;

@@ -237,8 +237,10 @@ export async function swapAkunUrutan(
   akunId2: string
 ) {
   try {
-    let akun1 = await db.akun.findUnique({ where: { id: akunId1 } });
-    let akun2 = await db.akun.findUnique({ where: { id: akunId2 } });
+    let [akun1, akun2] = await Promise.all([
+      db.akun.findUnique({ where: { id: akunId1 } }),
+      db.akun.findUnique({ where: { id: akunId2 } }),
+    ]);
 
     if (!akun1 || !akun2) {
       return { success: false, error: "Akun tidak ditemukan." };
@@ -261,8 +263,10 @@ export async function swapAkunUrutan(
       );
 
       // Re-fetch setelah re-index
-      const u1 = await db.akun.findUnique({ where: { id: akunId1 } });
-      const u2 = await db.akun.findUnique({ where: { id: akunId2 } });
+      const [u1, u2] = await Promise.all([
+        db.akun.findUnique({ where: { id: akunId1 } }),
+        db.akun.findUnique({ where: { id: akunId2 } }),
+      ]);
       if (u1 && u2) {
         akun1 = u1;
         akun2 = u2;

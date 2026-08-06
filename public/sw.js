@@ -1,12 +1,16 @@
-// SAREN Service Worker - v11
+// SAREN Service Worker - v12
 // Strategi: Cache-First untuk aset statis, Stale-While-Revalidate untuk halaman HTML (0ms load)
 
-const CACHE_VERSION = 'v11';
+const CACHE_VERSION = 'v12';
 const STATIC_CACHE  = `saren-static-${CACHE_VERSION}`;
 const PAGES_CACHE   = `saren-pages-${CACHE_VERSION}`;
 
-// Aset statis yang selalu di-cache saat install
+// Aset statis dan halaman inti yang selalu di-cache saat install
 const STATIC_ASSETS = [
+  '/',
+  '/aplikasi',
+  '/nomor',
+  '/note',
   '/offline.html',
   '/manifest.json',
   '/saren_logo.png',

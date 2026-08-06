@@ -227,3 +227,9 @@ button:active:not(:disabled) {
 .preload *::after {
   transition: none !important;
 }
+
+/* ── Hardware Acceleration & Off-screen Render Optimization ── */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 48px;
+}

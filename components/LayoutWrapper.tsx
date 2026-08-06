@@ -34,12 +34,18 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
                 <img
                   src="/saren_logo_dark.png"
                   alt="SAREN Logo"
+                  width={36}
+                  height={36}
+                  fetchPriority="high"
                   className="hidden dark:block h-9 w-9 rounded-xl object-cover shadow-sm border border-border-soft/50 bg-bg-surface transition-transform duration-200 group-hover:scale-105 group-active:scale-95"
                 />
                 {/* Logo light mode */}
                 <img
                   src="/saren_logo_light.png"
                   alt="SAREN Logo"
+                  width={36}
+                  height={36}
+                  fetchPriority="high"
                   className="block dark:hidden h-9 w-9 rounded-xl object-cover shadow-sm border border-border-soft/50 bg-bg-surface transition-transform duration-200 group-hover:scale-105 group-active:scale-95"
                 />
                 <span className="font-display font-semibold text-base text-text-primary tracking-tight">
