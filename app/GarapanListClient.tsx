@@ -121,6 +121,18 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
     return completed;
   }, [filteredList]);
 
+  // Memoize completed garapan map for 0ms render latency
+  const completedGarapanMap = React.useMemo(() => {
+    const map = new Map<string, boolean>();
+    list.forEach((item) => {
+      const isCompleted =
+        Boolean(item.aplikasi && item.aplikasi.length > 0) &&
+        item.aplikasi!.every((app) => checkAppTargetCompleted(app));
+      map.set(item.id, isCompleted);
+    });
+    return map;
+  }, [list]);
+
   // Modals state
   const [isAddOpen, setIsAddOpen] = React.useState(false);
   const [editingItem, setEditingItem] = React.useState<GarapanItem | null>(null);
@@ -235,7 +247,7 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
           className="gap-1.5 font-semibold text-xs px-3.5 sm:px-4 h-10 rounded-xl shrink-0 shadow-xs active:scale-[0.97] transition-all whitespace-nowrap"
         >
           <Plus className="h-4 w-4 shrink-0" />
-          <span>Tambah Garapan</span>
+          <span>Tambah </span>
         </Button>
       </Card>
 
@@ -245,19 +257,17 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
           <button
             type="button"
             onClick={() => setSelectedYear("Semua")}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 ${
-              selectedYear === "Semua"
-                ? "bg-accent text-white border-accent shadow-xs"
-                : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
-            }`}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 ${selectedYear === "Semua"
+              ? "bg-accent text-white border-accent shadow-xs"
+              : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
+              }`}
           >
             <span>Semua</span>
             <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                selectedYear === "Semua"
-                  ? "bg-white/20 text-white"
-                  : "bg-bg-page text-text-secondary border border-border-soft/40"
-              }`}
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${selectedYear === "Semua"
+                ? "bg-white/20 text-white"
+                : "bg-bg-page text-text-secondary border border-border-soft/40"
+                }`}
             >
               {list.length}
             </span>
@@ -268,19 +278,17 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
               type="button"
               key={yr}
               onClick={() => setSelectedYear(String(yr))}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 ${
-                selectedYear === String(yr)
-                  ? "bg-accent text-white border-accent shadow-xs"
-                  : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
-              }`}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 ${selectedYear === String(yr)
+                ? "bg-accent text-white border-accent shadow-xs"
+                : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
+                }`}
             >
               <span>{yr}</span>
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  selectedYear === String(yr)
-                    ? "bg-white/20 text-white"
-                    : "bg-bg-page text-text-secondary border border-border-soft/40"
-                }`}
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${selectedYear === String(yr)
+                  ? "bg-white/20 text-white"
+                  : "bg-bg-page text-text-secondary border border-border-soft/40"
+                  }`}
               >
                 {yearCounts[yr]}
               </span>
@@ -313,22 +321,17 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
             const monthName = MONTH_NAMES[item.bulan - 1];
 
             const isCurrentMonth = item.bulan === currentMonth && item.tahun === currentYear;
-
-            const isGarapanCompleted =
-              Boolean(item.aplikasi && item.aplikasi.length > 0) &&
-              item.aplikasi!.every((app) => checkAppTargetCompleted(app));
-
+            const isGarapanCompleted = completedGarapanMap.get(item.id);
             const appCount = item.aplikasi?.length || 0;
 
             return (
               <Card
                 key={item.id}
                 onClick={() => handleNavigate(`/garapan/${item.id}`)}
-                className={`card-stagger group relative flex items-center gap-3.5 p-4 sm:p-5 pr-12 cursor-pointer transition-all duration-200 min-h-[80px] ${
-                  isCurrentMonth
-                    ? "bg-bg-surface border-accent/40 shadow-xs hover:border-accent/60"
-                    : "bg-bg-surface/75 border-border-soft hover:bg-bg-surface hover:border-accent/30"
-                }`}
+                className={`card-stagger group relative flex items-center gap-3.5 p-4 sm:p-5 pr-12 cursor-pointer transition-all duration-200 min-h-[80px] ${isCurrentMonth
+                  ? "bg-bg-surface border-accent/40 shadow-xs hover:border-accent/60"
+                  : "bg-bg-surface/75 border-border-soft hover:bg-bg-surface hover:border-accent/30"
+                  }`}
               >
                 {/* Month color icon */}
                 <div className={`h-11 w-11 rounded-2xl bg-gradient-to-br ${monthAccent} text-accent flex items-center justify-center shrink-0 border border-accent/10 relative`}>

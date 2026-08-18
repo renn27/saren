@@ -16,6 +16,7 @@ import { MoreVertical, Edit2, Trash2, AppWindow, Plus, Upload, X, AppWindow as A
 import { toast } from "sonner";
 import { createAplikasi, updateAplikasi, deleteAplikasi } from "@/lib/actions/aplikasi";
 import { checkAppTargetCompleted } from "@/lib/utils/formulaEvaluator";
+import { compressImageFile } from "@/lib/utils/imageCompressor";
 
 interface AplikasiItem {
   id: string;
@@ -49,59 +50,6 @@ function getAppColor(name: string): string {
     hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
   }
   return APP_COLORS[Math.abs(hash) % APP_COLORS.length];
-}
-
-function compressImage(file: File, maxWidth: number, maxHeight: number, quality: number): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new window.Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          reject(new Error("Gagal membuat context 2D"));
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error("Kompresi gambar gagal"));
-            }
-          },
-          "image/webp",
-          quality
-        );
-      };
-      img.onerror = (err: any) => reject(err);
-    };
-    reader.onerror = (err: any) => reject(err);
-  });
 }
 
 export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
@@ -262,17 +210,8 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
       formData.append("kategori", kategoriInput.trim());
     }
     if (logoFile) {
-      try {
-        const compressedBlob = await compressImage(logoFile, 128, 128, 0.8);
-        const compressedFile = new File([compressedBlob], logoFile.name.replace(/\.[^/.]+$/, "") + ".webp", {
-          type: "image/webp",
-          lastModified: Date.now(),
-        });
-        formData.append("logo", compressedFile);
-      } catch (err) {
-        console.error("Gagal kompresi logo, menggunakan file asli:", err);
-        formData.append("logo", logoFile);
-      }
+      const compressedFile = await compressImageFile(logoFile, 256, 256, 0.85);
+      formData.append("logo", compressedFile);
     }
     if (clearLogo) formData.append("clearLogo", "true");
 

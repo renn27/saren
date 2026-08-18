@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown";
+import { Switch } from "@/components/ui/switch";
 import {
   TableContainer,
   Table,
@@ -56,6 +57,8 @@ import { updateAplikasi } from "@/lib/actions/aplikasi";
 import { TipeKolom } from "@prisma/client";
 import { evaluateFormula } from "@/lib/utils/formulaEvaluator";
 import { twMerge } from "tailwind-merge";
+import { AccountAutofillPicker } from "@/components/ui/account-autofill-picker";
+import { compressImageFile } from "@/lib/utils/imageCompressor";
 
 interface KolomItem {
   id: string;
@@ -145,6 +148,29 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
   const [selectedDetailAccount, setSelectedDetailAccount] = React.useState<AkunItem | null>(null);
   const [editingCell, setEditingCell] = React.useState<{ accountId: string; columnId: "nama" | string } | null>(null);
   const [selectedCell, setSelectedCell] = React.useState<{ accountId: string; columnId: string } | null>(null);
+
+  // Table column visibility toggle states
+  const [showDeviceColumn, setShowDeviceColumn] = React.useState(false);
+  const [showNomorHpColumn, setShowNomorHpColumn] = React.useState(false);
+
+  React.useEffect(() => {
+    const savedDevice = localStorage.getItem("saren_show_device_col");
+    const savedPhone = localStorage.getItem("saren_show_phone_col");
+    if (savedDevice !== null) setShowDeviceColumn(savedDevice === "true");
+    if (savedPhone !== null) setShowNomorHpColumn(savedPhone === "true");
+  }, []);
+
+  const handleToggleDeviceColumn = (checked: boolean) => {
+    setShowDeviceColumn(checked);
+    localStorage.setItem("saren_show_device_col", String(checked));
+    toast.success(checked ? "Kolom Perangkat ditampilkan di tabel" : "Kolom Perangkat disembunyikan");
+  };
+
+  const handleToggleNomorHpColumn = (checked: boolean) => {
+    setShowNomorHpColumn(checked);
+    localStorage.setItem("saren_show_phone_col", String(checked));
+    toast.success(checked ? "Kolom Nomor HP ditampilkan di tabel" : "Kolom Nomor HP disembunyikan");
+  };
 
   // Floating Calculator Popover State
   const [calcCellState, setCalcCellState] = React.useState<{
@@ -414,7 +440,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
         return String(val).trim().toLowerCase() === String(col.nilaiTarget).trim().toLowerCase();
       }
     });
-  }, [kolomList]);
+  }, [kolomList, evaluatedFormulasMap]);
 
   // Column CRUD
   const handleColumnSubmit = async (e: React.FormEvent) => {
@@ -798,7 +824,8 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
     formData.append("namaAplikasi", namaAplikasiState.trim());
     formData.append("deskripsi", deskripsiState.trim());
     if (logoFile) {
-      formData.append("logo", logoFile);
+      const compressedLogo = await compressImageFile(logoFile, 256, 256, 0.85);
+      formData.append("logo", compressedLogo);
     }
     if (clearLogo) {
       formData.append("clearLogo", "true");
@@ -1288,6 +1315,18 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                     )}
                     <TableHead className="sticky left-0 bg-bg-surface z-20 border-r border-border-soft min-w-[90px] sm:min-w-[150px] text-center font-bold">Akun</TableHead>
      
+                    {showDeviceColumn && (
+                      <TableHead className="text-center border-r border-border-soft/50 min-w-[100px] sm:min-w-[130px] font-bold select-none">
+                        Perangkat
+                      </TableHead>
+                    )}
+
+                    {showNomorHpColumn && (
+                      <TableHead className="text-center border-r border-border-soft/50 min-w-[120px] sm:min-w-[150px] font-bold select-none">
+                        Nomor HP
+                      </TableHead>
+                    )}
+     
                     {/* Render Dynamic Custom Column Headers */}
                     {aplikasi.kolom.map((col, colIndex) => {
                       const isDragging = draggedColIndex === colIndex;
@@ -1459,6 +1498,18 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                         >
                           <span>{acc.nama}</span>
                         </TableCell>
+
+                        {showDeviceColumn && (
+                          <TableCell className="text-center text-nowrap px-3 py-2 border-r border-border-soft/50 text-[13px] text-text-secondary">
+                            {acc.device || <span className="text-text-secondary/40 select-none">-</span>}
+                          </TableCell>
+                        )}
+
+                        {showNomorHpColumn && (
+                          <TableCell className="text-center text-nowrap px-3 py-2 border-r border-border-soft/50 font-mono text-[13px] text-text-primary">
+                            {acc.nomorHp || <span className="text-text-secondary/40 select-none">-</span>}
+                          </TableCell>
+                        )}
     
                       {/* Render Dynamic custom values */}
                       {aplikasi.kolom.map((col) => {
@@ -1689,6 +1740,8 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                     <TableCell className="sticky left-0 bg-bg-surface z-10 border-r border-border-soft text-right font-bold">
                       Total Akumulasi:
                     </TableCell>
+                    {showDeviceColumn && <TableCell className="border-r border-border-soft/50"></TableCell>}
+                    {showNomorHpColumn && <TableCell className="border-r border-border-soft/50"></TableCell>}
                     {aplikasi.kolom.map((col) => {
                       if (!col.isAccumulated) return <TableCell key={col.id}></TableCell>;
                       
@@ -2069,33 +2122,14 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
         <form onSubmit={handleAccountSubmit} className="flex flex-col gap-4">
           {/* Autofill Select (Only when adding a new account, not when editing) */}
           {!editingAccount && allExistingAccounts.length > 0 && (
-            <div className="flex flex-col gap-1.5 bg-accent-soft/30 border border-accent/10 p-3.5 rounded-xl mb-1">
-              <label className="text-xs font-semibold text-accent">
-                Salin Data dari Akun Lain (Opsional)
-              </label>
-              <Select
-                value={selectedAutofillId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSelectedAutofillId(val);
-                  if (val) {
-                    const acc = allExistingAccounts.find((a) => a.id === val);
-                    if (acc) {
-                      setNamaAkun(acc.nama);
-                      setDeviceAkun(acc.device || "");
-                      setNoHpAkun(acc.nomorHp || "");
-                    }
-                  }
-                }}
-              >
-                <option value="">-- Pilih Akun yang Sudah Ada --</option>
-                {existingAccountsWithLabels.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.displayName}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            <AccountAutofillPicker
+              accounts={allExistingAccounts}
+              onSelectAccount={({ nama, device, nomorHp }) => {
+                setNamaAkun(nama);
+                setDeviceAkun(device);
+                setNoHpAkun(nomorHp);
+              }}
+            />
           )}
           {/* Static Fields */}
           <div className="flex flex-col gap-1.5">
@@ -2337,15 +2371,26 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
             </div>
 
             {/* Row 2: Perangkat */}
-            <div className="flex items-center gap-3.5 py-3.5 border-b border-border-soft">
-              <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/10">
-                <Smartphone className="h-5 w-5" />
+            <div className="flex items-center justify-between gap-3.5 py-3.5 border-b border-border-soft">
+              <div className="flex items-center gap-3.5 min-w-0 grow">
+                <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/10">
+                  <Smartphone className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col grow min-w-0">
+                  <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">Perangkat</span>
+                  <span className="text-[15px] font-bold text-text-primary mt-0.5 truncate">
+                    {selectedDetailAccount?.device || <span className="text-text-secondary/50 font-normal italic select-none">Tidak ada</span>}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col grow min-w-0">
-                <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">Perangkat</span>
-                <span className="text-[15px] font-bold text-text-primary mt-0.5 truncate">
-                  {selectedDetailAccount?.device || <span className="text-text-secondary/50 font-normal italic select-none">Tidak ada</span>}
-                </span>
+
+              <div className="flex items-center gap-2 shrink-0 pl-2">
+                <span className="text-[11px] font-medium text-text-secondary hidden sm:inline">Kolom</span>
+                <Switch
+                  checked={showDeviceColumn}
+                  onCheckedChange={handleToggleDeviceColumn}
+                  title={showDeviceColumn ? "Sembunyikan kolom Perangkat di tabel" : "Tampilkan kolom Perangkat di tabel"}
+                />
               </div>
             </div>
 
@@ -2363,20 +2408,28 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                 </div>
               </div>
 
-              {selectedDetailAccount?.nomorHp && (
-                <button
-                  type="button"
-                  className="p-2.5 rounded-2xl border border-border-soft text-text-secondary hover:text-accent hover:bg-accent-soft hover:border-accent/30 transition-all shadow-sm shrink-0 ml-4 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(selectedDetailAccount.nomorHp || "");
-                    toast.success("Nomor HP disalin!");
-                  }}
-                  title="Salin Nomor HP"
-                >
-                  <Copy className="h-5 w-5 shrink-0" />
-                </button>
-              )}
+              <div className="flex items-center gap-2 shrink-0 pl-2">
+                <span className="text-[11px] font-medium text-text-secondary hidden sm:inline">Kolom</span>
+                <Switch
+                  checked={showNomorHpColumn}
+                  onCheckedChange={handleToggleNomorHpColumn}
+                  title={showNomorHpColumn ? "Sembunyikan kolom Nomor HP di tabel" : "Tampilkan kolom Nomor HP di tabel"}
+                />
+                {selectedDetailAccount?.nomorHp && (
+                  <button
+                    type="button"
+                    className="p-2.5 rounded-2xl border border-border-soft text-text-secondary hover:text-accent hover:bg-accent-soft hover:border-accent/30 transition-all shadow-sm shrink-0 ml-1 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(selectedDetailAccount.nomorHp || "");
+                      toast.success("Nomor HP disalin!");
+                    }}
+                    title="Salin Nomor HP"
+                  >
+                    <Copy className="h-4 w-4 shrink-0" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Connected Card Info */}

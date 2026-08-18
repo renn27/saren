@@ -49,6 +49,15 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
 
+  // Abaikan request Server Action dan React Server Component (RSC) payload agar selalu Network-Only
+  if (
+    request.headers.get('next-action') ||
+    request.headers.get('rsc') ||
+    url.searchParams.has('_rsc')
+  ) {
+    return;
+  }
+
   // Di mode development, abaikan intercept fetch agar tidak merusak HMR
   if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1' || self.location.hostname === '0.0.0.0') {
     return;

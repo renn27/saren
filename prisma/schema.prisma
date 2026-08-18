@@ -82,6 +82,7 @@ model Akun {
   updatedAt    DateTime @updatedAt
 
   @@index([aplikasiId, urutan])
+  @@index([aplikasiId, nama])
   @@map("akun")
 }
 
@@ -121,6 +122,7 @@ model Note {
 
   @@index([isTrashed, isArchived, isPinned])
   @@index([updatedAt])
+  @@index([createdAt])
   @@index([reminderSent, reminderAt])
   @@index([folderId, isTrashed, isArchived])
   @@map("note")
@@ -134,6 +136,8 @@ model NoteListItem {
   isCompleted Boolean  @default(false)
   urutan      Int      @default(0)
 
+  @@index([noteId, urutan])
+  @@index([noteId])
   @@map("note_list_item")
 }
 

@@ -70,40 +70,41 @@ export function NomorClient({ initialData }: NomorClientProps) {
   // Active Filter state
   const [activeFilter, setActiveFilter] = useState<"all" | "warning" | "expired">("all");
 
+  // Helper for timezone-safe date-only comparison
+  const normalizeDateOnly = (d: Date | string): number => {
+    const date = new Date(d);
+    return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  };
+
   const { expiredCount, warningCount, filteredData, totalPulsa } = useMemo(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+    const nowUTC = normalizeDateOnly(new Date());
 
     let expired = 0;
     let warning = 0;
 
     data.forEach((item) => {
-      const masa = new Date(item.masaAktif);
-      if (masa < now) {
+      const masaUTC = normalizeDateOnly(item.masaAktif);
+      const diffDays = Math.round((masaUTC - nowUTC) / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
         expired++;
-      } else {
-        const diffTime = masa.getTime() - now.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        if (diffDays <= 30) {
-          warning++;
-        }
+      } else if (diffDays <= 30) {
+        warning++;
       }
     });
 
     const sorted = [...data].sort((a, b) => {
-      const dateA = new Date(a.masaAktif).getTime();
-      const dateB = new Date(b.masaAktif).getTime();
+      const dateA = normalizeDateOnly(a.masaAktif);
+      const dateB = normalizeDateOnly(b.masaAktif);
       return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
     });
 
     const filtered = sorted.filter((item) => {
-      const masa = new Date(item.masaAktif);
-      if (activeFilter === "expired") return masa < now;
-      if (activeFilter === "warning") {
-        const diffTime = masa.getTime() - now.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return masa >= now && diffDays <= 30;
-      }
+      const masaUTC = normalizeDateOnly(item.masaAktif);
+      const diffDays = Math.round((masaUTC - nowUTC) / (1000 * 60 * 60 * 24));
+
+      if (activeFilter === "expired") return diffDays < 0;
+      if (activeFilter === "warning") return diffDays >= 0 && diffDays <= 30;
       return true;
     });
 
@@ -117,33 +118,25 @@ export function NomorClient({ initialData }: NomorClientProps) {
     };
   }, [data, sortOrder, activeFilter]);
 
-  const getRowHighlight = (masaAktifDate: Date) => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+  const getRowHighlight = (masaAktifDate: Date | string) => {
+    const nowUTC = normalizeDateOnly(new Date());
+    const masaUTC = normalizeDateOnly(masaAktifDate);
+    const diffDays = Math.round((masaUTC - nowUTC) / (1000 * 60 * 60 * 24));
 
-    const masa = new Date(masaAktifDate);
-    masa.setHours(0, 0, 0, 0);
-
-    const oneYearFromNow = new Date(now);
-    oneYearFromNow.setFullYear(now.getFullYear() + 1);
-
-    const diffTime = now.getTime() - masa.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (masa > oneYearFromNow) {
+    if (diffDays > 365) {
       // Lebih dari setahun -> Hijau Lembut
       return {
         row: "bg-target-bg hover:bg-target-hover",
         sticky: "bg-target-bg group-hover:bg-target-hover text-target-text"
       };
-    } else if (masa < now && diffDays > 30) {
-      // Lewat dari 30 hari -> Merah Lembut
+    } else if (diffDays < -30) {
+      // Hangus lewat 30 hari -> Merah Lembut
       return {
         row: "bg-danger-bg hover:bg-danger-hover",
         sticky: "bg-danger-bg group-hover:bg-danger-hover text-danger-text"
       };
-    } else if (masa < now && diffDays <= 30) {
-      // Lewat masa aktif tapi belum 30 hari -> Kuning Lembut
+    } else if (diffDays < 0 && diffDays >= -30) {
+      // Masa tenggang (lewat masa aktif tapi <= 30 hari) -> Kuning Lembut
       return {
         row: "bg-warning-bg hover:bg-warning-hover",
         sticky: "bg-warning-bg group-hover:bg-warning-hover text-warning-text"

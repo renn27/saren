@@ -49,9 +49,67 @@ export async function getGarapanList() {
 
 export async function getGarapan(id: string) {
   try {
-    return await db.garapan.findUnique({
+    // 1. Coba cari berdasarkan ID (CUID)
+    let garapan = await db.garapan.findUnique({
       where: { id },
     });
+
+    if (garapan) return garapan;
+
+    // 2. Fallback: Parsing nama bulan / angka bulan / format bulan-tahun (misal: "agustus", "8", "8-2026", "2026-8")
+    const cleanId = id.trim().toLowerCase();
+    const MONTH_MAP: Record<string, number> = {
+      januari: 1, jan: 1, january: 1,
+      februari: 2, feb: 2, february: 2,
+      maret: 3, mar: 3, march: 3,
+      april: 4, apr: 4,
+      mei: 5, may: 5,
+      juni: 6, jun: 6, june: 6,
+      juli: 7, jul: 7, july: 7,
+      agustus: 8, agu: 8, ags: 8, august: 8,
+      september: 9, sep: 9, sept: 9,
+      oktober: 10, okt: 10, oct: 10, october: 10,
+      november: 11, nov: 11,
+      desember: 12, des: 12, dec: 12, december: 12,
+    };
+
+    let targetBulan: number | null = null;
+    let targetTahun: number = new Date().getFullYear();
+
+    if (cleanId.includes("-")) {
+      const parts = cleanId.split("-");
+      if (parts.length === 2) {
+        const p1 = parseInt(parts[0], 10);
+        const p2 = parseInt(parts[1], 10);
+        if (!isNaN(p1) && !isNaN(p2)) {
+          if (p1 > 1000) {
+            targetTahun = p1;
+            targetBulan = p2;
+          } else {
+            targetBulan = p1;
+            targetTahun = p2;
+          }
+        }
+      }
+    } else if (MONTH_MAP[cleanId]) {
+      targetBulan = MONTH_MAP[cleanId];
+    } else {
+      const parsedNum = parseInt(cleanId, 10);
+      if (!isNaN(parsedNum) && parsedNum >= 1 && parsedNum <= 12) {
+        targetBulan = parsedNum;
+      }
+    }
+
+    if (targetBulan !== null) {
+      garapan = await db.garapan.findFirst({
+        where: {
+          bulan: targetBulan,
+          tahun: targetTahun,
+        },
+      });
+    }
+
+    return garapan;
   } catch (error) {
     console.error("Failed to fetch garapan:", error);
     return null;
@@ -204,6 +262,7 @@ export async function duplicateGarapan(sourceId: string, targetData: { bulan: nu
             namaAplikasi: app.namaAplikasi,
             logoUrl: app.logoUrl,
             deskripsi: app.deskripsi,
+            kategori: app.kategori,
           },
         });
 
@@ -225,28 +284,29 @@ export async function duplicateGarapan(sourceId: string, targetData: { bulan: nu
           kolomIdMap.set(col.id, newCol.id);
         }
 
-        // Copy accounts
-        for (const acc of app.akun) {
-          // Remap customValues keys using kolomIdMap
-          const oldCustomValues = (acc.customValues || {}) as Record<string, any>;
-          const newCustomValues: Record<string, any> = {};
-          for (const [oldColId, value] of Object.entries(oldCustomValues)) {
-            const newColId = kolomIdMap.get(oldColId);
-            if (newColId) {
-              newCustomValues[newColId] = value;
+        // Copy accounts in a single batch
+        if (app.akun.length > 0) {
+          const accountsData = app.akun.map((acc) => {
+            const oldCustomValues = (acc.customValues || {}) as Record<string, any>;
+            const newCustomValues: Record<string, any> = {};
+            for (const [oldColId, value] of Object.entries(oldCustomValues)) {
+              const newColId = kolomIdMap.get(oldColId);
+              if (newColId) {
+                newCustomValues[newColId] = value;
+              }
             }
-          }
 
-          await tx.akun.create({
-            data: {
+            return {
               aplikasiId: newApp.id,
               nama: acc.nama,
               device: acc.device,
               nomorHp: acc.nomorHp,
               customValues: newCustomValues,
               urutan: acc.urutan,
-            },
+            };
           });
+
+          await tx.akun.createMany({ data: accountsData });
         }
       }
     });

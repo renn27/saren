@@ -293,10 +293,14 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
       content = "";
     } else if (isInputTable) {
       const accumulatedCols = new Array(inputTableHeaders.length).fill(false);
+      const columnTypes = new Array(inputTableHeaders.length).fill("TEKS");
+      const columnFormulas = new Array(inputTableHeaders.length).fill("");
       content = JSON.stringify({
         headers: inputTableHeaders,
         rows: inputTableRows,
         accumulatedCols,
+        columnTypes,
+        columnFormulas,
       });
     }
 
@@ -923,7 +927,9 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
         ]);
       }
       const accumulatedCols = new Array(headers.length).fill(false);
-      nextContent = JSON.stringify({ headers, rows, accumulatedCols });
+      const columnTypes = new Array(headers.length).fill("TEKS");
+      const columnFormulas = new Array(headers.length).fill("");
+      nextContent = JSON.stringify({ headers, rows, accumulatedCols, columnTypes, columnFormulas });
       nextListItems = [];
     }
 

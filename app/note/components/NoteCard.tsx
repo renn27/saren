@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 import { fetchLinkMetadata } from "@/lib/actions/note";
-import { colorMap, extractUrls, calculateColumnTotal, renderTextWithLinks } from "@/app/note/constants";
+import { colorMap, extractUrls, calculateColumnTotal, renderTextWithLinks, parseNumericValue } from "@/app/note/constants";
+import { evaluateTableNoteFormula, formatTableFormulaResult } from "@/lib/utils/formulaEvaluator";
 import type { Note, Label, FolderItem } from "@/app/note/types";
 
 // ── NoteCard Props ────────────────────────────────────────────────────────────
@@ -226,7 +227,8 @@ export const NoteCard = React.memo(function NoteCard({
                 headers: string[];
                 rows: string[][];
                 accumulatedCols?: boolean[];
-                columnTypes?: ("TEKS" | "TANGGAL" | "CENTANG")[];
+                columnTypes?: ("TEKS" | "NOMINAL" | "TANGGAL" | "CENTANG" | "RUMUS")[];
+                columnFormulas?: string[];
               };
               if (!data.headers || !data.rows || data.headers.length === 0) {
                 return <em className="opacity-40 text-[11px] font-sans">Kosong</em>;
@@ -241,7 +243,7 @@ export const NoteCard = React.memo(function NoteCard({
 
               const totals = data.headers.slice(0, 3).map((_, idx) => {
                 if (accumulatedCols[idx]) {
-                  return calculateColumnTotal(data.rows, idx);
+                  return calculateColumnTotal(data.rows, idx, data.headers, data.columnTypes, data.columnFormulas);
                 }
                 return "";
               });
@@ -264,7 +266,12 @@ export const NoteCard = React.memo(function NoteCard({
                             key={idx}
                             className="p-1 font-semibold truncate max-w-[80px] border-r border-border-soft/60"
                           >
-                            {header}
+                            <span className="flex items-center gap-1">
+                              {data.columnTypes?.[idx] === "RUMUS" && (
+                                <span className="text-[9px] font-mono font-bold text-purple-500">fx</span>
+                              )}
+                              <span>{header}</span>
+                            </span>
                           </th>
                         ))}
                         {hasMoreCols && (
@@ -299,6 +306,25 @@ export const NoteCard = React.memo(function NoteCard({
                                   ) : (
                                     <span className="opacity-20">-</span>
                                   )
+                                ) : colType === "NOMINAL" ? (
+                                  cell ? (
+                                    <span className="font-mono text-[10.5px] text-emerald-600 dark:text-emerald-400 font-medium">
+                                      {cell.startsWith("Rp") ? cell : `Rp ${new Intl.NumberFormat("id-ID").format(parseNumericValue(cell) || 0)}`}
+                                    </span>
+                                  ) : (
+                                    <span className="opacity-20">-</span>
+                                  )
+                                ) : colType === "RUMUS" ? (
+                                  (() => {
+                                    const formula = data.columnFormulas?.[cellIdx];
+                                    if (!formula) return <span className="opacity-20">-</span>;
+                                    const calcVal = evaluateTableNoteFormula(formula, data.headers, data.rows, rowIdx, cellIdx);
+                                    return (
+                                      <span className="font-mono text-text-primary text-[10.5px] font-medium">
+                                        {formatTableFormulaResult(calcVal, formula)}
+                                      </span>
+                                    );
+                                  })()
                                 ) : (
                                   cell || <span className="opacity-20">-</span>
                                 )}
@@ -322,7 +348,7 @@ export const NoteCard = React.memo(function NoteCard({
                             return (
                               <td
                                 key={idx}
-                                className="p-1 truncate max-w-[80px] border-r border-border-soft/60 font-bold"
+                                className="p-1 truncate max-w-[80px] border-r border-border-soft/60 font-bold font-mono"
                               >
                                 {val}
                               </td>

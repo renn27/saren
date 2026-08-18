@@ -26,6 +26,9 @@ import {
   Sigma,
   Calendar,
   Type,
+  Calculator,
+  Banknote,
+  SlidersHorizontal,
   Image as ImageIcon,
   Share2,
   Folder,
@@ -34,7 +37,14 @@ import {
 import { toast } from "sonner";
 import { twMerge } from "tailwind-merge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertDialog } from "@/components/ui/dialog";
+import { Dialog, AlertDialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import {
+  evaluateTableNoteFormula,
+  formatTableFormulaResult,
+} from "@/lib/utils/formulaEvaluator";
+import { compressImageFile } from "@/lib/utils/imageCompressor";
 import {
   updateNote,
   trashNote,
@@ -151,40 +161,70 @@ function parseNumericValue(val: string): number {
   return parseFloat(cleanVal);
 }
 
-function calculateColumnTotal(rows: string[][], colIndex: number): string {
+export type TableColumnType = "TEKS" | "NOMINAL" | "TANGGAL" | "CENTANG" | "RUMUS";
+
+export interface NoteTableData {
+  headers: string[];
+  rows: string[][];
+  accumulatedCols: boolean[];
+  columnTypes: TableColumnType[];
+  columnFormulas: string[];
+}
+
+function calculateColumnTotal(
+  rows: string[][],
+  colIndex: number,
+  headers?: string[],
+  columnTypes?: TableColumnType[],
+  columnFormulas?: string[]
+): string {
   let total = 0;
   let hasNumber = false;
-  
-  for (const row of rows) {
-    const val = row[colIndex];
-    if (!val) continue;
-    
-    const num = parseNumericValue(val);
-    if (!isNaN(num)) {
-      total += num;
-      hasNumber = true;
+  const isRumus = columnTypes?.[colIndex] === "RUMUS";
+  const formula = columnFormulas?.[colIndex];
+
+  for (let ri = 0; ri < rows.length; ri++) {
+    if (isRumus && headers && formula) {
+      const calculated = evaluateTableNoteFormula(formula, headers, rows, ri, colIndex);
+      if (calculated !== null && !isNaN(calculated)) {
+        total += calculated;
+        hasNumber = true;
+      }
+    } else {
+      const val = rows[ri]?.[colIndex];
+      if (!val) continue;
+
+      const num = parseNumericValue(val);
+      if (!isNaN(num)) {
+        total += num;
+        hasNumber = true;
+      }
     }
   }
-  
+
   if (!hasNumber) return "";
-  
+
+  const isNominal = columnTypes?.[colIndex] === "NOMINAL";
+  const prefix = isNominal ? "Rp " : "";
+
   if (Number.isInteger(total)) {
-    return new Intl.NumberFormat("id-ID").format(total);
+    return `${prefix}${new Intl.NumberFormat("id-ID").format(total)}`;
   } else {
-    // Format float with up to 3 decimal places
-    return new Intl.NumberFormat("id-ID", {
-      maximumFractionDigits: 3
-    }).format(total);
+    // Format float with up to 4 decimal places
+    return `${prefix}${new Intl.NumberFormat("id-ID", {
+      maximumFractionDigits: 4,
+    }).format(total)}`;
   }
 }
 
-function parseTable(content: string | null) {
+function parseTable(content: string | null): NoteTableData {
   try {
     const p = JSON.parse(content || "{}") as {
       headers: string[];
       rows: string[][];
       accumulatedCols?: boolean[];
-      columnTypes?: ("TEKS" | "TANGGAL" | "CENTANG")[];
+      columnTypes?: TableColumnType[];
+      columnFormulas?: string[];
     };
     if (p.headers && p.rows) {
       const accumulatedCols = p.accumulatedCols || new Array(p.headers.length).fill(false);
@@ -193,17 +233,23 @@ function parseTable(content: string | null) {
       }
 
       const columnTypes = (p.columnTypes || new Array(p.headers.length).fill("TEKS")).map(
-        (t) => (t === "TANGGAL" || t === "CENTANG" ? t : "TEKS")
+        (t) => (t === "NOMINAL" || t === "TANGGAL" || t === "CENTANG" || t === "RUMUS" ? t : "TEKS")
       );
       while (columnTypes.length < p.headers.length) {
         columnTypes.push("TEKS");
+      }
+
+      const columnFormulas = p.columnFormulas || new Array(p.headers.length).fill("");
+      while (columnFormulas.length < p.headers.length) {
+        columnFormulas.push("");
       }
 
       return {
         headers: p.headers,
         rows: p.rows,
         accumulatedCols: accumulatedCols.slice(0, p.headers.length),
-        columnTypes: columnTypes.slice(0, p.headers.length) as ("TEKS" | "TANGGAL" | "CENTANG")[],
+        columnTypes: columnTypes.slice(0, p.headers.length) as TableColumnType[],
+        columnFormulas: columnFormulas.slice(0, p.headers.length),
       };
     }
   } catch {}
@@ -211,7 +257,8 @@ function parseTable(content: string | null) {
     headers: ["Kolom 1", "Kolom 2"],
     rows: [["", ""]],
     accumulatedCols: [false, false],
-    columnTypes: ["TEKS", "TEKS"] as ("TEKS" | "TANGGAL" | "CENTANG")[],
+    columnTypes: ["TEKS", "TEKS"],
+    columnFormulas: ["", ""],
   };
 }
 
@@ -236,52 +283,6 @@ function serializeNote(n: Note) {
     reminderMinutesBefore: n.reminderMinutesBefore,
     listItems: n.listItems.map((it) => ({ text: it.text, isCompleted: it.isCompleted })),
     labelIds: n.labels.map((l) => l.id),
-  });
-}
-
-async function compressImage(file: File): Promise<File> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new window.Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let width = img.width;
-        let height = img.height;
-        const maxWidth = 1200;
-
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const compressedFile = new File([blob], file.name, {
-                type: "image/jpeg",
-                lastModified: Date.now(),
-              });
-              resolve(compressedFile);
-            } else {
-              resolve(file);
-            }
-          },
-          "image/jpeg",
-          0.7
-        );
-      };
-      img.onerror = () => resolve(file);
-    };
-    reader.onerror = () => resolve(file);
   });
 }
 
@@ -633,7 +634,7 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
     const toastId = toast.loading("Mengompresi & mengunggah gambar...");
 
     try {
-      const compressedFile = await compressImage(file);
+      const compressedFile = await compressImageFile(file, 1200, 1200, 0.8);
 
       const formData = new FormData();
       formData.append("image", compressedFile);
@@ -665,8 +666,19 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
     } else if (note.isTable) {
       const data = parseTable(note.content);
       if (data.headers && data.rows) {
+        const resolvedRows = data.rows.map((row, ri) =>
+          row.map((cell, ci) => {
+            if (data.columnTypes[ci] === "RUMUS") {
+              const formula = data.columnFormulas[ci];
+              const calcVal = evaluateTableNoteFormula(formula, data.headers, data.rows, ri, ci);
+              return formatTableFormulaResult(calcVal, formula);
+            }
+            return cell;
+          })
+        );
+
         const widths = data.headers.map((h, i) =>
-          Math.max(h.length, ...data.rows.map((r) => (r[i] || "").length))
+          Math.max(h.length, ...resolvedRows.map((r) => (r[i] || "").length))
         );
 
         const border = "+" + widths.map((w) => "-".repeat(w + 2)).join("+") + "+";
@@ -674,7 +686,7 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
           "| " + row.map((cell, i) => (cell || "").padEnd(widths[i])).join(" | ") + " |";
 
         text += border + "\n" + formatRow(data.headers) + "\n" + border + "\n";
-        data.rows.forEach((r) => {
+        resolvedRows.forEach((r) => {
           text += formatRow(r) + "\n";
         });
         text += border;
@@ -684,7 +696,7 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
           text += "\n\nTotal Akumulasi:\n";
           data.headers.forEach((h, idx) => {
             if (data.accumulatedCols[idx]) {
-              const total = calculateColumnTotal(data.rows, idx);
+              const total = calculateColumnTotal(data.rows, idx, data.headers, data.columnTypes, data.columnFormulas);
               text += `- ${h}: Σ ${total}\n`;
             }
           });
@@ -801,11 +813,17 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
 
         const maxHeaderHeight = 35;
         ctx.font = "bold 13px Inter, sans-serif";
-        tableRowHeights = tableData.rows.map((row: string[]) => {
+        tableRowHeights = tableData.rows.map((row: string[], ri: number) => {
           ctx.font = "13px Inter, sans-serif";
           let maxCellHeight = 30;
-          row.forEach((cell) => {
-            const cellLines = wrapText(cell || "", colWidth - 10);
+          row.forEach((cell, ci) => {
+            let displayVal = cell;
+            if (tableData.columnTypes[ci] === "RUMUS") {
+              const formula = tableData.columnFormulas[ci];
+              const calc = evaluateTableNoteFormula(formula, tableData.headers, tableData.rows, ri, ci);
+              displayVal = formatTableFormulaResult(calc, formula);
+            }
+            const cellLines = wrapText(displayVal || "", colWidth - 10);
             maxCellHeight = Math.max(maxCellHeight, cellLines.length * 18 + 10);
           });
           return maxCellHeight;
@@ -847,7 +865,8 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
     const textSecondary = "#64748B";
     const accentColor = "#0891B2";
 
-    let currentY = padding + 20;
+    let currentY = padding + 30;
+
     ctx.fillStyle = textPrimary;
     ctx.font = "bold 24px Inter, sans-serif";
     wrappedTitle.forEach((line) => {
@@ -858,33 +877,18 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
     currentY += 15;
 
     if (note.isList) {
+      ctx.font = "15px Inter, sans-serif";
       note.listItems.forEach((item) => {
-        ctx.strokeStyle = item.isCompleted ? accentColor : textSecondary;
-        ctx.lineWidth = 2;
-        const boxX = padding;
-        const boxY = currentY - 14;
-        const boxSize = 16;
-        ctx.strokeRect(boxX, boxY, boxSize, boxSize);
-
         if (item.isCompleted) {
           ctx.fillStyle = accentColor;
-          ctx.fillRect(boxX + 3, boxY + 3, boxSize - 6, boxSize - 6);
-        }
-
-        ctx.fillStyle = item.isCompleted ? textSecondary : textPrimary;
-        ctx.font = "14px Inter, sans-serif";
-        ctx.fillText(item.text, padding + 26, currentY - 1);
-
-        if (item.isCompleted) {
-          const textWidth = ctx.measureText(item.text).width;
+          ctx.fillText("✓", padding, currentY);
+          ctx.fillStyle = textSecondary;
+        } else {
           ctx.strokeStyle = textSecondary;
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(padding + 26, currentY - 6);
-          ctx.lineTo(padding + 26 + textWidth, currentY - 6);
-          ctx.stroke();
+          ctx.strokeRect(padding, currentY - 12, 12, 12);
+          ctx.fillStyle = textPrimary;
         }
-
+        ctx.fillText(item.text, padding + 22, currentY);
         currentY += 28;
       });
     } else if (note.isTable && tableData) {
@@ -919,7 +923,13 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
         let cellX = startX;
         row.forEach((cell, ci) => {
           const colW = tableColWidths[ci];
-          const cellLines = wrapText(cell || "-", colW - 10);
+          let displayVal = cell || "-";
+          if (tableData.columnTypes[ci] === "RUMUS") {
+            const formula = tableData.columnFormulas[ci];
+            const calc = evaluateTableNoteFormula(formula, tableData.headers, tableData.rows, ri, ci);
+            displayVal = formatTableFormulaResult(calc, formula);
+          }
+          const cellLines = wrapText(displayVal, colW - 10);
 
           let lineY = currentY + 18;
           cellLines.forEach((line) => {
@@ -959,7 +969,7 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
         tableData.headers.forEach((_: any, ci: number) => {
           let cellVal = "";
           if (tableData.accumulatedCols[ci]) {
-            const sum = calculateColumnTotal(tableData.rows, ci);
+            const sum = calculateColumnTotal(tableData.rows, ci, tableData.headers, tableData.columnTypes, tableData.columnFormulas);
             cellVal = `Σ ${sum}`;
           } else if (ci === firstNonAcc) {
             cellVal = "Total";
@@ -1192,7 +1202,9 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
           if (lines.length) rows = lines.map((l) => [l, ""]);
         }
         const accumulatedCols = new Array(headers.length).fill(false);
-        content = JSON.stringify({ headers, rows, accumulatedCols });
+        const columnTypes = new Array(headers.length).fill("TEKS");
+        const columnFormulas = new Array(headers.length).fill("");
+        content = JSON.stringify({ headers, rows, accumulatedCols, columnTypes, columnFormulas });
         listItems = [];
       }
 
@@ -1202,19 +1214,7 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
   };
 
   // ── Table helpers ─────────────────────────────────────────────────────────
-  const updateTableContent = (
-    fn: (t: {
-      headers: string[];
-      rows: string[][];
-      accumulatedCols: boolean[];
-      columnTypes: ("TEKS" | "TANGGAL" | "CENTANG")[];
-    }) => {
-      headers: string[];
-      rows: string[][];
-      accumulatedCols: boolean[];
-      columnTypes: ("TEKS" | "TANGGAL" | "CENTANG")[];
-    }
-  ) => {
+  const updateTableContent = (fn: (t: NoteTableData) => NoteTableData) => {
     const t = parseTable(note.content);
     setNote((p) => ({ ...p, content: JSON.stringify(fn(t)) }));
   };
@@ -1315,7 +1315,7 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
 
           {/* ── Body ──────────────────────────────────────────────────── */}
           {note.isTable ? (
-            <TableEditor note={note} setNote={setNote} updateTableContent={updateTableContent} />
+            <TableEditor note={note} updateTableContent={updateTableContent} />
           ) : !note.isList ? (
             <textarea
               ref={textareaRef}
@@ -2192,40 +2192,51 @@ function ChecklistEditor({
   );
 }
 
-// ─── Table editor ─────────────────────────────────────────────────────────────
-// ─── Table editor ─────────────────────────────────────────────────────────────
+// ─── Component Table Editor ──────────────────────────────────────────────────
 function TableEditor({
   note,
-  setNote,
   updateTableContent,
 }: {
   note: Note;
-  setNote: React.Dispatch<React.SetStateAction<Note>>;
-  updateTableContent: (
-    fn: (t: {
-      headers: string[];
-      rows: string[][];
-      accumulatedCols: boolean[];
-      columnTypes: ("TEKS" | "TANGGAL" | "CENTANG")[];
-    }) => {
-      headers: string[];
-      rows: string[][];
-      accumulatedCols: boolean[];
-      columnTypes: ("TEKS" | "TANGGAL" | "CENTANG")[];
-    }
-  ) => void;
+  updateTableContent: (fn: (t: NoteTableData) => NoteTableData) => void;
 }) {
-  const { headers, rows, accumulatedCols, columnTypes } = parseTable(note.content);
+  const { headers, rows, accumulatedCols, columnTypes, columnFormulas } = parseTable(note.content);
   const [isEditMode, setIsEditMode] = React.useState(false);
+  const [configColIndex, setConfigColIndex] = React.useState<number | null>(null);
 
   const hasAccumulated = accumulatedCols.some(Boolean);
-  const totals = headers.map((_, ci) => {
-    if (accumulatedCols[ci]) {
-      return calculateColumnTotal(rows, ci);
-    }
-    return "";
-  });
+  const totals = React.useMemo(() => {
+    return headers.map((_, ci) => {
+      if (accumulatedCols[ci]) {
+        return calculateColumnTotal(rows, ci, headers, columnTypes, columnFormulas);
+      }
+      return "";
+    });
+  }, [headers, rows, accumulatedCols, columnTypes, columnFormulas]);
   const firstNonAcc = accumulatedCols.indexOf(false);
+
+  const handleCellKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rIdx: number, cIdx: number) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (rIdx < rows.length - 1) {
+        const nextInput = document.querySelector<HTMLInputElement>(`input[data-cell="${rIdx + 1}-${cIdx}"]`);
+        nextInput?.focus();
+        nextInput?.select();
+      } else {
+        updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => ({
+          headers: hs,
+          rows: [...rs, new Array(hs.length).fill("")],
+          accumulatedCols: ac,
+          columnTypes: ct,
+          columnFormulas: cf,
+        }));
+        setTimeout(() => {
+          const nextInput = document.querySelector<HTMLInputElement>(`input[data-cell="${rIdx + 1}-${cIdx}"]`);
+          nextInput?.focus();
+        }, 50);
+      }
+    }
+  };
 
   return (
     <div className="overflow-x-auto pb-4">
@@ -2235,118 +2246,160 @@ function TableEditor({
             {headers.map((h, ci) => (
               <th
                 key={ci}
-                className="relative p-2 text-left font-semibold border-r border-black/15 dark:border-white/15 min-w-[140px]"
+                className="relative p-2.5 text-left font-semibold border-r border-black/15 dark:border-white/15 min-w-[140px]"
               >
-                <input
-                  type="text"
-                  value={h}
-                  onChange={(e) =>
-                    updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => {
-                      const next = [...hs];
-                      next[ci] = e.target.value;
-                      return { headers: next, rows: rs, accumulatedCols: ac, columnTypes: ct };
-                    })
-                  }
-                  className={`w-full bg-transparent border-none font-semibold focus:outline-none p-0 ${isEditMode ? "pr-6" : ""}`}
-                />
-                {isEditMode && (
-                  <div className="flex items-center gap-1.5 mt-1 border-t border-black/5 dark:border-white/5 pt-1 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => {
-                          const next = [...ac];
-                          next[ci] = !next[ci];
-                          return { headers: hs, rows: rs, accumulatedCols: next, columnTypes: ct };
+                {!isEditMode ? (
+                  <div className="flex items-center justify-between gap-1.5">
+                    <input
+                      type="text"
+                      value={h}
+                      onChange={(e) =>
+                        updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                          const next = [...hs];
+                          next[ci] = e.target.value;
+                          return { headers: next, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf };
                         })
                       }
-                      className={twMerge(
-                        "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold cursor-pointer transition-colors border select-none",
-                        accumulatedCols[ci]
-                          ? "bg-accent-soft text-accent border-accent/20"
-                          : "text-text-secondary hover:text-text-primary border-transparent hover:bg-black/5 dark:hover:bg-white/5"
+                      className="w-full bg-transparent border-none font-semibold focus:outline-none p-0 text-[13.5px]"
+                    />
+                    <div className="flex items-center gap-1 shrink-0">
+                      {columnTypes[ci] === "RUMUS" && (
+                        <button
+                          type="button"
+                          onClick={() => setConfigColIndex(ci)}
+                          className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-colors select-none cursor-pointer"
+                          title="Lihat / Ubah Rumus Kolom"
+                        >
+                          fx
+                        </button>
                       )}
-                      title="Toggle Jumlahkan Kolom (Total)"
-                    >
-                      <Sigma className="h-3 w-3" />
-                      <span>Total</span>
-                    </button>
-
-                    {/* Column Type Selector Chip */}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => {
-                          const nextTypes = [...ct];
-                          const current = nextTypes[ci] || "TEKS";
-                          let nextType: "TEKS" | "TANGGAL" | "CENTANG" = "TEKS";
-                          if (current === "TEKS") nextType = "TANGGAL";
-                          else if (current === "TANGGAL") nextType = "CENTANG";
-                          else nextType = "TEKS";
-
-                          nextTypes[ci] = nextType;
-                          return { headers: hs, rows: rs, accumulatedCols: ac, columnTypes: nextTypes };
-                        })
-                      }
-                      className={twMerge(
-                        "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold cursor-pointer transition-colors border select-none",
-                        columnTypes[ci] === "TANGGAL"
-                          ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                          : columnTypes[ci] === "CENTANG"
-                          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                          : "text-text-secondary hover:text-text-primary border-transparent hover:bg-black/5 dark:hover:bg-white/5"
+                      {columnTypes[ci] === "NOMINAL" && (
+                        <span className="px-1 py-0.5 rounded text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 select-none">
+                          Rp
+                        </span>
                       )}
-                      title="Ganti Tipe Kolom (Teks / Tanggal / Centang)"
-                    >
-                      {columnTypes[ci] === "TANGGAL" ? (
-                        <>
-                          <Calendar className="h-3 w-3" />
-                          <span>Tanggal</span>
-                        </>
-                      ) : columnTypes[ci] === "CENTANG" ? (
-                        <>
+                      {columnTypes[ci] === "CENTANG" && (
+                        <span className="p-0.5 rounded text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 select-none">
                           <CheckSquare className="h-3 w-3" />
-                          <span>Centang</span>
-                        </>
-                      ) : (
-                        <>
-                          <Type className="h-3 w-3" />
-                          <span>Teks</span>
-                        </>
+                        </span>
                       )}
+                      {columnTypes[ci] === "TANGGAL" && (
+                        <span className="p-0.5 rounded text-blue-500 bg-blue-500/10 border border-blue-500/20 select-none">
+                          <Calendar className="h-3 w-3" />
+                        </span>
+                      )}
+                      {accumulatedCols[ci] && (
+                        <span className="text-[10px] font-bold text-accent px-1 rounded bg-accent-soft border border-accent/20 select-none" title="Total Penjumlahan Aktif">
+                          Σ
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-1">
+                      <input
+                        type="text"
+                        value={h}
+                        onChange={(e) =>
+                          updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                            const next = [...hs];
+                            next[ci] = e.target.value;
+                            return { headers: next, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf };
+                          })
+                        }
+                        className="w-full bg-transparent border-none font-semibold focus:outline-none p-0 text-[13.5px]"
+                      />
+                      {headers.length > 1 && (
+                        <button
+                          onClick={() =>
+                            updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => ({
+                              headers: hs.filter((_, i) => i !== ci),
+                              rows: rs.map((r) => r.filter((_, i) => i !== ci)),
+                              accumulatedCols: ac.filter((_, i) => i !== ci),
+                              columnTypes: ct.filter((_, i) => i !== ci),
+                              columnFormulas: cf.filter((_, i) => i !== ci),
+                            }))
+                          }
+                          className="p-1 text-text-secondary hover:text-danger rounded-lg hover:bg-danger/10 transition-colors cursor-pointer shrink-0"
+                          title="Hapus kolom"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Clean Column Configuration Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={() => setConfigColIndex(ci)}
+                      className={twMerge(
+                        "flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold cursor-pointer transition-all border select-none w-full shadow-2xs",
+                        columnTypes[ci] === "RUMUS"
+                          ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 hover:bg-purple-500/20"
+                          : columnTypes[ci] === "NOMINAL"
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                          : columnTypes[ci] === "CENTANG"
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                          : columnTypes[ci] === "TANGGAL"
+                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/20"
+                          : "bg-bg-surface text-text-secondary hover:text-text-primary border-border-soft hover:border-accent/40"
+                      )}
+                      title="Buka Pengaturan Kolom & Rumus"
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        {columnTypes[ci] === "RUMUS" ? (
+                          <>
+                            <Calculator className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">Rumus (fx)</span>
+                          </>
+                        ) : columnTypes[ci] === "NOMINAL" ? (
+                          <>
+                            <Banknote className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">Nominal (Rp)</span>
+                          </>
+                        ) : columnTypes[ci] === "CENTANG" ? (
+                          <>
+                            <CheckSquare className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">Centang</span>
+                          </>
+                        ) : columnTypes[ci] === "TANGGAL" ? (
+                          <>
+                            <Calendar className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">Tanggal</span>
+                          </>
+                        ) : (
+                          <>
+                            <Type className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">Teks</span>
+                          </>
+                        )}
+                        {accumulatedCols[ci] && (
+                          <span className="text-[10px] font-bold text-accent bg-accent-soft px-1 rounded border border-accent/20">
+                            Σ
+                          </span>
+                        )}
+                      </div>
+                      <SlidersHorizontal className="h-3 w-3 shrink-0 opacity-60" />
                     </button>
                   </div>
-                )}
-                {isEditMode && headers.length > 1 && (
-                  <button
-                    onClick={() =>
-                      updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => ({
-                        headers: hs.filter((_, i) => i !== ci),
-                        rows: rs.map((r) => r.filter((_, i) => i !== ci)),
-                        accumulatedCols: ac.filter((_, i) => i !== ci),
-                        columnTypes: ct.filter((_, i) => i !== ci),
-                      }))
-                    }
-                    className="absolute top-1 right-1 p-0.5 text-text-secondary hover:text-danger rounded cursor-pointer"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
                 )}
               </th>
             ))}
             {isEditMode && (
-              <th className="p-2 w-8 border-l border-black/15 dark:border-white/15">
+              <th className="p-2 w-10 border-l border-black/15 dark:border-white/15 text-center">
                 <button
                   onClick={() =>
-                    updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => ({
+                    updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => ({
                       headers: [...hs, `Kolom ${hs.length + 1}`],
                       rows: rs.map((r) => [...r, ""]),
                       accumulatedCols: [...ac, false],
                       columnTypes: [...ct, "TEKS"],
+                      columnFormulas: [...cf, ""],
                     }))
                   }
-                  className="text-text-secondary hover:text-accent cursor-pointer flex items-center justify-center"
-                  title="Tambah kolom"
+                  className="p-1.5 text-text-secondary hover:text-accent rounded-xl hover:bg-accent-soft/50 cursor-pointer transition-colors inline-flex items-center justify-center"
+                  title="Tambah kolom baru"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -2369,10 +2422,10 @@ function TableEditor({
                         <Checkbox
                           checked={cell === "true" || cell === "1"}
                           onCheckedChange={(checked) =>
-                            updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => {
+                            updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
                               const next = rs.map((r) => [...r]);
                               next[ri][ci] = checked ? "true" : "false";
-                              return { headers: hs, rows: next, accumulatedCols: ac, columnTypes: ct };
+                              return { headers: hs, rows: next, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf };
                             })
                           }
                         />
@@ -2380,25 +2433,69 @@ function TableEditor({
                     ) : colType === "TANGGAL" ? (
                       <input
                         type="date"
+                        data-cell={`${ri}-${ci}`}
                         value={cell || ""}
+                        onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}
                         onChange={(e) =>
-                          updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => {
+                          updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
                             const next = rs.map((r) => [...r]);
                             next[ri][ci] = e.target.value;
-                            return { headers: hs, rows: next, accumulatedCols: ac, columnTypes: ct };
+                            return { headers: hs, rows: next, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf };
                           })
                         }
                         className="w-full bg-transparent border-none p-0 focus:outline-none text-[13.5px] font-mono text-text-primary cursor-pointer"
                       />
+                    ) : colType === "NOMINAL" ? (
+                      <input
+                        type="text"
+                        data-cell={`${ri}-${ci}`}
+                        inputMode="decimal"
+                        value={cell}
+                        placeholder="Rp 0"
+                        onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                            const next = rs.map((r) => [...r]);
+                            next[ri][ci] = raw;
+                            return { headers: hs, rows: next, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf };
+                          });
+                        }}
+                        onBlur={(e) => {
+                          const num = parseNumericValue(e.target.value);
+                          if (!isNaN(num) && e.target.value.trim() !== "") {
+                            const formatted = `Rp ${new Intl.NumberFormat("id-ID").format(num)}`;
+                            updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                              const next = rs.map((r) => [...r]);
+                              next[ri][ci] = formatted;
+                              return { headers: hs, rows: next, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf };
+                            });
+                          }
+                        }}
+                        className="w-full bg-transparent border-none p-0 focus:outline-none text-[13.5px] font-mono text-right text-text-primary"
+                      />
+                    ) : colType === "RUMUS" ? (
+                      <div className="w-full text-right font-mono font-medium text-text-primary text-[13.5px] px-2 py-0.5 select-none flex items-center justify-end">
+                        {(() => {
+                          const formula = columnFormulas[ci];
+                          if (!formula) {
+                            return <span className="text-text-secondary/40 italic text-xs">Rumus belum diisi</span>;
+                          }
+                          const calcVal = evaluateTableNoteFormula(formula, headers, rows, ri, ci);
+                          return formatTableFormulaResult(calcVal, formula);
+                        })()}
+                      </div>
                     ) : (
                       <input
                         type="text"
+                        data-cell={`${ri}-${ci}`}
                         value={cell}
+                        onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}
                         onChange={(e) =>
-                          updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => {
+                          updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
                             const next = rs.map((r) => [...r]);
                             next[ri][ci] = e.target.value;
-                            return { headers: hs, rows: next, accumulatedCols: ac, columnTypes: ct };
+                            return { headers: hs, rows: next, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf };
                           })
                         }
                         className="w-full bg-transparent border-none p-0 focus:outline-none text-[14px]"
@@ -2411,11 +2508,12 @@ function TableEditor({
                 <td className="p-1 text-center border-l border-black/10 dark:border-white/10">
                   <button
                     onClick={() =>
-                      updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => ({
+                      updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => ({
                         headers: hs,
                         rows: rs.filter((_, i) => i !== ri),
                         accumulatedCols: ac,
                         columnTypes: ct,
+                        columnFormulas: cf,
                       }))
                     }
                     className="p-0.5 text-text-secondary hover:text-danger cursor-pointer flex items-center justify-center mx-auto"
@@ -2438,7 +2536,7 @@ function TableEditor({
                 return (
                   <td
                     key={ci}
-                    className="p-2 border-r border-black/10 dark:border-white/10 text-accent font-bold"
+                    className="p-2 border-r border-black/10 dark:border-white/10 text-accent font-bold font-mono text-right"
                   >
                     {cellVal}
                   </td>
@@ -2455,11 +2553,12 @@ function TableEditor({
       <div className="flex items-center justify-between gap-2 mt-3">
         <button
           onClick={() =>
-            updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct }) => ({
+            updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => ({
               headers: hs,
               rows: [...rs, new Array(hs.length).fill("")],
               accumulatedCols: ac,
               columnTypes: ct,
+              columnFormulas: cf,
             }))
           }
           className="flex items-center gap-1.5 text-[12px] font-medium text-text-secondary hover:text-text-primary px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/8 cursor-pointer transition-colors"
@@ -2480,6 +2579,328 @@ function TableEditor({
           {isEditMode ? "Selesai Mengatur" : "Atur Kolom & Baris"}
         </button>
       </div>
+
+      {/* ── Modal Pengaturan Kolom & Rumus ── */}
+      {configColIndex !== null && (
+        <Dialog
+          isOpen={configColIndex !== null}
+          onClose={() => setConfigColIndex(null)}
+          title={`Atur: ${headers[configColIndex] || `Kolom ${configColIndex + 1}`}`}
+          description="Sesuaikan nama, jenis data, rumus matematika dinamis, dan akumulasi total kolom."
+          maxWidthClassName="max-w-lg"
+        >
+          <div className="flex flex-col gap-4 pt-1">
+            {/* 1. Nama Kolom */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                Nama Kolom
+              </label>
+              <input
+                type="text"
+                value={headers[configColIndex] || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                    const next = [...hs];
+                    next[configColIndex] = val;
+                    return { headers: next, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf };
+                  });
+                }}
+                placeholder="Misal: Bulan, Gram, Saldo, Selisih..."
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-border-soft bg-bg-surface text-text-primary text-sm font-semibold focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all shadow-2xs"
+              />
+            </div>
+
+            {/* 2. Pilihan Jenis Tipe Kolom (Grid Cards) */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                Jenis Tipe Data
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  {
+                    type: "TEKS" as TableColumnType,
+                    title: "Teks / Angka",
+                    icon: Type,
+                    color: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+                  },
+                  {
+                    type: "NOMINAL" as TableColumnType,
+                    title: "Nominal (Rp)",
+                    icon: Banknote,
+                    color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+                  },
+                  {
+                    type: "TANGGAL" as TableColumnType,
+                    title: "Tanggal",
+                    icon: Calendar,
+                    color: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+                  },
+                  {
+                    type: "CENTANG" as TableColumnType,
+                    title: "Centang",
+                    icon: CheckSquare,
+                    color: "text-teal-500 bg-teal-500/10 border-teal-500/20",
+                  },
+                  {
+                    type: "RUMUS" as TableColumnType,
+                    title: "Rumus (fx)",
+                    icon: Calculator,
+                    color: "text-purple-500 bg-purple-500/10 border-purple-500/20",
+                  },
+                ].map((item) => {
+                  const isSelected = (columnTypes[configColIndex] || "TEKS") === item.type;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.type}
+                      type="button"
+                      onClick={() => {
+                        updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                          const nextTypes = [...ct];
+                          nextTypes[configColIndex] = item.type;
+                          return { headers: hs, rows: rs, accumulatedCols: ac, columnTypes: nextTypes, columnFormulas: cf };
+                        });
+                      }}
+                      className={twMerge(
+                        "flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all cursor-pointer select-none",
+                        isSelected
+                          ? "border-accent bg-accent-soft text-accent ring-1 ring-accent font-semibold shadow-2xs"
+                          : "border-border-soft bg-bg-surface hover:bg-black/3 dark:hover:bg-white/3 text-text-primary"
+                      )}
+                    >
+                      <div className={twMerge("p-1.5 rounded-lg border shrink-0 flex items-center justify-center", item.color)}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                      <span className="text-xs font-semibold truncate flex-1 font-display">
+                        {item.title}
+                      </span>
+                      {isSelected && (
+                        <span className="flex items-center justify-center h-4 w-4 rounded-full bg-accent text-white shadow-xs text-[9px] font-bold shrink-0">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. Toggle Hitung Total Kolom (Sigma) */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-bg-page/60 border border-border-soft">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-accent-soft text-accent border border-accent/15">
+                  <Sigma className="h-4 w-4" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-text-primary">
+                    Hitung Total Akumulasi (Σ)
+                  </span>
+                  <span className="text-[11px] text-text-secondary">
+                    Tampilkan baris total penjumlahan di bawah tabel
+                  </span>
+                </div>
+              </div>
+              <Switch
+                checked={accumulatedCols[configColIndex] || false}
+                onCheckedChange={(checked) => {
+                  updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                    const nextAc = [...ac];
+                    nextAc[configColIndex] = checked;
+                    return { headers: hs, rows: rs, accumulatedCols: nextAc, columnTypes: ct, columnFormulas: cf };
+                  });
+                }}
+              />
+            </div>
+
+            {/* 4. Konfigurasi Rumus (Khusus Tipe RUMUS) */}
+            {columnTypes[configColIndex] === "RUMUS" && (
+              <div className="flex flex-col gap-3 p-4 rounded-2xl bg-purple-500/5 border border-purple-500/25 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                      Ekspresi Rumus
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 font-mono font-bold border border-purple-500/20">
+                      fx
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-bg-surface border border-purple-500/30 shadow-2xs focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20">
+                  <span className="font-mono font-bold text-sm text-purple-600 dark:text-purple-400 shrink-0 select-none">
+                    fx =
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Contoh: selisih([Gram]) atau [Gram] - prev([Gram])"
+                    value={columnFormulas[configColIndex] || ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                        const nextF = [...cf];
+                        nextF[configColIndex] = val;
+                        return { headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: nextF };
+                      });
+                    }}
+                    className="w-full bg-transparent border-none text-xs font-mono font-semibold text-text-primary focus:outline-none placeholder:text-text-secondary/40"
+                  />
+                </div>
+
+                {/* Quick Helper Shortcut Chips */}
+                <div className="flex flex-col gap-2.5 pt-1">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold text-text-secondary flex items-center gap-1">
+                      <span>💡 Rumus Cepat (Klik untuk menyisipkan):</span>
+                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {headers.map((otherH, oIdx) => {
+                        if (oIdx === configColIndex) return null;
+                        return (
+                          <React.Fragment key={oIdx}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                                  const nextF = [...cf];
+                                  nextF[configColIndex] = `[${otherH}] - prev([${otherH}])`;
+                                  return { headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: nextF };
+                                });
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/25 text-xs font-medium cursor-pointer transition-all active:scale-95 flex items-center gap-1"
+                              title={`Selisih [${otherH}] - prev([${otherH}])`}
+                            >
+                              <span>Selisih ({otherH})</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                                  const nextF = [...cf];
+                                  nextF[configColIndex] = `(([${otherH}] - prev([${otherH}])) / prev([${otherH}])) * 100`;
+                                  return { headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: nextF };
+                                });
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 border border-blue-500/25 text-xs font-medium cursor-pointer transition-all active:scale-95 flex items-center gap-1"
+                              title={`Persentase Kenaikan % (([${otherH}] - prev([${otherH}])) / prev([${otherH}])) * 100`}
+                            >
+                              <span>% Kenaikan ({otherH})</span>
+                            </button>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Sisipkan Variabel Kolom Saat Ini & Bulan Lalu (prev) */}
+                  <div className="flex flex-col gap-1.5 pt-1">
+                    <span className="text-[11px] font-semibold text-text-secondary">Sisipkan Variabel Kolom:</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {headers.map((otherH, oIdx) => {
+                        if (oIdx === configColIndex) return null;
+                        return (
+                          <React.Fragment key={oIdx}>
+                            {/* Current row */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                                  const nextF = [...cf];
+                                  const cur = nextF[configColIndex] || "";
+                                  nextF[configColIndex] = cur ? `${cur} [${otherH}]` : `[${otherH}]`;
+                                  return { headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: nextF };
+                                });
+                              }}
+                              className="px-2 py-1 rounded-lg bg-bg-surface hover:bg-accent-soft hover:text-accent border border-border-soft text-xs font-mono cursor-pointer transition-all active:scale-95 shadow-2xs"
+                              title={`Nilai [${otherH}] baris ini`}
+                            >
+                              [{otherH}]
+                            </button>
+                            {/* Previous row */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                                  const nextF = [...cf];
+                                  const cur = nextF[configColIndex] || "";
+                                  nextF[configColIndex] = cur ? `${cur} prev([${otherH}])` : `prev([${otherH}])`;
+                                  return { headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: nextF };
+                                });
+                              }}
+                              className="px-2 py-1 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 border border-purple-500/25 text-xs font-mono cursor-pointer transition-all active:scale-95 shadow-2xs"
+                              title={`Nilai prev([${otherH}]) baris sebelumnya`}
+                            >
+                              prev([{otherH}])
+                            </button>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Operator Keypad */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                    <span className="text-[11px] font-semibold text-text-secondary">Operator:</span>
+                    {["+", "-", "*", "/", "%", "(", ")", "^"].map((op) => (
+                      <button
+                        key={op}
+                        type="button"
+                        onClick={() => {
+                          updateTableContent(({ headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: cf }) => {
+                            const nextF = [...cf];
+                            const cur = nextF[configColIndex] || "";
+                            nextF[configColIndex] = `${cur} ${op} `;
+                            return { headers: hs, rows: rs, accumulatedCols: ac, columnTypes: ct, columnFormulas: nextF };
+                          });
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-bg-surface hover:bg-accent-soft hover:text-accent border border-border-soft text-xs font-mono font-bold cursor-pointer transition-all active:scale-95 shadow-2xs"
+                      >
+                        {op}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Penjelasan Detail Rumus */}
+                  <div className="mt-1 p-3 rounded-2xl bg-bg-surface/90 border border-border-soft text-[11.5px] text-text-secondary leading-relaxed flex flex-col gap-1.5">
+                    <p className="font-semibold text-text-primary flex items-center gap-1.5">
+                      <span>📌 Cara Kerja Perhitungan Baris Sebelumnya:</span>
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-[11px]">
+                      <li>
+                        <code className="text-accent font-mono font-semibold">[Kolom]</code>: Mengambil nilai kolom pada baris saat ini (bulan ini).
+                      </li>
+                      <li>
+                        <code className="text-purple-600 dark:text-purple-400 font-mono font-semibold">prev([Kolom])</code>: Mengambil nilai kolom pada baris sebelumnya (bulan lalu).
+                      </li>
+                      <li>
+                        <b>Rumus Selisih:</b> <code className="text-emerald-600 dark:text-emerald-400 font-mono">[Gram] - prev([Gram])</code>
+                      </li>
+                      <li>
+                        <b>Rumus % Kenaikan:</b> <code className="text-blue-600 dark:text-blue-400 font-mono">(([Gram] - prev([Gram])) / prev([Gram])) * 100</code>
+                      </li>
+                      <li className="text-text-secondary/80">
+                        <i>Catatan: Pada baris pertama (karena belum ada baris sebelumnya), nilai <code>prev(...)</code> otomatis dianggap sama dengan baris awal sehingga menghasilkan 0 / aman dari error.</i>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 5. Tombol Selesai */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-soft">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setConfigColIndex(null)}
+                className="w-full sm:w-auto px-6 h-10 font-semibold"
+              >
+                Selesai & Terapkan
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 }

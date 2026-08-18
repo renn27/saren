@@ -180,30 +180,50 @@ export function parseNumericValue(val: string): number {
   return parseFloat(cleanVal);
 }
 
-// ── Helper: hitung total kolom pada tabel ────────────────────────────────────
+import { evaluateTableNoteFormula } from "@/lib/utils/formulaEvaluator";
 
-export function calculateColumnTotal(rows: string[][], colIndex: number): string {
+export function calculateColumnTotal(
+  rows: string[][],
+  colIndex: number,
+  headers?: string[],
+  columnTypes?: string[],
+  columnFormulas?: string[]
+): string {
   let total = 0;
   let hasNumber = false;
+  const isRumus = columnTypes?.[colIndex] === "RUMUS";
+  const formula = columnFormulas?.[colIndex];
 
-  for (const row of rows) {
-    const val = row[colIndex];
-    if (!val) continue;
+  for (let ri = 0; ri < rows.length; ri++) {
+    if (isRumus && headers && formula) {
+      const calculated = evaluateTableNoteFormula(formula, headers, rows, ri, colIndex);
+      if (calculated !== null && !isNaN(calculated)) {
+        total += calculated;
+        hasNumber = true;
+      }
+    } else {
+      const val = rows[ri]?.[colIndex];
+      if (!val) continue;
 
-    const num = parseNumericValue(val);
-    if (!isNaN(num)) {
-      total += num;
-      hasNumber = true;
+      const num = parseNumericValue(val);
+      if (!isNaN(num)) {
+        total += num;
+        hasNumber = true;
+      }
     }
   }
 
   if (!hasNumber) return "";
 
+  const isNominal = columnTypes?.[colIndex] === "NOMINAL";
+  const prefix = isNominal ? "Rp " : "";
+
   if (Number.isInteger(total)) {
-    return new Intl.NumberFormat("id-ID").format(total);
+    return `${prefix}${new Intl.NumberFormat("id-ID").format(total)}`;
   } else {
-    return new Intl.NumberFormat("id-ID", {
-      maximumFractionDigits: 3,
-    }).format(total);
+    return `${prefix}${new Intl.NumberFormat("id-ID", {
+      maximumFractionDigits: 4,
+    }).format(total)}`;
   }
 }
+

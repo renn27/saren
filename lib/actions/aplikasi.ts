@@ -209,9 +209,8 @@ export async function createAplikasi(garapanId: string | null, formData: FormDat
 
     try {
       if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        console.warn("BLOB_READ_WRITE_TOKEN is missing. Using fallback mock logo URL.");
-        // Fallback mockup
-        logoUrl = "";
+        console.warn("BLOB_READ_WRITE_TOKEN is missing. Logo upload skipped.");
+        logoUrl = null;
       } else {
         const blob = await put(`logos/${Date.now()}-${file.name}`, file, {
           access: "public",
@@ -297,8 +296,8 @@ export async function updateAplikasi(id: string, garapanId: string | null, formD
       // Upload new logo
       try {
         if (!process.env.BLOB_READ_WRITE_TOKEN) {
-          console.warn("BLOB_READ_WRITE_TOKEN is missing. Using fallback mock logo URL.");
-          logoUrl = "";
+          console.warn("BLOB_READ_WRITE_TOKEN is missing. Logo upload skipped.");
+          logoUrl = null;
         } else {
           const blob = await put(`logos/${Date.now()}-${file.name}`, file, {
             access: "public",
