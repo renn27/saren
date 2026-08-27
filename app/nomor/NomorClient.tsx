@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Nomor } from "@prisma/client";
-import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, ArrowUpDown, ArrowDown, ArrowUp, Coins, Clock, Calculator } from "lucide-react";
+import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, Check, ArrowUpDown, ArrowDown, ArrowUp, Coins, Clock, Calculator } from "lucide-react";
 import { CalculatorPopover } from "@/components/ui/calculator-popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { createNomor, updateNomor, deleteNomor } from "@/lib/actions/nomor";
+import { triggerHaptic } from "@/lib/utils/haptics";
 import { twMerge } from "tailwind-merge";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -56,6 +57,10 @@ export function NomorClient({ initialData }: NomorClientProps) {
 
   // Selected Cell State for 2-step Edit
   const [selectedNomorCell, setSelectedNomorCell] = useState<{ id: string; field: "pulsa" | "masaAktif" } | null>(null);
+
+  // Micro-interaction states for Copy & Flash Save
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [flashSavedId, setFlashSavedId] = useState<string | null>(null);
 
   // Floating Calculator Popover State
   const [calcState, setCalcState] = useState<{ isOpen: boolean; initialVal: number; item: Nomor | null }>({
@@ -253,6 +258,8 @@ export function NomorClient({ initialData }: NomorClientProps) {
 
     if (res.success && res.data) {
       toast.success("Masa aktif berhasil diperbarui", { id: toastId });
+      setFlashSavedId(item.id);
+      setTimeout(() => setFlashSavedId(null), 800);
       setData((prev) =>
         prev.map((n) => (n.id === item.id ? res.data! : n))
       );
@@ -278,6 +285,8 @@ export function NomorClient({ initialData }: NomorClientProps) {
 
     if (res.success && res.data) {
       toast.success("Pulsa berhasil diperbarui", { id: toastId });
+      setFlashSavedId(item.id);
+      setTimeout(() => setFlashSavedId(null), 800);
       setData((prev) =>
         prev.map((n) => (n.id === item.id ? res.data! : n))
       );
@@ -501,7 +510,10 @@ export function NomorClient({ initialData }: NomorClientProps) {
                             className="text-text-primary border-r border-border-soft/50 whitespace-nowrap px-4 cursor-copy hover:bg-accent-soft/30 hover:text-accent transition-colors font-mono select-all"
                             onClick={(e) => {
                               e.stopPropagation();
+                              triggerHaptic("success");
                               navigator.clipboard.writeText(item.nomorKartu);
+                              setCopiedId(item.id);
+                              setTimeout(() => setCopiedId(null), 1500);
                               toast.success(`${item.provider} berhasil disalin!`, {
                                 icon: "📋",
                                 duration: 2000,
@@ -509,14 +521,23 @@ export function NomorClient({ initialData }: NomorClientProps) {
                             }}
                             title="Klik untuk menyalin nomor"
                           >
-                            {item.nomorKartu}
+                            <div className="flex items-center justify-between gap-2 min-w-0">
+                              <span>{item.nomorKartu}</span>
+                              {copiedId === item.id && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded-md animate-check-pop shrink-0 select-none">
+                                  <Check className="h-3 w-3 stroke-[3]" />
+                                  <span>Tersalin</span>
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           {/* Pulsa Cell */}
                           {(() => {
                             const isPulsaSelected = selectedNomorCell?.id === item.id && selectedNomorCell?.field === "pulsa";
+                            const isFlashSaved = flashSavedId === item.id;
                             return (
                               <TableCell 
-                                className="p-1 border-r border-border-soft/50 whitespace-nowrap cursor-pointer select-none font-mono font-medium min-w-[110px]"
+                                className={`p-1 border-r border-border-soft/50 whitespace-nowrap cursor-pointer select-none font-mono font-medium min-w-[110px] transition-colors duration-300 ${isFlashSaved ? "bg-emerald-500/20" : ""}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (isPulsaSelected) {
@@ -642,8 +663,13 @@ export function NomorClient({ initialData }: NomorClientProps) {
                                       
                                       if (masa < now && diffDays <= 30 && diffDays >= 0) {
                                         const daysLeft = 30 - diffDays;
+                                        const isCritical = daysLeft <= 5;
                                         return (
-                                          <span className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] font-bold rounded-full bg-warning-hover text-warning-text">
+                                          <span className={`inline-flex items-center justify-center px-2 py-0.5 text-[11px] font-bold rounded-full select-none ${
+                                            isCritical
+                                              ? "bg-danger-soft text-danger border border-danger/30 animate-breathing-glow font-black"
+                                              : "bg-warning-hover text-warning-text"
+                                          }`}>
                                             -{daysLeft}
                                           </span>
                                         );
@@ -908,19 +934,17 @@ export function NomorClient({ initialData }: NomorClientProps) {
       </Dialog>
 
       {/* Floating Calculator Popover for SIM Pulsa */}
-      {calcState.isOpen && calcState.item && (
-        <CalculatorPopover
-          isOpen={calcState.isOpen}
-          title={`Kalkulator Pulsa (${calcState.item.provider})`}
-          initialValue={calcState.initialVal}
-          onClose={() => setCalcState((prev) => ({ ...prev, isOpen: false }))}
-          onApply={(val) => {
-            if (calcState.item) {
-              handleSaveInlinePulsa(calcState.item, String(val));
-            }
-          }}
-        />
-      )}
+      <CalculatorPopover
+        isOpen={Boolean(calcState.isOpen && calcState.item)}
+        title={calcState.item ? `Kalkulator Pulsa (${calcState.item.provider})` : "Kalkulator Pulsa"}
+        initialValue={calcState.initialVal}
+        onClose={() => setCalcState((prev) => ({ ...prev, isOpen: false }))}
+        onApply={(val) => {
+          if (calcState.item) {
+            handleSaveInlinePulsa(calcState.item, String(val));
+          }
+        }}
+      />
     </div>
   );
 }

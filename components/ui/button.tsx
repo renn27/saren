@@ -1,6 +1,7 @@
 import * as React from "react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { triggerHaptic } from "@/lib/utils/haptics";
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -9,10 +10,20 @@ export interface ButtonProps
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", ...props }, ref) => {
+  ({ className, variant = "primary", size = "md", onClick, ...props }, ref) => {
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (variant === "danger") {
+        triggerHaptic("warning");
+      } else {
+        triggerHaptic("light");
+      }
+      onClick?.(e);
+    };
+
     return (
       <button
         ref={ref}
+        onClick={handleClick}
         className={twMerge(
           "inline-flex items-center justify-center font-medium transition-all duration-200 ease-in-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 font-sans cursor-pointer",
           // Variants

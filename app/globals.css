@@ -173,20 +173,60 @@ td:has(.absolute) {
   100% { background-position:  200% 0; }
 }
 
-/* ── Page-level fade-in animation ── */
+/* ── Page-level fluid entrance animation ── */
 @keyframes page-enter {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(14px) scale(0.985);
   }
-  to {
+  100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 .page-enter {
-  animation: page-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Card Staggered Cascade Entrance ── */
+@keyframes card-entrance {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.card-stagger {
+  animation: card-entrance 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.card-stagger:nth-child(1) { animation-delay: 0.02s; }
+.card-stagger:nth-child(2) { animation-delay: 0.05s; }
+.card-stagger:nth-child(3) { animation-delay: 0.08s; }
+.card-stagger:nth-child(4) { animation-delay: 0.11s; }
+.card-stagger:nth-child(5) { animation-delay: 0.14s; }
+.card-stagger:nth-child(6) { animation-delay: 0.17s; }
+.card-stagger:nth-child(7) { animation-delay: 0.20s; }
+.card-stagger:nth-child(8) { animation-delay: 0.23s; }
+.card-stagger:nth-child(n+9) { animation-delay: 0.26s; }
+
+/* ── Empty State Floating Icon ── */
+@keyframes empty-floating {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.empty-float {
+  animation: empty-floating 3s ease-in-out infinite;
 }
 
 /* ── Smooth global transitions ── */
@@ -208,15 +248,542 @@ button:active:not(:disabled) {
   transform: scale(0.97);
 }
 
-/* ── Transition for theme color changes ── */
-*, *::before, *::after {
-  transition-property: background-color, border-color, color;
-  transition-duration: 0.2s;
-  transition-timing-function: ease;
+/* ── Checklist item transition animations ── */
+@keyframes checklist-slide-down {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 48px;
+  }
+  30% {
+    opacity: 0.85;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(14px);
+    max-height: 0px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    overflow: hidden;
+  }
+}
+
+@keyframes checklist-slide-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 48px;
+  }
+  30% {
+    opacity: 0.85;
+    transform: translateY(-4px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+    max-height: 0px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    overflow: hidden;
+  }
+}
+
+@keyframes checklist-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes checkmark-pop {
+  0% {
+    transform: scale(0.85);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes reorder-settle {
+  0% {
+    transform: scale(1.025);
+    box-shadow: 0 4px 12px rgba(8, 145, 178, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: none;
+  }
+}
+
+/* ── Popover Spring Floating Animations ── */
+@keyframes popover-spring-up {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes popover-spring-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.93);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.008);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Modal Dialog Animations (GPU-accelerated open/close) ── */
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-card-in {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.92);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modal-card-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
+}
+
+@keyframes checklist-remove {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    max-height: 48px;
+  }
+  40% {
+    opacity: 0.6;
+    transform: translateX(-16px) scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-36px) scale(0.88);
+    max-height: 0px;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+}
+
+/* ── Micro Pop (for Clear button & small icons) ── */
+@keyframes micro-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ── Skeleton Shimmer Wave ── */
+@keyframes shimmer-wave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ── Breathing Glow for Expiring SIM cards ── */
+@keyframes breathing-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(225, 29, 72, 0);
+    transform: scale(1.02);
+  }
+}
+
+/* ── Image Fade Reveal ── */
+@keyframes image-reveal {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+
+.animate-checklist-down {
+  animation: checklist-slide-down 0.32s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+  pointer-events: none;
+  will-change: transform, opacity, max-height;
+}
+
+.animate-checklist-up {
+  animation: checklist-slide-up 0.32s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+  pointer-events: none;
+  will-change: transform, opacity, max-height;
+}
+
+.animate-checklist-enter {
+  animation: checklist-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+.animate-check-pop {
+  animation: checkmark-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-reorder-settle {
+  animation: reorder-settle 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-popover-up {
+  animation: popover-spring-up 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: bottom center;
+  will-change: transform, opacity;
+}
+
+.animate-popover-down {
+  animation: popover-spring-down 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top center;
+  will-change: transform, opacity;
+}
+
+.animate-checklist-remove {
+  animation: checklist-remove 0.22s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+  pointer-events: none;
+  will-change: transform, opacity, max-height;
+}
+
+.animate-micro-pop {
+  animation: micro-pop 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 0%,
+    var(--accent-soft) 50%,
+    var(--bg-surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-wave 1.8s infinite ease-in-out;
+}
+
+.animate-breathing-glow {
+  animation: breathing-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-image-reveal {
+  animation: image-reveal 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-modal-backdrop-in {
+  animation: modal-backdrop-in 0.22s ease-out both;
+  will-change: opacity;
+}
+
+.animate-modal-backdrop-out {
+  animation: modal-backdrop-out 0.18s ease-in forwards;
+  will-change: opacity;
+  pointer-events: none;
+}
+
+.animate-modal-card-in {
+  animation: modal-card-in 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
+.animate-modal-card-out {
+  animation: modal-card-out 0.2s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+  transform-origin: center center;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+/* ── 30-Point GPU Smooth Keyframes ── */
+
+/* Theme Toggle Spin & Pop (Point 5) */
+@keyframes theme-spin {
+  0% {
+    transform: rotate(-180deg) scale(0.75);
+    opacity: 0;
+  }
+  70% {
+    transform: rotate(10deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Badge Counter Bump (Point 7, 17) */
+@keyframes badge-bump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.22);
+  }
+  70% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Dynamic Glowing Ring Pulse (Point 8, 22) */
+@keyframes glowing-ring-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(8, 145, 178, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(8, 145, 178, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(8, 145, 178, 0);
+  }
+}
+
+/* Instant Card Drop Settle (Point 10) */
+@keyframes drop-settle {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(3px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Active Cell Selection Pop (Point 11) */
+@keyframes cell-active-pop {
+  0% {
+    transform: scale(0.97);
+  }
+  60% {
+    transform: scale(1.015);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Next Row Enter Flash Highlight (Point 12) */
+@keyframes cell-flash-next {
+  0% {
+    background-color: var(--accent-soft);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Numeric Value Increment / Decrement Flash (Point 13, 20) */
+@keyframes value-flash-inc {
+  0% {
+    background-color: rgba(34, 197, 94, 0.22);
+    transform: scale(1.03);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+}
+
+@keyframes value-flash-dec {
+  0% {
+    background-color: rgba(239, 68, 68, 0.22);
+    transform: scale(1.03);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+}
+
+/* Row Insertion Slide Down (Point 14) */
+@keyframes row-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animated Strikethrough Draw (Point 16) */
+@keyframes strikethrough-draw {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+/* Pin Snap Rotation Toss (Point 19) */
+@keyframes pin-snap {
+  0% {
+    transform: rotate(0deg) scale(0.85);
+  }
+  50% {
+    transform: rotate(-35deg) scale(1.25);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+/* Particle Burst Micro Dots (Point 21) */
+@keyframes particle-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: var(--tw-particle-direction, translate(12px, -12px)) scale(0.2);
+  }
+}
+
+/* Micro-Shake Feedback (Point 28) */
+@keyframes micro-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20%, 60% {
+    transform: translateX(-4px);
+  }
+  40%, 80% {
+    transform: translateX(4px);
+  }
+}
+
+.animate-theme-spin {
+  animation: theme-spin 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-badge-bump {
+  animation: badge-bump 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-glowing-ring {
+  animation: glowing-ring-pulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-drop-settle {
+  animation: drop-settle 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-cell-pop {
+  animation: cell-active-pop 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-cell-next {
+  animation: cell-flash-next 0.35s ease-out both;
+}
+
+.animate-value-inc {
+  animation: value-flash-inc 0.4s ease-out both;
+}
+
+.animate-value-dec {
+  animation: value-flash-dec 0.4s ease-out both;
+}
+
+.animate-row-enter {
+  animation: row-slide-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-pin-snap {
+  animation: pin-snap 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-particle-burst {
+  animation: particle-burst 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-micro-shake {
+  animation: micro-shake 0.3s ease-in-out both;
 }
 
 /* Re-allow normal transitions for motion elements */
-.card-stagger, .empty-float, [style*="animation"] {
+.card-stagger, .empty-float, .animate-checklist-down, .animate-checklist-up, .animate-checklist-enter, .animate-check-pop, .animate-reorder-settle, .animate-popover-up, .animate-popover-down, .animate-checklist-remove, .animate-micro-pop, .animate-shimmer, .animate-breathing-glow, .animate-image-reveal, .animate-modal-backdrop-in, .animate-modal-backdrop-out, .animate-modal-card-in, .animate-modal-card-out, .animate-theme-spin, .animate-badge-bump, .animate-glowing-ring, .animate-drop-settle, .animate-cell-pop, .animate-cell-next, .animate-value-inc, .animate-value-dec, .animate-row-enter, .animate-pin-snap, .animate-particle-burst, .animate-micro-shake, [style*="animation"] {
   transition: none;
 }
 
@@ -232,4 +799,10 @@ button:active:not(:disabled) {
 .cv-auto {
   content-visibility: auto;
   contain-intrinsic-size: 1px 48px;
+}
+
+/* ── Mobile Momentum & Overscroll Containment ── */
+html, body {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }

@@ -26,7 +26,7 @@ export function Dialog({
   hideHeader = false,
 }: DialogProps) {
   const [shouldRender, setShouldRender] = React.useState(isOpen);
-  const [isAnimating, setIsAnimating] = React.useState(false);
+  const [isClosing, setIsClosing] = React.useState(false);
 
   const prevContentRef = React.useRef({ title, description, children });
   if (isOpen) {
@@ -39,19 +39,17 @@ export function Dialog({
 
     if (isOpen) {
       setShouldRender(true);
-      // Small delay to allow element mounting before triggering transition
-      timeoutId = setTimeout(() => {
-        setIsAnimating(true);
-      }, 10);
-    } else {
-      setIsAnimating(false);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
       timeoutId = setTimeout(() => {
         setShouldRender(false);
-      }, 500); // match transition duration
+        setIsClosing(false);
+      }, 200); // match modal-card-out duration
     }
 
     return () => clearTimeout(timeoutId);
-  }, [isOpen]);
+  }, [isOpen, shouldRender]);
 
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -79,8 +77,8 @@ export function Dialog({
       {/* Backdrop */}
       <div
         className={twMerge(
-          "fixed inset-0 bg-text-primary/20 backdrop-blur-sm transition-opacity duration-300 ease-out",
-          isAnimating ? "opacity-100" : "opacity-0"
+          "fixed inset-0 bg-text-primary/25 dark:bg-black/55 backdrop-blur-sm",
+          isClosing ? "animate-modal-backdrop-out" : "animate-modal-backdrop-in"
         )}
         onClick={onClose}
       />
@@ -88,11 +86,9 @@ export function Dialog({
       {/* Content */}
       <div
         className={twMerge(
-          "relative w-full max-w-lg bg-bg-surface border border-border-soft rounded-3xl shadow-xl flex flex-col max-h-[85vh] md:max-h-[90vh] overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] z-10 font-sans",
+          "relative w-full max-w-lg bg-bg-surface border border-border-soft rounded-3xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[90vh] overflow-hidden z-10 font-sans",
           maxWidthClassName,
-          isAnimating
-            ? "opacity-100 translate-y-0 scale-100"
-            : "opacity-0 translate-y-8 scale-95"
+          isClosing ? "animate-modal-card-out" : "animate-modal-card-in"
         )}
       >
         <button
@@ -146,7 +142,7 @@ export function AlertDialog({
   isDanger = true,
 }: AlertDialogProps) {
   const [shouldRender, setShouldRender] = React.useState(isOpen);
-  const [isAnimating, setIsAnimating] = React.useState(false);
+  const [isClosing, setIsClosing] = React.useState(false);
 
   const prevContentRef = React.useRef({ title, description });
   if (isOpen) {
@@ -159,18 +155,17 @@ export function AlertDialog({
 
     if (isOpen) {
       setShouldRender(true);
-      timeoutId = setTimeout(() => {
-        setIsAnimating(true);
-      }, 10);
-    } else {
-      setIsAnimating(false);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
       timeoutId = setTimeout(() => {
         setShouldRender(false);
-      }, 500);
+        setIsClosing(false);
+      }, 200);
     }
 
     return () => clearTimeout(timeoutId);
-  }, [isOpen]);
+  }, [isOpen, shouldRender]);
 
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -198,8 +193,8 @@ export function AlertDialog({
       {/* Backdrop */}
       <div
         className={twMerge(
-          "fixed inset-0 bg-text-primary/20 backdrop-blur-sm transition-opacity duration-300 ease-out",
-          isAnimating ? "opacity-100" : "opacity-0"
+          "fixed inset-0 bg-text-primary/25 dark:bg-black/55 backdrop-blur-sm",
+          isClosing ? "animate-modal-backdrop-out" : "animate-modal-backdrop-in"
         )}
         onClick={onClose}
       />
@@ -207,10 +202,8 @@ export function AlertDialog({
       {/* Content */}
       <div
         className={twMerge(
-          "relative w-full max-w-md bg-bg-surface border border-border-soft rounded-3xl shadow-xl p-6 md:p-8 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] z-10 font-sans",
-          isAnimating
-            ? "opacity-100 translate-y-0 scale-100"
-            : "opacity-0 translate-y-8 scale-95"
+          "relative w-full max-w-md bg-bg-surface border border-border-soft rounded-3xl shadow-2xl p-6 md:p-8 z-10 font-sans",
+          isClosing ? "animate-modal-card-out" : "animate-modal-card-in"
         )}
       >
         <div className="flex flex-col gap-2 mb-6">

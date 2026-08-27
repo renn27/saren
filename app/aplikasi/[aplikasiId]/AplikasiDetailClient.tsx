@@ -49,6 +49,7 @@ import {
   Calculator,
   GripVertical,
 } from "lucide-react";
+import { triggerHaptic } from "@/lib/utils/haptics";
 import { CalculatorPopover } from "@/components/ui/calculator-popover";
 import { toast } from "sonner";
 import { createKolom, deleteKolom, swapKolomUrutan, updateKolom, clearKolomData } from "@/lib/actions/kolom";
@@ -986,7 +987,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
   };
 
   return (
-    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
+    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'page-enter'}`}>
       {/* Breadcrumbs */}
       <div className="flex flex-col gap-2 mb-3">
         <Button
@@ -2605,17 +2606,15 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
       </Dialog>
 
       {/* Floating Calculator Popover for Nominal/Nomor Cells */}
-      {calcCellState.isOpen && (
-        <CalculatorPopover
-          isOpen={calcCellState.isOpen}
-          title={`Kalkulator ${calcCellState.colName}`}
-          initialValue={calcCellState.initialVal}
-          onClose={() => setCalcCellState((prev) => ({ ...prev, isOpen: false }))}
-          onApply={(val) => {
-            handleInlineSave(calcCellState.accountId, calcCellState.columnId, val);
-          }}
-        />
-      )}
+      <CalculatorPopover
+        isOpen={calcCellState.isOpen}
+        title={`Kalkulator ${calcCellState.colName || ""}`}
+        initialValue={calcCellState.initialVal}
+        onClose={() => setCalcCellState((prev) => ({ ...prev, isOpen: false }))}
+        onApply={(val) => {
+          handleInlineSave(calcCellState.accountId, calcCellState.columnId, val);
+        }}
+      />
     </div>
   );
 }

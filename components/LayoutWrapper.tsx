@@ -6,16 +6,24 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeaderSettings } from "@/components/HeaderSettings";
 import { AppNavigationSidebar, AppNavigationBottom } from "@/components/AppNavigation";
+import { twMerge } from "tailwind-merge";
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === "/login";
   const isNoteDetailPage = pathname.startsWith("/note/") && pathname !== "/note";
+  const [isScrolled, setIsScrolled] = React.useState(false);
 
   React.useEffect(() => {
     // Remove preload class after page hydration to enable transitions
     document.documentElement.classList.remove("preload");
   }, []);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const top = e.currentTarget.scrollTop;
+    if (top > 10 && !isScrolled) setIsScrolled(true);
+    else if (top <= 10 && isScrolled) setIsScrolled(false);
+  };
 
   if (isLoginPage) {
     return <div className="min-h-screen flex flex-col">{children}</div>;
@@ -24,10 +32,20 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Scroll area on mobile, non-scrolling wrapper on desktop */}
-      <div className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden min-h-0 max-w-full overflow-x-hidden no-scrollbar">
+      <div
+        onScroll={handleScroll}
+        className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden min-h-0 max-w-full overflow-x-hidden no-scrollbar"
+      >
         {/* Global Navigation Header with Glassmorphism */}
         {!isNoteDetailPage && (
-          <header className="relative md:sticky md:top-0 z-40 w-full border-b border-border-soft/50 bg-bg-surface/80 backdrop-blur-xl transition-all duration-200 shrink-0">
+          <header
+            className={twMerge(
+              "relative md:sticky md:top-0 z-40 w-full border-b transition-all duration-200 shrink-0",
+              isScrolled
+                ? "border-border-soft bg-bg-surface/95 backdrop-blur-xl shadow-xs"
+                : "border-border-soft/40 bg-bg-surface/80 backdrop-blur-md"
+            )}
+          >
             <div className="w-full px-4 h-16 flex items-center justify-between md:px-6">
               <Link href="/" prefetch={true} className="flex items-center gap-2.5 group">
                 {/* Logo dark mode */}

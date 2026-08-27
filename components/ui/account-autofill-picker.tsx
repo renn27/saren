@@ -169,7 +169,7 @@ export function AccountAutofillPicker({
                   e.stopPropagation();
                   setSearchQuery("");
                 }}
-                className="p-0.5 text-text-secondary hover:text-text-primary rounded-md"
+                className="p-0.5 text-text-secondary hover:text-text-primary rounded-md animate-micro-pop"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -185,7 +185,7 @@ export function AccountAutofillPicker({
 
           {/* Compact Dropdown Popover */}
           {isOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1.5 bg-bg-surface border border-border-soft rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-52 flex flex-col">
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-bg-surface border border-border-soft rounded-2xl shadow-xl z-50 overflow-hidden animate-popover-down max-h-52 flex flex-col">
               <div className="px-3 py-1.5 bg-bg-page/50 border-b border-border-soft/60 flex items-center justify-between text-[10px] text-text-secondary font-medium select-none">
                 <span>{searchQuery ? "Hasil Pencarian" : "Saran Akun Sering Dipakai"}</span>
                 <span>Maks {filteredAccounts.length} item</span>

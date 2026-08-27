@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Sun, Moon } from "lucide-react";
+import { triggerHaptic } from "@/lib/utils/haptics";
 
 export function ThemeToggle() {
   const [theme, setTheme] = React.useState<"light" | "dark">("dark");
@@ -13,6 +14,7 @@ export function ThemeToggle() {
   }, []);
 
   const toggleTheme = () => {
+    triggerHaptic("light");
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
     localStorage.setItem("theme", nextTheme);
@@ -29,13 +31,13 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="h-9 w-9 flex items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-text-secondary hover:bg-accent-soft hover:text-accent hover:border-accent/30 transition-all duration-200 cursor-pointer group"
+      className="h-9 w-9 flex items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-text-secondary hover:bg-accent-soft hover:text-accent hover:border-accent/30 transition-all duration-200 cursor-pointer group active:scale-90"
       title={theme === "dark" ? "Ubah ke Mode Terang" : "Ubah ke Mode Gelap"}
     >
       {theme === "dark" ? (
-        <Sun className="h-4 w-4 transition-transform duration-300 group-hover:rotate-45" />
+        <Sun key="sun" className="h-4 w-4 text-warning animate-theme-spin" />
       ) : (
-        <Moon className="h-4 w-4 transition-transform duration-300 group-hover:-rotate-12" />
+        <Moon key="moon" className="h-4 w-4 text-accent animate-theme-spin" />
       )}
     </button>
   );

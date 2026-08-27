@@ -66,6 +66,22 @@ export const NoteCard = React.memo(function NoteCard({
 }: NoteCardProps) {
   // Group checklist items
   const activeItems = note.listItems.filter((i) => !i.isCompleted);
+  const [completingIds, setCompletingIds] = React.useState<Set<string>>(new Set());
+
+  const handleToggleCheck = (itemId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (note.isTrashed || completingIds.has(itemId)) return;
+
+    setCompletingIds((prev) => new Set(prev).add(itemId));
+    setTimeout(() => {
+      onToggleListItem(itemId, true);
+      setCompletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }, 320);
+  };
 
   // Self-contained dropdown state — no parent state dependency
   const moreButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -186,7 +202,7 @@ export const NoteCard = React.memo(function NoteCard({
           <img
             src={note.imageUrl}
             alt="Pratinjau Catatan"
-            className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover/card:scale-105 animate-image-reveal"
             loading="lazy"
           />
         </div>
@@ -198,7 +214,8 @@ export const NoteCard = React.memo(function NoteCard({
           <div className="flex items-center gap-1.5">
             <h4
               className={twMerge(
-                "text-[13.5px] font-semibold tracking-tight line-clamp-2 leading-tight truncate",
+                "text-[13.5px] tracking-tight line-clamp-2 leading-tight truncate",
+                !note.title ? "font-normal text-text-secondary/70 italic" : "font-semibold text-text-primary",
                 note.color !== "default" && colorMap[note.color]?.textClass
               )}
             >
@@ -387,26 +404,39 @@ export const NoteCard = React.memo(function NoteCard({
           /* Checklist preview */
           <div className="flex flex-col gap-1.5">
             {/* Active Items */}
-            {activeItems.slice(0, 5).map((item) => (
-              <div key={item.id} className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  checked={false}
-                  onChange={() => onToggleListItem(item.id, true)}
-                  onClick={(e) => e.stopPropagation()}
-                  disabled={note.isTrashed}
-                  className="mt-0.5 rounded border-border-soft text-accent focus:ring-accent h-3.5 w-3.5"
-                />
-                <span
+            {activeItems.slice(0, 5).map((item) => {
+              const isCompleting = completingIds.has(item.id);
+              return (
+                <div
+                  key={item.id}
                   className={twMerge(
-                    "break-all truncate",
-                    note.color !== "default" && colorMap[note.color]?.textClass
+                    "flex items-start gap-2 transition-all duration-300",
+                    isCompleting && "animate-checklist-down"
                   )}
                 >
-                  {renderTextWithLinks(item.text)}
-                </span>
-              </div>
-            ))}
+                  <input
+                    type="checkbox"
+                    checked={isCompleting}
+                    onChange={() => {}}
+                    onClick={(e) => handleToggleCheck(item.id, e)}
+                    disabled={note.isTrashed}
+                    className={twMerge(
+                      "mt-0.5 rounded border-border-soft text-accent focus:ring-accent h-3.5 w-3.5 cursor-pointer shrink-0 transition-transform",
+                      isCompleting && "animate-check-pop"
+                    )}
+                  />
+                  <span
+                    className={twMerge(
+                      "break-all truncate transition-all duration-200",
+                      note.color !== "default" && colorMap[note.color]?.textClass,
+                      isCompleting && "line-through text-text-secondary/50 opacity-60"
+                    )}
+                  >
+                    {renderTextWithLinks(item.text)}
+                  </span>
+                </div>
+              );
+            })}
 
             {/* Overflow Count */}
             {activeItems.length > 5 && (
@@ -703,22 +733,22 @@ export const NoteCard = React.memo(function NoteCard({
           </div>
         ) : (
           /* TRASHED ACTIONS */
-          <div className="flex items-center justify-between w-full">
+          <div className="flex items-center justify-between gap-2 w-full pt-1.5 border-t border-border-soft/40">
             <button
               onClick={onRestore}
-              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-accent hover:bg-accent-soft rounded-lg cursor-pointer transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-[11.5px] font-semibold text-accent hover:bg-accent-soft/80 bg-accent-soft/40 border border-accent/20 rounded-xl cursor-pointer transition-all active:scale-95 whitespace-nowrap shadow-2xs"
               title="Pulihkan Catatan"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
+              <RotateCcw className="h-3.5 w-3.5 shrink-0" />
               <span>Pulihkan</span>
             </button>
             <button
               onClick={onDeletePermanently}
-              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-danger hover:bg-danger-soft/20 rounded-lg cursor-pointer transition-colors"
-              title="Hapus Permanen"
+              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 text-[11.5px] font-semibold text-danger hover:bg-danger/15 bg-danger/10 border border-danger/20 rounded-xl cursor-pointer transition-all active:scale-95 whitespace-nowrap shadow-2xs"
+              title="Hapus Catatan Secara Permanen"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-              <span>Hapus Permanen</span>
+              <Trash2 className="h-3.5 w-3.5 shrink-0" />
+              <span>Hapus</span>
             </button>
           </div>
         )}

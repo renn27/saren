@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { MoreVertical, Edit2, Trash2, Calendar, Plus, List, CheckCircle2, AppWindow, Users } from "lucide-react";
 import { toast } from "sonner";
 import { createGarapan, updateGarapan, deleteGarapan } from "@/lib/actions/garapan";
+import { triggerHaptic } from "@/lib/utils/haptics";
 import { checkAppTargetCompleted } from "@/lib/utils/formulaEvaluator";
 
 interface GarapanItem {
@@ -219,7 +220,7 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
   };
 
   return (
-    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
+    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'page-enter'}`}>
       {/* Header Card */}
       <Card className="relative flex flex-row items-center justify-between gap-3 mb-3.5 p-4 sm:p-5 overflow-hidden">
         {/* Subtle decorative accent glow */}
@@ -256,16 +257,19 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 mb-3.5 no-scrollbar w-full select-none">
           <button
             type="button"
-            onClick={() => setSelectedYear("Semua")}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 ${selectedYear === "Semua"
-              ? "bg-accent text-white border-accent shadow-xs"
+            onClick={() => {
+              triggerHaptic("selection");
+              setSelectedYear("Semua");
+            }}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 active:scale-95 ${selectedYear === "Semua"
+              ? "bg-accent text-white border-accent shadow-xs scale-[1.02]"
               : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
               }`}
           >
             <span>Semua</span>
             <span
               className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${selectedYear === "Semua"
-                ? "bg-white/20 text-white"
+                ? "bg-white/20 text-white animate-badge-bump"
                 : "bg-bg-page text-text-secondary border border-border-soft/40"
                 }`}
             >
@@ -277,16 +281,19 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
             <button
               type="button"
               key={yr}
-              onClick={() => setSelectedYear(String(yr))}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 ${selectedYear === String(yr)
-                ? "bg-accent text-white border-accent shadow-xs"
+              onClick={() => {
+                triggerHaptic("selection");
+                setSelectedYear(String(yr));
+              }}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 active:scale-95 ${selectedYear === String(yr)
+                ? "bg-accent text-white border-accent shadow-xs scale-[1.02]"
                 : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
                 }`}
             >
               <span>{yr}</span>
               <span
                 className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${selectedYear === String(yr)
-                  ? "bg-white/20 text-white"
+                  ? "bg-white/20 text-white animate-badge-bump"
                   : "bg-bg-page text-text-secondary border border-border-soft/40"
                   }`}
               >
@@ -326,9 +333,9 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
 
             return (
               <Card
-                key={item.id}
+                key={`${item.id}-${selectedYear}`}
                 onClick={() => handleNavigate(`/garapan/${item.id}`)}
-                className={`card-stagger group relative flex items-center gap-3.5 p-4 sm:p-5 pr-12 cursor-pointer transition-all duration-200 min-h-[80px] ${isCurrentMonth
+                className={`card-stagger group relative flex items-center gap-3.5 p-4 sm:p-5 pr-12 cursor-pointer transition-all duration-200 min-h-[80px] active:scale-[0.985] ${isCurrentMonth
                   ? "bg-bg-surface border-accent/40 shadow-xs hover:border-accent/60"
                   : "bg-bg-surface/75 border-border-soft hover:bg-bg-surface hover:border-accent/30"
                   }`}
@@ -344,7 +351,7 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
                       {monthName}
                     </h3>
                     {isCurrentMonth && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft text-accent border border-accent/30 px-2 py-0.5 text-[10px] font-bold shrink-0 select-none">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft text-accent border border-accent/30 px-2 py-0.5 text-[10px] font-bold shrink-0 select-none animate-glowing-ring">
                         <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
                         Bulan Ini
                       </span>

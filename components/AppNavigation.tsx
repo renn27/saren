@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Briefcase, Hash, StickyNote, AppWindow, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { twMerge } from "tailwind-merge";
+import { triggerHaptic } from "@/lib/utils/haptics";
 
 function getNavItems(pathname: string) {
   return [
@@ -50,6 +51,7 @@ export function AppNavigationSidebar() {
   }, []);
 
   const toggleCollapse = () => {
+    triggerHaptic("light");
     const nextState = !isCollapsed;
     setIsCollapsed(nextState);
     localStorage.setItem("saren_sidebar_collapsed", String(nextState));
@@ -136,8 +138,8 @@ export function AppNavigationBottom() {
   const navItems = getNavItems(pathname);
 
   return (
-    <div className="md:hidden w-full border-t border-border-soft bg-bg-surface shadow-[0_-4px_12px_rgba(0,0,0,0.03)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.2)] shrink-0 z-50 pb-safe">
-      <nav className="flex items-center justify-around h-14 px-4">
+    <div className="md:hidden w-full border-t border-border-soft/70 bg-bg-surface/92 backdrop-blur-xl shadow-[0_-4px_16px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.3)] shrink-0 z-50 pb-safe">
+      <nav className="flex items-center justify-around h-16 px-2 sm:px-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = item.isActive;
@@ -146,21 +148,33 @@ export function AppNavigationBottom() {
               key={item.href}
               href={item.href}
               prefetch={true}
-              className={twMerge(
-                "flex flex-col items-center justify-center w-20 h-full gap-1 transition-colors select-none cursor-pointer active:scale-95",
-                active ? "text-accent" : "text-text-secondary"
-              )}
+              onClick={() => triggerHaptic("light")}
+              className="group flex-1 flex flex-col items-center justify-center h-full py-1 gap-0.5 select-none cursor-pointer active:scale-95 transition-transform duration-150"
             >
-              <Icon
+              {/* Active Icon Capsule */}
+              <div
                 className={twMerge(
-                  "h-5 w-5 shrink-0 transition-transform duration-200",
-                  active ? "scale-105 stroke-[2.25]" : "scale-100 stroke-[2]"
+                  "h-8 px-4 rounded-full flex items-center justify-center transition-all duration-200",
+                  active
+                    ? "bg-accent-soft text-accent border border-accent/25 shadow-2xs"
+                    : "text-text-secondary/70 group-hover:text-text-primary group-hover:bg-bg-page/60"
                 )}
-              />
+              >
+                <Icon
+                  className={twMerge(
+                    "h-5 w-5 transition-transform duration-200",
+                    active ? "scale-105 stroke-[2.25]" : "scale-100 stroke-[1.8]"
+                  )}
+                />
+              </div>
+
+              {/* Label */}
               <span
                 className={twMerge(
-                  "text-[10px] tracking-wide transition-all font-sans",
-                  active ? "font-semibold text-accent" : "font-medium text-text-secondary/80"
+                  "text-[11px] font-sans tracking-tight transition-colors duration-150 leading-tight mt-0.5",
+                  active
+                    ? "font-bold text-accent"
+                    : "font-medium text-text-secondary/80 group-hover:text-text-primary"
                 )}
               >
                 {item.name}

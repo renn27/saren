@@ -56,6 +56,7 @@ import {
   fetchLinkMetadata,
   assignNoteToFolder,
 } from "@/lib/actions/note";
+import { triggerHaptic } from "@/lib/utils/haptics";
 
 // ─── Color palette ──────────────────────────────────────────────────────────
 const colorMap: Record<
@@ -1260,16 +1261,23 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
 
         {/* Pin button on the right */}
         <button
-          onClick={handlePin}
+          onClick={() => {
+            triggerHaptic("medium");
+            handlePin();
+          }}
           className={twMerge(
-            "p-2 rounded-full cursor-pointer transition-colors flex-shrink-0",
+            "p-2 rounded-full cursor-pointer transition-colors flex-shrink-0 active:scale-90",
             note.isPinned
               ? "text-accent hover:bg-accent/10"
               : "text-text-secondary hover:bg-black/5 dark:hover:bg-white/10"
           )}
           title={note.isPinned ? "Lepas sematan" : "Sematkan"}
         >
-          {note.isPinned ? <PinOff className="h-[18px] w-[18px]" /> : <Pin className="h-[18px] w-[18px]" />}
+          {note.isPinned ? (
+            <PinOff key="pinoff" className="h-[18px] w-[18px] animate-pin-snap" />
+          ) : (
+            <Pin key="pin" className="h-[18px] w-[18px] animate-pin-snap" />
+          )}
         </button>
       </div>
 
@@ -1283,7 +1291,7 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
               <img
                 src={note.imageUrl}
                 alt="Catatan"
-                className="w-full max-h-[350px] object-cover"
+                className="w-full max-h-[350px] object-cover animate-image-reveal"
               />
               <button
                 type="button"
@@ -1876,7 +1884,7 @@ function Popover({
   return (
     <div
       className={twMerge(
-        "absolute z-50 bg-bg-surface border border-border-soft rounded-2xl shadow-2xl",
+        "absolute z-50 bg-bg-surface border border-border-soft rounded-2xl shadow-2xl animate-popover-up",
         className
       )}
     >
@@ -1928,6 +1936,21 @@ function ChecklistEditor({
   const [focusedItemId, setFocusedItemId] = React.useState<string | null>(null);
   const [isDraggable, setIsDraggable] = React.useState(false);
   const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
+  const [settledItemId, setSettledItemId] = React.useState<string | null>(null);
+  
+  // Animation states for smooth transition
+  const [completingIds, setCompletingIds] = React.useState<Set<string>>(new Set());
+  const [uncompletingIds, setUncompletingIds] = React.useState<Set<string>>(new Set());
+  const [recentlyEnteredIds, setRecentlyEnteredIds] = React.useState<Set<string>>(new Set());
+  const animationTimeoutsRef = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Cleanup timeouts on unmount
+  React.useEffect(() => {
+    return () => {
+      animationTimeoutsRef.current.forEach((t) => clearTimeout(t));
+      animationTimeoutsRef.current.clear();
+    };
+  }, []);
 
   const addItem = () => {
     if (!newItem.trim()) return;
@@ -1947,13 +1970,101 @@ function ChecklistEditor({
     setNewItem("");
   };
 
-  const toggle = (id: string) =>
-    setNote((p) => ({
-      ...p,
-      listItems: p.listItems.map((it) =>
-        it.id === id ? { ...it, isCompleted: !it.isCompleted } : it
-      ),
-    }));
+  const handleToggle = (id: string, isCurrentlyCompleted: boolean) => {
+    if (!isCurrentlyCompleted) {
+      // User is checking an active item -> animate slide down & fade
+      if (completingIds.has(id)) {
+        const existingTimer = animationTimeoutsRef.current.get(id);
+        if (existingTimer) clearTimeout(existingTimer);
+        animationTimeoutsRef.current.delete(id);
+        setCompletingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        return;
+      }
+
+      setCompletingIds((prev) => new Set(prev).add(id));
+      const timer = setTimeout(() => {
+        setNote((p) => ({
+          ...p,
+          listItems: p.listItems.map((it) =>
+            it.id === id ? { ...it, isCompleted: true } : it
+          ),
+        }));
+        setCompletingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        setRecentlyEnteredIds((prev) => new Set(prev).add(id));
+        setTimeout(() => {
+          setRecentlyEnteredIds((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }, 400);
+        animationTimeoutsRef.current.delete(id);
+      }, 320);
+
+      animationTimeoutsRef.current.set(id, timer);
+    } else {
+      // User is unchecking a completed item -> animate slide up & restore
+      if (uncompletingIds.has(id)) {
+        const existingTimer = animationTimeoutsRef.current.get(id);
+        if (existingTimer) clearTimeout(existingTimer);
+        animationTimeoutsRef.current.delete(id);
+        setUncompletingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        return;
+      }
+
+      setUncompletingIds((prev) => new Set(prev).add(id));
+      const timer = setTimeout(() => {
+        setNote((p) => ({
+          ...p,
+          listItems: p.listItems.map((it) =>
+            it.id === id ? { ...it, isCompleted: false } : it
+          ),
+        }));
+        setUncompletingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        setRecentlyEnteredIds((prev) => new Set(prev).add(id));
+        setTimeout(() => {
+          setRecentlyEnteredIds((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }, 400);
+        animationTimeoutsRef.current.delete(id);
+      }, 320);
+
+      animationTimeoutsRef.current.set(id, timer);
+    }
+  };
+
+  const [removingIds, setRemovingIds] = React.useState<Set<string>>(new Set());
+
+  const handleRemove = (id: string) => {
+    setRemovingIds((prev) => new Set(prev).add(id));
+    setTimeout(() => {
+      remove(id);
+      setRemovingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 220);
+  };
 
   const remove = (id: string) =>
     setNote((p) => ({
@@ -1991,6 +2102,9 @@ function ChecklistEditor({
   };
 
   const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    if (typeof window !== "undefined" && navigator.vibrate) {
+      try { navigator.vibrate(20); } catch (_) {}
+    }
     setDraggedIndex(index);
     setIsDraggable(true);
   };
@@ -2021,107 +2135,174 @@ function ChecklistEditor({
   };
 
   const handleTouchEnd = () => {
+    if (draggedIndex !== null && active[draggedIndex]) {
+      const itemId = active[draggedIndex].id;
+      setSettledItemId(itemId);
+      setTimeout(() => setSettledItemId(null), 300);
+    }
     setDraggedIndex(null);
     setIsDraggable(false);
   };
 
-  const renderActiveItem = (item: { id: string; text: string; isCompleted: boolean }, index: number) => (
-    <div
-      key={item.id}
-      data-active-index={index}
-      draggable={isDraggable}
-      onDragStart={() => setDraggedIndex(index)}
-      onDragOver={(e) => e.preventDefault()}
-      onDragEnter={() => {
-        if (draggedIndex !== null && draggedIndex !== index) {
-          moveItem(draggedIndex, index);
+  const renderActiveItem = (item: { id: string; text: string; isCompleted: boolean }, index: number) => {
+    const isCompleting = completingIds.has(item.id);
+    const isRecentlyEntered = recentlyEnteredIds.has(item.id);
+    const isBeingDragged = draggedIndex === index;
+    const isRemoving = removingIds.has(item.id);
+
+    return (
+      <div
+        key={item.id}
+        data-active-index={index}
+        draggable={isDraggable && !isCompleting && !isRemoving}
+        onDragStart={(e) => {
           setDraggedIndex(index);
-        }
-      }}
-      onDragEnd={() => {
-        setDraggedIndex(null);
-        setIsDraggable(false);
-      }}
-      onTouchEnd={handleTouchEnd}
-      className={twMerge(
-        "flex items-center gap-2 group py-1.5 px-2 rounded-xl transition-all duration-150",
-        draggedIndex === index ? "opacity-40 bg-accent-soft/10" : "hover:bg-bg-page/30"
-      )}
-    >
-      <button
-        onMouseEnter={() => setIsDraggable(true)}
-        onMouseLeave={() => setIsDraggable(false)}
-        onTouchStart={(e) => handleTouchStart(e, index)}
-        onTouchMove={(e) => handleTouchMove(e, index)}
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+        }}
+        onDragEnter={() => {
+          if (draggedIndex !== null && draggedIndex !== index) {
+            moveItem(draggedIndex, index);
+            setDraggedIndex(index);
+          }
+        }}
+        onDragEnd={() => {
+          if (draggedIndex !== null && active[draggedIndex]) {
+            const itemId = active[draggedIndex].id;
+            setSettledItemId(itemId);
+            setTimeout(() => setSettledItemId(null), 300);
+          }
+          setDraggedIndex(null);
+          setIsDraggable(false);
+        }}
         onTouchEnd={handleTouchEnd}
-        className="p-1 text-text-secondary/30 hover:text-text-secondary cursor-grab active:cursor-grabbing shrink-0 transition-colors touch-none select-none"
-        title="Geser untuk mengurutkan"
+        className={twMerge(
+          "relative flex items-center gap-2 group py-1.5 px-2 rounded-xl transition-all duration-200",
+          isBeingDragged
+            ? "z-30 shadow-lg scale-[1.02] bg-bg-surface ring-2 ring-accent/60 border border-accent/40 opacity-95"
+            : "hover:bg-bg-page/40 active:bg-bg-page/30",
+          settledItemId === item.id && "animate-reorder-settle",
+          isCompleting && "animate-checklist-down",
+          isRemoving && "animate-checklist-remove",
+          isRecentlyEntered && "animate-checklist-enter"
+        )}
       >
-        <GripVertical className="h-4 w-4" />
-      </button>
-
-      <input
-        type="checkbox"
-        checked={item.isCompleted}
-        onChange={() => toggle(item.id)}
-        className="h-4.5 w-4.5 rounded-md border-border-soft text-accent focus:ring-accent cursor-pointer flex-shrink-0"
-      />
-      <input
-        type="text"
-        value={item.text}
-        onFocus={() => setFocusedItemId(item.id)}
-        onBlur={() => {
-          setTimeout(() => {
-            setFocusedItemId((curr) => (curr === item.id ? null : curr));
-          }, 150);
-        }}
-        onChange={(e) => editText(item.id, e.target.value)}
-        className="flex-1 bg-transparent border-none text-[15px] focus:outline-none p-0 leading-6 text-text-primary"
-      />
-      {focusedItemId === item.id && (
         <button
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => remove(item.id)}
-          className="p-0.5 text-text-secondary hover:text-danger cursor-pointer shrink-0"
+          onMouseEnter={() => setIsDraggable(true)}
+          onMouseLeave={() => {
+            if (draggedIndex === null) setIsDraggable(false);
+          }}
+          onTouchStart={(e) => handleTouchStart(e, index)}
+          onTouchMove={(e) => handleTouchMove(e, index)}
+          onTouchEnd={handleTouchEnd}
+          disabled={isCompleting || isRemoving}
+          className={twMerge(
+            "p-1.5 rounded-lg cursor-grab active:cursor-grabbing shrink-0 transition-all touch-none select-none disabled:opacity-0",
+            isBeingDragged
+              ? "text-accent bg-accent-soft scale-110"
+              : "text-text-secondary/40 hover:text-text-secondary hover:bg-black/5 dark:hover:bg-white/5 active:scale-110 active:text-accent"
+          )}
+          title="Geser untuk mengurutkan"
         >
-          <X className="h-3.5 w-3.5" />
+          <GripVertical className="h-4 w-4" />
         </button>
-      )}
-    </div>
-  );
 
-  const renderDoneItem = (item: { id: string; text: string; isCompleted: boolean }) => (
-    <div key={item.id} className="flex items-center gap-3 py-1.5 px-2 opacity-60">
-      <div className="w-6 shrink-0" />
-      <input
-        type="checkbox"
-        checked={item.isCompleted}
-        onChange={() => toggle(item.id)}
-        className="h-4.5 w-4.5 rounded-md border-border-soft text-accent focus:ring-accent cursor-pointer flex-shrink-0"
-      />
-      <input
-        type="text"
-        value={item.text}
-        onFocus={() => setFocusedItemId(item.id)}
-        onBlur={() => {
-          setTimeout(() => {
-            setFocusedItemId((curr) => (curr === item.id ? null : curr));
-          }, 150);
-        }}
-        onChange={(e) => editText(item.id, e.target.value)}
-        className="flex-1 bg-transparent border-none text-[15px] focus:outline-none p-0 leading-6 text-text-secondary/50 line-through"
-      />
-      {focusedItemId === item.id && (
-        <button
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => remove(item.id)}
-          className="p-0.5 text-text-secondary hover:text-danger cursor-pointer shrink-0"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      )}
-    </div>
-  );
+        <input
+          type="checkbox"
+          checked={item.isCompleted || isCompleting}
+          onChange={() => handleToggle(item.id, false)}
+          className={twMerge(
+            "h-4.5 w-4.5 rounded-md border-border-soft text-accent focus:ring-accent cursor-pointer flex-shrink-0 transition-transform duration-200",
+            isCompleting && "animate-check-pop"
+          )}
+        />
+        <input
+          type="text"
+          value={item.text}
+          disabled={isCompleting || isRemoving}
+          onFocus={() => setFocusedItemId(item.id)}
+          onBlur={() => {
+            setTimeout(() => {
+              setFocusedItemId((curr) => (curr === item.id ? null : curr));
+            }, 150);
+          }}
+          onChange={(e) => editText(item.id, e.target.value)}
+          className={twMerge(
+            "flex-1 bg-transparent border-none text-[15px] focus:outline-none p-0 leading-6 text-text-primary transition-all duration-200",
+            isCompleting && "line-through text-text-secondary/50"
+          )}
+        />
+        {focusedItemId === item.id && !isCompleting && !isRemoving && (
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleRemove(item.id)}
+            className="p-0.5 text-text-secondary hover:text-danger cursor-pointer shrink-0 animate-micro-pop"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderDoneItem = (item: { id: string; text: string; isCompleted: boolean }) => {
+    const isUncompleting = uncompletingIds.has(item.id);
+    const isRecentlyEntered = recentlyEnteredIds.has(item.id);
+    const isRemoving = removingIds.has(item.id);
+
+    return (
+      <div
+        key={item.id}
+        className={twMerge(
+          "flex items-center gap-3 py-1.5 px-2 transition-all duration-200",
+          isUncompleting ? "opacity-90 animate-checklist-up" : "opacity-60",
+          isRemoving && "animate-checklist-remove",
+          isRecentlyEntered && "animate-checklist-enter"
+        )}
+      >
+        <div className="w-6 shrink-0" />
+        <input
+          type="checkbox"
+          checked={!isUncompleting && item.isCompleted}
+          onChange={() => handleToggle(item.id, true)}
+          className={twMerge(
+            "h-4.5 w-4.5 rounded-md border-border-soft text-accent focus:ring-accent cursor-pointer flex-shrink-0 transition-transform duration-200",
+            isUncompleting && "animate-check-pop"
+          )}
+        />
+        <input
+          type="text"
+          value={item.text}
+          disabled={isUncompleting || isRemoving}
+          onFocus={() => setFocusedItemId(item.id)}
+          onBlur={() => {
+            setTimeout(() => {
+              setFocusedItemId((curr) => (curr === item.id ? null : curr));
+            }, 150);
+          }}
+          onChange={(e) => editText(item.id, e.target.value)}
+          className={twMerge(
+            "flex-1 bg-transparent border-none text-[15px] focus:outline-none p-0 leading-6 transition-all duration-200",
+            isUncompleting
+              ? "text-text-primary no-underline font-medium"
+              : "text-text-secondary/50 line-through"
+          )}
+        />
+        {focusedItemId === item.id && !isUncompleting && !isRemoving && (
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleRemove(item.id)}
+            className="p-0.5 text-text-secondary hover:text-danger cursor-pointer shrink-0 animate-micro-pop"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-0.5">
@@ -2147,12 +2328,12 @@ function ChecklistEditor({
             const matches = done.filter(i => i.text.toLowerCase().includes(newItem.toLowerCase()));
             if (matches.length === 0) return null;
             return (
-              <div className="absolute left-7 right-0 top-7 z-50 bg-bg-surface border border-border-soft rounded-xl shadow-lg p-1.5 flex flex-col gap-0.5 max-h-40 overflow-y-auto">
+              <div className="absolute left-7 right-0 top-7 z-50 bg-bg-surface border border-border-soft rounded-xl shadow-lg p-1.5 flex flex-col gap-0.5 max-h-40 overflow-y-auto animate-popover-down">
                 {matches.map((item) => (
                   <button
                     key={item.id}
                     onClick={() => {
-                      toggle(item.id);
+                      handleToggle(item.id, true);
                       setNewItem("");
                     }}
                     className="flex items-center gap-2 px-3 py-2 text-[13px] text-text-primary hover:bg-accent-soft/30 hover:text-accent rounded-lg text-left cursor-pointer transition-colors w-full font-sans truncate"
@@ -2171,21 +2352,26 @@ function ChecklistEditor({
       {done.length > 0 && (
         <div className="mt-4 border-t border-border-soft/30 pt-4">
           <button
-            onClick={() => setShowCompleted(!showCompleted)}
-            className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-text-secondary/60 hover:text-text-primary transition-colors cursor-pointer select-none mb-2"
+            onClick={() => {
+              triggerHaptic("light");
+              setShowCompleted(!showCompleted);
+            }}
+            className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-text-secondary/60 hover:text-text-primary transition-colors cursor-pointer select-none mb-2 group"
           >
-            {showCompleted ? (
-              <ChevronDown className="h-3.5 w-3.5 stroke-[3]" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5 stroke-[3]" />
-            )}
-            <span>Selesai ({done.length})</span>
+            <ChevronRight className={twMerge("h-3.5 w-3.5 stroke-[3] transition-transform duration-200", showCompleted && "rotate-90")} />
+            <span>Selesai</span>
+            <span key={done.length} className="inline-block px-1.5 py-0.2 rounded-full bg-accent-soft text-accent text-[10px] animate-badge-bump">
+              {done.length}
+            </span>
           </button>
-          {showCompleted && (
-            <div className="flex flex-col gap-0.5">
+          <div className={twMerge(
+            "grid transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+            showCompleted ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0"
+          )}>
+            <div className="overflow-hidden flex flex-col gap-0.5">
               {done.map(renderDoneItem)}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>

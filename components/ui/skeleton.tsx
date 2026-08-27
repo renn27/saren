@@ -6,7 +6,7 @@ export function Skeleton({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={twMerge("animate-pulse rounded bg-border-soft/60", className)}
+      className={twMerge("animate-shimmer rounded bg-bg-surface border border-border-soft/30", className)}
       {...props}
     />
   );

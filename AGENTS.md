@@ -64,6 +64,7 @@ Aplikasi SAREN dirancang dan dioptimalkan secara penuh untuk **perangkat layar s
   * **Pencarian Cepat & Pembatasan Salin Data Akun (`AccountAutofillPicker`)**: Modal pembuatan akun pada detail garapan dan aplikasi dilengkapi komponen pencarian instan yang membatasi hasil awal (maks 6 akun) dan hasil pencarian (maks 8 akun). Dropdown popover compact (`max-h-52`) mencegah dropdown melebar tak terhingga saat data akun berjumlah ratusan, menampilkan preview `Device` dan `Nomor HP`, serta menjaga waktu respon pencarian tetap 0ms.
   * **Kompresi Otomatis Logo & Gambar Klien (`compressImageFile`)**: Utilitas terpusat di `@/lib/utils/imageCompressor.ts` yang mengompresi logo aplikasi dan gambar catatan secara otomatis di sisi klien menggunakan HTML5 Canvas ke format modern `.webp` sebelum diunggah ke FormData/server. Menghemat bandwidth hingga 80-90% dan mempercepat proses upload di koneksi seluler.
   * **Non-blocking Font Loading**: Pengaturan font Google (`Inter`, `Plus_Jakarta_Sans`, `IBM_Plex_Mono`) menggunakan `display: "swap"`.
+  * **Navigasi Bawah Modern Mobile (`AppNavigationBottom`)**: Menggunakan tinggi proporsional `h-16` (64px) dengan efek *glassmorphism* `backdrop-blur-xl bg-bg-surface/92`. Status aktif menggunakan *capsule badge* oval (`h-8 px-4 rounded-full bg-accent-soft text-accent border border-accent/25`) di sekeliling ikon dengan label teks terpusat di bawahnya (`text-[11px] font-bold text-accent`), menghindari tumpang tindih visual dan memberikan ruang sentuh ergonomis.
 * **Server Actions**: Interaksi mutasi database (create, update, delete) dilakukan melalui Server Actions di `@/lib/actions/`.
 
 ### 2. Penataan Gaya (Tailwind CSS)
@@ -105,23 +106,25 @@ Merupakan sub-komponen di dalam `NoteClient.tsx` yang bertanggung jawab merender
   * 🏷️ **Ubah Label** (`Tag` / membuka sub-dropdown pilihan label melayang)
   * 📝 **Ubah Tipe Catatan** (`FileText` / `CheckSquare` / mengubah tipe antara teks catatan biasa dan checklist)
 * **Penempatan Dropdown**: Semua dropdown menu melayang diposisikan di dalam kontainer `relative ml-auto` pembungkus tombol tiga titik dengan kelas `absolute right-0 bottom-8 z-50` agar melayang rapi di atas toolbar sebelah kanan dan tidak melebihi lebar layar.
-* **Perilaku Klik Checklist Preview**:
+* **Perilaku Klik Checklist Preview & Animasi Halus (Smooth Transitions)**:
   * Pemicu centang (*checkbox*) harus menggunakan `e.stopPropagation()` pada elemen `<input type="checkbox" />` secara langsung.
   * **Dilarang keras meletakkan `e.stopPropagation()` pada pembungkus baris checklist** (kontainer `div` baris teks). Klik pada area teks catatan checklist harus tetap dapat memicu event klik kartu (`onClick={onSelect}`) agar kartu dapat dibuka untuk masuk ke halaman detail catatan.
+  * **Animasi Transisi Checklist Halus**: Saat item checklist dicentang, sistem memberikan feedback instan (checkbox tercentang, pop `animate-check-pop`, teks tercoret *strikethrough*), lalu meluncur turun dan mengecil secara halus (`animate-checklist-down`) sebelum dipindahkan/disembunyikan setelah 320ms, mencegah perubahan tampilan yang mendadak/kasar.
+  * **Animasi Hapus Baris Checklist**: Menghapus item checklist menggunakan animasi geser keluar (`animate-checklist-remove`) selama 220ms sehingga baris di bawahnya naik secara halus.
 * **Penyembunyian Item Selesai di Kartu**: Item checklist yang sudah dicentang (selesai) tidak ditampilkan pada pratinjau kartu (`NoteCard`) di dashboard utama.
 
 ### 4. Komponen Edit & Detail Catatan (`NoteEditClient.tsx`)
 Mengelola alur pengeditan satu catatan secara mendalam, dioptimalkan sepenuhnya untuk kenyamanan ponsel (mobile):
 * **Bebas Header & Navigasi Global**: Di halaman `/note/[id]`, Header Utama aplikasi dan Navigasi Bawah disembunyikan lewat `LayoutWrapper.tsx` untuk memberikan ruang kerja maksimal dan menghindari tombol gigi ganda.
 * **Header Minimalis & Centered Status**: Header atas hanya berisi tombol Kembali dan tombol Sematkan (Pin). Informasi `"Diedit [Waktu]"` wajib diletakkan di tengah-tengah header atas secara absolut (`absolute left-1/2 -translate-x-1/2`) agar simetris dan mudah dibaca.
-* **Toolbar Aksi Bawah (Thumb Zone)**: Semua aksi modifikasi diletakkan pada toolbar melayang di bagian bawah layar (`fixed bottom-0 left-0 right-0 z-30 h-12`) dengan efek *backdrop-blur*. Tombol-tombol di dalam toolbar bawah:
+* **Toolbar Aksi Bawah (Thumb Zone) & Popover Pegas (`animate-popover-up`)**: Semua aksi modifikasi diletakkan pada toolbar melayang di bagian bawah layar (`fixed bottom-0 left-0 right-0 z-30 h-12`) dengan efek *backdrop-blur*. Popover menu warna, label, dan tipe muncul dengan animasi pegas GPU melayang dari bawah (`animate-popover-up`).
   * 🎨 **Ubah Warna** (popover melayang ke atas: `bottom-14`)
   * 🏷️ **Ubah Label** (popover melayang ke atas: `bottom-14`)
   * 📝 **Ubah Tipe** (popover melayang ke atas: `bottom-14`)
   * 📥 **Arsipkan / Pulihkan**
   * 📋 **Duplikat**
   * 🗑️ **Hapus ke Sampah** (berwarna merah `text-danger` secara permanen, dan wajib memicu dialog konfirmasi `confirm()` sebelum menghapus).
-* **Target Sentuh Checklist**: Di dalam `ChecklistEditor`, setiap baris memiliki padding vertikal longgar (`py-1.5`) dengan ukuran checkbox `h-4.5 w-4.5` (18px) dan kelengkungan `rounded-md` untuk kenyamanan jari mobile. Tombol hapus item (`X`) di kanan baris tidak menggunakan status hover tersembunyi, melainkan hanya dimunculkan secara dinamis saat baris input teks yang bersangkutan sedang berfokus/diedit (menggunakan state focus).
+* **Target Sentuh Checklist & Animasi Transisi**: Di dalam `ChecklistEditor`, setiap baris memiliki padding vertikal longgar (`py-1.5`) dengan ukuran checkbox `h-4.5 w-4.5` (18px) dan kelengkungan `rounded-md` untuk kenyamanan jari mobile. Saat mencentang item aktif, item menampilkan pop centang dan mencoret teks, lalu meluncur turun (`animate-checklist-down`) ke bagian selesai. Sebaliknya, saat membatalkan centang pada daftar tugas selesai, item meluncur naik (`animate-checklist-up`) dan masuk kembali ke daftar aktif dengan animasi masuk (`animate-checklist-enter`). Tombol hapus item (`X`) di kanan baris tidak menggunakan status hover tersembunyi, melainkan hanya dimunculkan secara dinamis saat baris input teks yang bersangkutan sedang berfokus/diedit (menggunakan state focus).
 * **Pengaturan Urutan (Drag and Drop)**: Setiap item aktif pada `ChecklistEditor` dilengkapi dengan tombol drag handle (`GripVertical`) di sebelah kiri untuk melakukan drag and drop guna mengatur urutan item secara interaktif.
 * **Auto-collapse Item Selesai**: Secara default, ketika halaman edit dibuka, daftar tugas yang sudah diselesaikan (`done`) disembunyikan dalam keadaan tertutup/terlipat (*auto-collapse*). Pengguna dapat membukanya kembali dengan menekan tombol toggle *"Selesai (Jumlah)"*.
 * **Mode Pengaturan Tabel (Table Editor) & Modal Pengaturan Kolom (`ColumnConfigDialog`)**: 
@@ -212,7 +215,8 @@ Model `Nomor` memiliki kolom-kolom berikut di Prisma schema:
 ### Fitur Tabel Nomor & Notifikasi PWA
 * **Kolom Sticky "Kartu"**: Kolom pertama menggunakan `sticky left-0` dengan background `bg-bg-surface` — **jangan gunakan `bg-bg-page`** agar konsisten dengan warna header tabel.
 * **Inline Edit Pulsa & Masa Aktif**: Klik sel untuk mengedit nilai pulsa/tanggal secara langsung.
-* **Klik-untuk-Salin Nomor**: Mengklik sel Nomor langsung menyalin ke clipboard.
+* **Klik-untuk-Salin Nomor & Micro-Check Animasi**: Mengklik sel Nomor langsung menyalin ke clipboard dan memunculkan badge centang hijau mikro (`Check` `text-success animate-check-pop`) langsung di dalam sel selama 1.5 detik sebagai konfirmasi visual instan.
+* **Flash Highlight Simpan Pulsa**: Saat saldo pulsa diedit inline dan berhasil disimpan, sel memberikan kilatan warna lembut (`flashSavedId` selama 800ms) untuk konfirmasi visual nilai baru.
 * **Highlight Masa Aktif**: 🟢 Hijau (>1 thn), 🟡 Kuning (masa tenggang <30 hr), 🔴 Merah (hangus >30 hr).
 * **Kolom "Terakhir Diedit"**: Ditampilkan di sebelah kanan kolom "Masa Aktif" (sebelum kolom Aksi), menyajikan tanggal dan waktu perbaruan terakhir data nomor (`updatedAt`).
 * **Aturan Pengiriman Notifikasi PWA Kartu**:

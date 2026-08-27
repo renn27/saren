@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { MoreVertical, Edit2, Trash2, AppWindow, Plus, Upload, X, AppWindow as AppIcon, Search, CheckCircle2, Tag, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { createAplikasi, updateAplikasi, deleteAplikasi } from "@/lib/actions/aplikasi";
+import { triggerHaptic } from "@/lib/utils/haptics";
 import { checkAppTargetCompleted } from "@/lib/utils/formulaEvaluator";
 import { compressImageFile } from "@/lib/utils/imageCompressor";
 
@@ -260,7 +261,7 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
   };
 
   return (
-    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
+    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'page-enter'}`}>
       <Card className="relative flex flex-col gap-4 p-4 sm:p-5 mb-4">
         {/* Top Row: Title */}
         <div className="flex items-center justify-between gap-4 w-full">
@@ -297,7 +298,7 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-text-secondary hover:bg-accent-soft/50 transition-colors cursor-pointer"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md text-text-secondary hover:bg-accent-soft/50 transition-colors cursor-pointer animate-micro-pop"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -319,16 +320,19 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
           <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-2 no-scrollbar w-full select-none border-t border-border-soft/60">
             <button
               type="button"
-              onClick={() => setSelectedCategory("Semua")}
+              onClick={() => {
+                triggerHaptic("selection");
+                setSelectedCategory("Semua");
+              }}
               className={twMerge(
-                "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
+                "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 active:scale-95",
                 selectedCategory === "Semua"
-                  ? "bg-accent text-white border-accent shadow-xs"
+                  ? "bg-accent text-white border-accent shadow-xs scale-[1.02]"
                   : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
               )}
             >
               <span>Semua</span>
-              <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedCategory === "Semua" ? "bg-white/20 text-white" : "bg-bg-page text-text-secondary border border-border-soft/40")}>
+              <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedCategory === "Semua" ? "bg-white/20 text-white animate-badge-bump" : "bg-bg-page text-text-secondary border border-border-soft/40")}>
                 {list.length}
               </span>
             </button>
@@ -336,16 +340,19 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
             {uncategorizedCount > 0 && (
               <button
                 type="button"
-                onClick={() => setSelectedCategory("__NONE__")}
+                onClick={() => {
+                  triggerHaptic("selection");
+                  setSelectedCategory("__NONE__");
+                }}
                 className={twMerge(
-                  "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
+                  "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 active:scale-95",
                   selectedCategory === "__NONE__"
-                    ? "bg-accent text-white border-accent shadow-xs"
+                    ? "bg-accent text-white border-accent shadow-xs scale-[1.02]"
                     : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
                 )}
               >
                 <span>Tanpa Kategori</span>
-                <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedCategory === "__NONE__" ? "bg-white/20 text-white" : "bg-bg-page text-text-secondary border border-border-soft/40")}>
+                <span className={twMerge("px-1.5 py-0.2 rounded-full text-[10px] font-bold", selectedCategory === "__NONE__" ? "bg-white/20 text-white animate-badge-bump" : "bg-bg-page text-text-secondary border border-border-soft/40")}>
                   {uncategorizedCount}
                 </span>
               </button>
@@ -358,11 +365,14 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
                 <button
                   key={cat}
                   type="button"
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => {
+                    triggerHaptic("selection");
+                    setSelectedCategory(cat);
+                  }}
                   className={twMerge(
-                    "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5",
+                    "px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 active:scale-95",
                     isSelected
-                      ? "bg-accent text-white border-accent shadow-xs"
+                      ? "bg-accent text-white border-accent shadow-xs scale-[1.02]"
                       : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
                   )}
                 >
@@ -370,7 +380,7 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
                   <span
                     className={twMerge(
                       "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
-                      isSelected ? "bg-white/20 text-white" : "bg-bg-page text-text-secondary border border-border-soft/40"
+                      isSelected ? "bg-white/20 text-white animate-badge-bump" : "bg-bg-page text-text-secondary border border-border-soft/40"
                     )}
                   >
                     {count}
@@ -407,10 +417,10 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
 
             return (
               <Card
-                key={item.id}
+                key={`${item.id}-${selectedCategory}`}
                 hoverable
                 onClick={() => handleNavigate(`/aplikasi/${item.id}`)}
-                className="card-stagger relative group pr-10 sm:pr-11 flex flex-col justify-between min-h-[116px] sm:min-h-[132px] p-4 sm:p-5 hover:z-10 focus-within:z-10"
+                className="card-stagger relative group pr-10 sm:pr-11 flex flex-col justify-between min-h-[116px] sm:min-h-[132px] p-4 sm:p-5 hover:z-10 focus-within:z-10 active:scale-[0.985] transition-transform duration-150"
               >
                 {/* Target Completed Check Badge */}
                 {isTargetCompleted && (

@@ -1667,7 +1667,7 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                                 );
                               }}
                               className={twMerge(
-                                "flex-1 bg-transparent border-none text-[13px] text-text-primary focus:outline-none p-0 focus:ring-0",
+                                "flex-1 bg-transparent border-none text-[13px] text-text-primary focus:outline-none p-0 focus:ring-0 transition-all duration-200",
                                 item.isCompleted && "line-through text-text-secondary/60",
                                 inputColor !== "default" && colorMap[inputColor]?.textClass
                               )}
@@ -1880,7 +1880,9 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                   DIPINDAI ({pinnedNotes.length})
                 </div>
                 <div
+                  key={isGridView ? "pinned-grid" : "pinned-list"}
                   className={twMerge(
+                    "page-enter",
                     isGridView
                       ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-3"
                       : "flex flex-col gap-2.5 max-w-2xl mx-auto w-full"
@@ -1920,7 +1922,9 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                   </div>
                 )}
                 <div
+                  key={isGridView ? "other-grid" : "other-list"}
                   className={twMerge(
+                    "page-enter",
                     isGridView
                       ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-3"
                       : "flex flex-col gap-2.5 max-w-2xl mx-auto w-full"

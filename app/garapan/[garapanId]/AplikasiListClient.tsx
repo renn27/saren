@@ -334,7 +334,7 @@ export function AplikasiListClient({ garapan, initialList, standaloneList = [] }
   const formattedMonthYear = `${MONTH_NAMES[garapan.bulan - 1]} ${garapan.tahun}`;
 
   return (
-    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'animate-in fade-in slide-in-from-bottom-4 ease-[cubic-bezier(0.16,1,0.3,1)]'}`}>
+    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'page-enter'}`}>
       {/* Back Button */}
       <div className="mb-3">
         <Button
