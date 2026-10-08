@@ -150,6 +150,10 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
     setLabels(initialLabels);
   }, [initialLabels]);
 
+  React.useEffect(() => {
+    setFolders(initialFolders);
+  }, [initialFolders]);
+
   const toggleView = () => {
     const nextView = !isGridView;
     setIsGridView(nextView);

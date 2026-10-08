@@ -1,13 +1,14 @@
 {
   "name": "saren",
-  "version": "0.1.0",
+  "version": "26.10.08.01",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "bump-version": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

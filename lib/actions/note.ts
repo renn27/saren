@@ -186,6 +186,7 @@ export async function updateNote(id: string, data: UpdateNoteInput) {
     });
 
     revalidatePath("/note");
+    revalidatePath(`/note/${id}`);
     return { success: true, data: note };
   } catch (error) {
     console.error("Failed to update note:", error);
@@ -203,6 +204,7 @@ export async function trashNote(id: string) {
       },
     });
     revalidatePath("/note");
+    revalidatePath(`/note/${id}`);
     return { success: true, data: note };
   } catch (error) {
     console.error("Failed to trash note:", error);
@@ -219,6 +221,7 @@ export async function restoreNote(id: string) {
       },
     });
     revalidatePath("/note");
+    revalidatePath(`/note/${id}`);
     return { success: true, data: note };
   } catch (error) {
     console.error("Failed to restore note:", error);
@@ -271,6 +274,7 @@ export async function togglePinNote(id: string) {
       });
     });
     revalidatePath("/note");
+    revalidatePath(`/note/${id}`);
     return { success: true, data: updated };
   } catch (error) {
     if (error instanceof Error && error.message === "NOT_FOUND") {
@@ -300,6 +304,7 @@ export async function toggleArchiveNote(id: string) {
       });
     });
     revalidatePath("/note");
+    revalidatePath(`/note/${id}`);
     return { success: true, data: updated };
   } catch (error) {
     if (error instanceof Error && error.message === "NOT_FOUND") {
@@ -317,6 +322,7 @@ export async function updateNoteColor(id: string, color: string) {
       data: { color },
     });
     revalidatePath("/note");
+    revalidatePath(`/note/${id}`);
     return { success: true, data: note };
   } catch (error) {
     console.error("Failed to update note color:", error);
@@ -486,6 +492,7 @@ export async function uploadNoteImage(id: string, formData: FormData) {
     });
 
     revalidatePath("/note");
+    revalidatePath(`/note/${id}`);
     return { success: true, data: note };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -517,6 +524,7 @@ export async function deleteNoteImage(id: string) {
     });
 
     revalidatePath("/note");
+    revalidatePath(`/note/${id}`);
     return { success: true, data: note };
   } catch (error) {
     console.error("Failed to delete note image:", error);
@@ -703,6 +711,7 @@ export async function assignNoteToFolder(noteId: string, folderId: string | null
       data: { folderId },
     });
     revalidatePath("/note");
+    revalidatePath(`/note/${noteId}`);
     return { success: true, data: note };
   } catch (error) {
     console.error("Failed to assign note to folder:", error);

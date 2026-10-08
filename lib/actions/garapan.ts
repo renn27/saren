@@ -19,6 +19,8 @@ export async function getGarapanList() {
         aplikasi: {
           select: {
             id: true,
+            namaAplikasi: true,
+            logoUrl: true,
             kolom: {
               select: {
                 id: true,
@@ -30,6 +32,7 @@ export async function getGarapanList() {
             },
             akun: {
               select: {
+                id: true,
                 customValues: true,
               },
             },
@@ -183,6 +186,7 @@ export async function updateGarapan(id: string, formData: { bulan: number; tahun
     });
 
     revalidatePath("/");
+    revalidatePath(`/garapan/${id}`);
     return { success: true, data: updatedGarapan };
   } catch (error) {
     console.error("Error updating garapan:", error);
@@ -196,6 +200,7 @@ export async function deleteGarapan(id: string) {
       where: { id },
     });
     revalidatePath("/");
+    revalidatePath(`/garapan/${id}`);
     return { success: true };
   } catch (error) {
     console.error("Error deleting garapan:", error);

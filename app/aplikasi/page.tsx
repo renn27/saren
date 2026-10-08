@@ -5,6 +5,9 @@ export const metadata = {
   title: "Daftar Aplikasi - SAREN",
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function Page() {
   const list = await getStandaloneAplikasiList();
 

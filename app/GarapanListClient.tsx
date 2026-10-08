@@ -10,11 +10,13 @@ import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MoreVertical, Edit2, Trash2, Calendar, Plus, List, CheckCircle2, AppWindow, Users } from "lucide-react";
+import { 
+  MoreVertical, Edit2, Trash2, Calendar, Plus, 
+  ChevronRight, CalendarDays 
+} from "lucide-react";
 import { toast } from "sonner";
 import { createGarapan, updateGarapan, deleteGarapan } from "@/lib/actions/garapan";
 import { triggerHaptic } from "@/lib/utils/haptics";
-import { checkAppTargetCompleted } from "@/lib/utils/formulaEvaluator";
 
 interface GarapanItem {
   id: string;
@@ -32,20 +34,25 @@ const MONTH_NAMES = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"
 ];
 
-// Accent colors per month for subtle variety
+const MONTH_SHORT = [
+  "JAN", "FEB", "MAR", "APR", "MEI", "JUN",
+  "JUL", "AGS", "SEP", "OKT", "NOV", "DES"
+];
+
+// Curated month accent palettes (harmonious across dark & light themes)
 const MONTH_ACCENTS = [
-  "from-sky-400/20 to-cyan-400/10",    // Jan
-  "from-rose-400/20 to-pink-400/10",   // Feb
-  "from-emerald-400/20 to-teal-400/10",// Mar
-  "from-violet-400/20 to-purple-400/10",// Apr
-  "from-amber-400/20 to-orange-400/10",// Mei
-  "from-sky-400/20 to-blue-400/10",    // Jun
-  "from-red-400/20 to-orange-400/10",  // Jul
-  "from-indigo-400/20 to-violet-400/10",// Aug
-  "from-teal-400/20 to-emerald-400/10",// Sep
-  "from-orange-400/20 to-amber-400/10",// Okt
-  "from-blue-400/20 to-sky-400/10",    // Nov
-  "from-purple-400/20 to-violet-400/10",// Des
+  { gradient: "from-sky-500/15 via-sky-500/10 to-cyan-500/5", border: "border-sky-500/25", text: "text-sky-500" },
+  { gradient: "from-rose-500/15 via-rose-500/10 to-pink-500/5", border: "border-rose-500/25", text: "text-rose-500" },
+  { gradient: "from-emerald-500/15 via-emerald-500/10 to-teal-500/5", border: "border-emerald-500/25", text: "text-emerald-500" },
+  { gradient: "from-violet-500/15 via-violet-500/10 to-purple-500/5", border: "border-violet-500/25", text: "text-violet-500" },
+  { gradient: "from-amber-500/15 via-amber-500/10 to-orange-500/5", border: "border-amber-500/25", text: "text-amber-500" },
+  { gradient: "from-blue-500/15 via-blue-500/10 to-indigo-500/5", border: "border-blue-500/25", text: "text-blue-500" },
+  { gradient: "from-red-500/15 via-red-500/10 to-rose-500/5", border: "border-red-500/25", text: "text-red-500" },
+  { gradient: "from-indigo-500/15 via-indigo-500/10 to-violet-500/5", border: "border-indigo-500/25", text: "text-indigo-500" },
+  { gradient: "from-teal-500/15 via-teal-500/10 to-emerald-500/5", border: "border-teal-500/25", text: "text-teal-500" },
+  { gradient: "from-orange-500/15 via-orange-500/10 to-amber-500/5", border: "border-orange-500/25", text: "text-orange-500" },
+  { gradient: "from-blue-500/15 via-blue-500/10 to-sky-500/5", border: "border-blue-500/25", text: "text-blue-500" },
+  { gradient: "from-purple-500/15 via-purple-500/10 to-fuchsia-500/5", border: "border-purple-500/25", text: "text-purple-500" },
 ];
 
 export function GarapanListClient({ initialList }: GarapanListClientProps) {
@@ -96,43 +103,7 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
     return list.filter((item) => item.tahun === Number(selectedYear));
   }, [list, selectedYear]);
 
-  // Total apps count across current filtered list
-  const totalAppsCount = React.useMemo(() => {
-    return filteredList.reduce((acc, item) => acc + (item.aplikasi?.length || 0), 0);
-  }, [filteredList]);
 
-  // Total accounts count across current filtered list
-  const totalAccountsCount = React.useMemo(() => {
-    return filteredList.reduce((acc, item) => {
-      if (!item.aplikasi) return acc;
-      return acc + item.aplikasi.reduce((appAcc: number, app: any) => appAcc + (app.akun?.length || 0), 0);
-    }, 0);
-  }, [filteredList]);
-
-  // Completed applications count (100% target met)
-  const completedAppsCount = React.useMemo(() => {
-    let completed = 0;
-    filteredList.forEach((item) => {
-      item.aplikasi?.forEach((app) => {
-        if (checkAppTargetCompleted(app)) {
-          completed++;
-        }
-      });
-    });
-    return completed;
-  }, [filteredList]);
-
-  // Memoize completed garapan map for 0ms render latency
-  const completedGarapanMap = React.useMemo(() => {
-    const map = new Map<string, boolean>();
-    list.forEach((item) => {
-      const isCompleted =
-        Boolean(item.aplikasi && item.aplikasi.length > 0) &&
-        item.aplikasi!.every((app) => checkAppTargetCompleted(app));
-      map.set(item.id, isCompleted);
-    });
-    return map;
-  }, [list]);
 
   // Modals state
   const [isAddOpen, setIsAddOpen] = React.useState(false);
@@ -222,19 +193,19 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
   return (
     <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'page-enter'}`}>
       {/* Header Card */}
-      <Card className="relative flex flex-row items-center justify-between gap-3 mb-3.5 p-4 sm:p-5 overflow-hidden">
+      <Card className="relative flex flex-row items-center justify-between gap-3 mb-3.5 p-4 sm:p-5 overflow-hidden rounded-2xl border border-border-soft shadow-xs">
         {/* Subtle decorative accent glow */}
-        <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-accent/10 blur-xl pointer-events-none" />
+        <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-accent/8 blur-xl pointer-events-none" />
 
         <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
-          <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-accent-soft via-accent-soft/40 to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/15 shadow-2xs">
-            <List className="h-5 w-5" />
+          <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-gradient-to-br from-accent-soft via-accent-soft/40 to-accent/20 text-accent flex items-center justify-center shrink-0 border border-accent/15 shadow-2xs">
+            <CalendarDays className="h-5 w-5" />
           </div>
           <div className="flex flex-col min-w-0">
-            <h2 className="text-[18px] sm:text-[21px] font-bold tracking-tight text-text-primary font-display leading-snug truncate select-none">
+            <h2 className="text-[18px] sm:text-[20px] font-bold tracking-tight text-text-primary font-display leading-tight truncate select-none">
               Daftar Garapan
             </h2>
-            <p className="text-xs text-text-secondary font-sans mt-0.5 truncate">
+            <p className="text-[12px] text-text-secondary font-sans mt-0.5 truncate">
               {filteredList.length !== list.length
                 ? `${filteredList.length} dari ${list.length} bulan tercatat`
                 : `${list.length} bulan tercatat`}
@@ -245,10 +216,10 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
         <Button
           variant="primary"
           onClick={() => setIsAddOpen(true)}
-          className="gap-1.5 font-semibold text-xs px-3.5 sm:px-4 h-10 rounded-xl shrink-0 shadow-xs active:scale-[0.97] transition-all whitespace-nowrap"
+          className="gap-1.5 font-semibold text-xs px-3.5 sm:px-4 h-9.5 rounded-xl shrink-0 shadow-xs active:scale-[0.97] transition-all whitespace-nowrap"
         >
           <Plus className="h-4 w-4 shrink-0" />
-          <span>Tambah </span>
+          <span>Tambah</span>
         </Button>
       </Card>
 
@@ -261,17 +232,19 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
               triggerHaptic("selection");
               setSelectedYear("Semua");
             }}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 active:scale-95 ${selectedYear === "Semua"
-              ? "bg-accent text-white border-accent shadow-xs scale-[1.02]"
-              : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
-              }`}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 active:scale-95 ${
+              selectedYear === "Semua"
+                ? "bg-accent text-white border-accent shadow-xs scale-[1.02]"
+                : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
+            }`}
           >
             <span>Semua</span>
             <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${selectedYear === "Semua"
-                ? "bg-white/20 text-white animate-badge-bump"
-                : "bg-bg-page text-text-secondary border border-border-soft/40"
-                }`}
+              className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+                selectedYear === "Semua"
+                  ? "bg-white/20 text-white animate-badge-bump"
+                  : "bg-bg-page text-text-secondary border border-border-soft/40"
+              }`}
             >
               {list.length}
             </span>
@@ -285,17 +258,19 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
                 triggerHaptic("selection");
                 setSelectedYear(String(yr));
               }}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 active:scale-95 ${selectedYear === String(yr)
-                ? "bg-accent text-white border-accent shadow-xs scale-[1.02]"
-                : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
-                }`}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer border flex items-center gap-1.5 active:scale-95 ${
+                selectedYear === String(yr)
+                  ? "bg-accent text-white border-accent shadow-xs scale-[1.02]"
+                  : "bg-bg-surface text-text-secondary border-border-soft hover:border-accent/40"
+              }`}
             >
               <span>{yr}</span>
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${selectedYear === String(yr)
-                  ? "bg-white/20 text-white animate-badge-bump"
-                  : "bg-bg-page text-text-secondary border border-border-soft/40"
-                  }`}
+                className={`px-1.5 py-0.2 rounded-md text-[10px] font-bold ${
+                  selectedYear === String(yr)
+                    ? "bg-white/20 text-white animate-badge-bump"
+                    : "bg-bg-page text-text-secondary border border-border-soft/40"
+                }`}
               >
                 {yearCounts[yr]}
               </span>
@@ -322,71 +297,89 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
           onAction={() => setSelectedYear("Semua")}
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
           {filteredList.map((item) => {
             const monthAccent = MONTH_ACCENTS[(item.bulan - 1) % 12];
             const monthName = MONTH_NAMES[item.bulan - 1];
+            const monthShort = MONTH_SHORT[(item.bulan - 1) % 12];
 
             const isCurrentMonth = item.bulan === currentMonth && item.tahun === currentYear;
-            const isGarapanCompleted = completedGarapanMap.get(item.id);
             const appCount = item.aplikasi?.length || 0;
 
             return (
               <Card
                 key={`${item.id}-${selectedYear}`}
                 onClick={() => handleNavigate(`/garapan/${item.id}`)}
-                className={`card-stagger group relative flex items-center gap-3.5 p-4 sm:p-5 pr-12 cursor-pointer transition-all duration-200 min-h-[80px] active:scale-[0.985] ${isCurrentMonth
-                  ? "bg-bg-surface border-accent/40 shadow-xs hover:border-accent/60"
-                  : "bg-bg-surface/75 border-border-soft hover:bg-bg-surface hover:border-accent/30"
-                  }`}
+                className={`card-stagger group relative flex items-center justify-between p-3.5 sm:p-4 rounded-2xl cursor-pointer transition-all duration-200 min-h-[76px] active:scale-[0.985] hover:z-10 focus-within:z-20 border ${
+                  isCurrentMonth
+                    ? "bg-bg-surface border-accent/45 shadow-xs hover:border-accent/60 ring-1 ring-accent/15"
+                    : "bg-bg-surface border-border-soft hover:border-accent/35 hover:shadow-2xs"
+                }`}
               >
-                {/* Month color icon */}
-                <div className={`h-11 w-11 rounded-2xl bg-gradient-to-br ${monthAccent} text-accent flex items-center justify-center shrink-0 border border-accent/10 relative`}>
-                  <Calendar className="h-5 w-5 group-hover:scale-110 transition-transform duration-300 ease-out" />
-                </div>
-                {/* Title, Year, Badge & Metadata */}
-                <div className="flex-1 min-w-0 flex flex-col justify-center gap-1 font-display">
-                  <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <h3 className="text-[17px] font-bold text-text-primary truncate leading-snug py-0.5">
-                      {monthName}
-                    </h3>
-                    {isCurrentMonth && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft text-accent border border-accent/30 px-2 py-0.5 text-[10px] font-bold shrink-0 select-none animate-glowing-ring">
-                        <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-                        Bulan Ini
-                      </span>
-                    )}
-                    {isGarapanCompleted && (
-                      <span className="inline-flex items-center justify-center h-5.5 w-5.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-500 shrink-0 select-none" title="Garapan Selesai">
-                        <CheckCircle2 className="h-3.5 w-3.5 stroke-[2.5]" />
-                      </span>
-                    )}
+                {/* Main Content */}
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                  {/* Month Calendar Tile */}
+                  <div
+                    className={`h-11 w-11 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br ${monthAccent.gradient} border ${monthAccent.border} flex flex-col items-center justify-center shrink-0 shadow-2xs select-none transition-transform duration-300 group-hover:scale-105`}
+                  >
+                    <span className={`text-[9px] sm:text-[9.5px] font-extrabold tracking-wider uppercase leading-none ${monthAccent.text}`}>
+                      {monthShort}
+                    </span>
+                    <span className="text-[15px] sm:text-[16px] font-extrabold font-display text-text-primary leading-tight mt-0.5">
+                      {String(item.bulan).padStart(2, "0")}
+                    </span>
                   </div>
-                  {appCount > 0 && (
-                    <p className="text-[11.5px] text-text-secondary font-sans font-medium leading-normal">
-                      {appCount} aplikasi tercatat
+
+                  {/* Title & App count */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 font-display">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <h3 className="text-[16px] sm:text-[17px] font-bold text-text-primary truncate leading-snug">
+                        {monthName}
+                      </h3>
+                      {isCurrentMonth && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft text-accent border border-accent/30 px-2 py-0.5 text-[10px] font-bold shrink-0 select-none animate-glowing-ring">
+                          <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+                          Bulan Ini
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-[12px] text-text-secondary font-sans font-medium">
+                      {appCount > 0 ? `${appCount} aplikasi tercatat` : "Belum ada aplikasi"}
                     </p>
-                  )}
+                  </div>
                 </div>
 
-                {/* Dropdown Action Menu */}
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <DropdownMenu
-                    trigger={
-                      <button className="p-1.5 rounded-xl text-text-secondary hover:bg-accent-soft/80 hover:text-text-primary transition-all duration-150 cursor-pointer">
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-                    }
-                  >
-                    <DropdownMenuItem onClick={() => setEditingItem(item)}>
-                      <Edit2 className="h-3.5 w-3.5" />
-                      <span>Edit</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem isDanger onClick={() => setDeletingItem(item)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                      <span>Hapus</span>
-                    </DropdownMenuItem>
-                  </DropdownMenu>
+                {/* Actions & Chevron */}
+                <div className="flex items-center gap-0.5 shrink-0 ml-2">
+                  {/* Dropdown Action Menu */}
+                  <div className="relative z-10" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu
+                      trigger={
+                        <button
+                          type="button"
+                          aria-label="Opsi garapan"
+                          className="h-8.5 w-8.5 rounded-xl text-text-secondary hover:bg-accent-soft/80 hover:text-text-primary transition-all duration-150 cursor-pointer flex items-center justify-center active:scale-95"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      }
+                    >
+                      <DropdownMenuItem onClick={() => setEditingItem(item)}>
+                        <Edit2 className="h-3.5 w-3.5" />
+                        <span>Edit</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem isDanger onClick={() => setDeletingItem(item)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Hapus</span>
+                      </DropdownMenuItem>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Chevron Indicator */}
+                  <div className="h-8.5 w-5 flex items-center justify-center text-text-secondary/40 group-hover:text-accent group-hover:translate-x-0.5 transition-all duration-200">
+                    <ChevronRight className="h-4.5 w-4.5" />
+                  </div>
                 </div>
               </Card>
             );

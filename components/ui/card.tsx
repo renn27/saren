@@ -10,6 +10,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
+        data-card=""
         className={twMerge(
           "bg-bg-surface border border-border-soft rounded-3xl p-6 font-sans transition-all duration-200 ease-out",
           // Base shadow using CSS var

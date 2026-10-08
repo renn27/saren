@@ -54,7 +54,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { triggerHaptic } from "@/lib/utils/haptics";
-import { CalculatorPopover } from "@/components/ui/calculator-popover";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { createKolom, deleteKolom, swapKolomUrutan, updateKolom, clearKolomData } from "@/lib/actions/kolom";
 import { createAkun, updateAkun, deleteAkun, getAllAccountsForAutofill, swapAkunUrutan, bulkUpdateCentang } from "@/lib/actions/akun";
@@ -62,8 +62,17 @@ import { updateAplikasi } from "@/lib/actions/aplikasi";
 import { TipeKolom } from "@prisma/client";
 import { evaluateFormula } from "@/lib/utils/formulaEvaluator";
 import { twMerge } from "tailwind-merge";
-import { AccountAutofillPicker } from "@/components/ui/account-autofill-picker";
 import { compressImageFile } from "@/lib/utils/imageCompressor";
+
+const CalculatorPopover = dynamic(
+  () => import("@/components/ui/calculator-popover").then((mod) => mod.CalculatorPopover),
+  { ssr: false }
+);
+
+const AccountAutofillPicker = dynamic(
+  () => import("@/components/ui/account-autofill-picker").then((mod) => mod.AccountAutofillPicker),
+  { ssr: false }
+);
 
 interface Garapan {
   id: string;

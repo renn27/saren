@@ -452,7 +452,7 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
                 </h3>
 
                 {/* Dropdown Menu */}
-                <div className="absolute right-2 top-3 sm:right-3 sm:top-4">
+                <div className="absolute right-2 top-3 sm:right-3 sm:top-4 z-10">
                   <DropdownMenu
                     trigger={
                       <button 

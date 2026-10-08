@@ -13,6 +13,9 @@ export const metadata = {
   title: "Detail Aplikasi - SAREN",
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function Page({ params }: PageProps) {
   const resolvedParams = await params;
 

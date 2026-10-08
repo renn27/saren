@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Nomor } from "@prisma/client";
 import { Plus, Trash2, Edit, Save, Hash, MoreVertical, Smartphone, Phone, Calendar, Copy, Check, ArrowUpDown, ArrowDown, ArrowUp, Coins, Clock, Calculator } from "lucide-react";
-import { CalculatorPopover } from "@/components/ui/calculator-popover";
+import dynamic from "next/dynamic";
+
+const CalculatorPopover = dynamic(
+  () => import("@/components/ui/calculator-popover").then((mod) => mod.CalculatorPopover),
+  { ssr: false }
+);
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
@@ -31,6 +36,11 @@ interface NomorClientProps {
 
 export function NomorClient({ initialData }: NomorClientProps) {
   const [data, setData] = useState<Nomor[]>(initialData);
+
+  useEffect(() => {
+    setData(initialData);
+  }, [initialData]);
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

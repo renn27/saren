@@ -138,6 +138,7 @@ export async function importAplikasiToGarapan(standaloneAplikasiId: string, gara
     });
 
     revalidatePath(`/garapan/${garapanId}`);
+    revalidatePath("/");
     return { success: true, aplikasi: newApp };
   } catch (error) {
     console.error("Failed to import aplikasi to garapan:", error);
@@ -236,6 +237,7 @@ export async function createAplikasi(garapanId: string | null, formData: FormDat
 
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}`);
+      revalidatePath("/");
     } else {
       revalidatePath("/aplikasi");
     }
@@ -323,6 +325,7 @@ export async function updateAplikasi(id: string, garapanId: string | null, formD
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}`);
       revalidatePath(`/garapan/${garapanId}/aplikasi/${id}`);
+      revalidatePath("/");
     } else {
       revalidatePath("/aplikasi");
       revalidatePath(`/aplikasi/${id}`);
@@ -351,6 +354,7 @@ export async function deleteAplikasi(id: string, garapanId: string | null) {
 
     if (garapanId) {
       revalidatePath(`/garapan/${garapanId}`);
+      revalidatePath("/");
     } else {
       revalidatePath("/aplikasi");
     }

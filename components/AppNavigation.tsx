@@ -106,7 +106,7 @@ export function AppNavigationSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              prefetch={true}
+              prefetch={false}
               title={isCollapsed ? item.name : undefined}
               className={twMerge(
                 "flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group relative",
@@ -147,7 +147,7 @@ export function AppNavigationBottom() {
             <Link
               key={item.href}
               href={item.href}
-              prefetch={true}
+              prefetch={false}
               onClick={() => triggerHaptic("light")}
               className="group flex-1 flex flex-col items-center justify-center h-full py-1 gap-0.5 select-none cursor-pointer active:scale-95 transition-transform duration-150"
             >

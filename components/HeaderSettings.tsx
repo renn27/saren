@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { logout } from "@/lib/actions/auth";
 import { saveSubscription, unsubscribe, sendTestPush } from "@/lib/actions/push";
 import { exportFullBackup, restoreFullBackup } from "@/lib/actions/backup";
+import { APP_VERSION } from "@/lib/constants/version";
 import { toast } from "sonner";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -335,6 +336,14 @@ export function HeaderSettings() {
           <LogOut className="h-4 w-4 shrink-0" />
           <span>Keluar</span>
         </DropdownMenuItem>
+
+        {/* Version Info Footer */}
+        <div className="px-3.5 py-2 border-t border-border-soft/60 flex items-center justify-between text-text-secondary select-none">
+          <span className="text-[11px] font-medium">Versi</span>
+          <span className="font-mono text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-accent-soft text-accent border border-accent/20">
+            v{APP_VERSION}
+          </span>
+        </div>
       </DropdownMenu>
 
       {/* Backup & Restore Modal */}

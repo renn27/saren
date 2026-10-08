@@ -160,11 +160,16 @@ html { scrollbar-width: none; } /* Firefox */
   animation: gentle-float 3s ease-in-out infinite;
 }
 
-/* ── Fix table stacking context for cells containing an open dropdown ── */
+/* ── Fix stacking context for cards, table rows, and cells containing an open dropdown ── */
+.card-stagger:has([data-dropdown-open="true"]),
+[data-card]:has([data-dropdown-open="true"]),
+tr:has([data-dropdown-open="true"]),
+th:has([data-dropdown-open="true"]),
+td:has([data-dropdown-open="true"]),
 th:has(.absolute),
 td:has(.absolute) {
   position: relative;
-  z-index: 35 !important;
+  z-index: 40 !important;
 }
 
 /* ── Subtle shimmer on skeleton loaders ── */

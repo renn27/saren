@@ -41,6 +41,7 @@ export interface DropdownMenuProps {
   children: React.ReactNode;
   align?: "left" | "right";
   className?: string;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function DropdownMenu({
@@ -48,11 +49,34 @@ export function DropdownMenu({
   children,
   align = "right",
   className,
+  onOpenChange,
 }: DropdownMenuProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [shouldRender, setShouldRender] = React.useState(false);
   const [isAnimating, setIsAnimating] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Notify parent on open change
+  React.useEffect(() => {
+    onOpenChange?.(isOpen);
+  }, [isOpen, onOpenChange]);
+
+  // Elevate parent card/row stacking context when dropdown is open
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+    const parentCard = containerRef.current.closest<HTMLElement>(
+      "[data-card], .card-stagger, tr, td, [data-dropdown-elevate]"
+    );
+    if (!parentCard) return;
+
+    if (isOpen) {
+      const prevZIndex = parentCard.style.zIndex;
+      parentCard.style.zIndex = "40";
+      return () => {
+        parentCard.style.zIndex = prevZIndex;
+      };
+    }
+  }, [isOpen]);
 
   // Open / close with animation
   React.useEffect(() => {
@@ -88,7 +112,12 @@ export function DropdownMenu({
   }, [isOpen]);
 
   return (
-    <div ref={containerRef} className="relative inline-block text-left">
+    <div
+      ref={containerRef}
+      data-state={isOpen ? "open" : "closed"}
+      data-dropdown-open={isOpen ? "true" : undefined}
+      className={twMerge("relative inline-block text-left", isOpen && "z-40")}
+    >
       <div
         onClick={(e) => {
           e.preventDefault();

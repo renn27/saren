@@ -3,6 +3,9 @@ import { getGarapan } from "@/lib/actions/garapan";
 import { getAplikasi } from "@/lib/actions/aplikasi";
 import { AplikasiDetailClient } from "./AplikasiDetailClient";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 interface PageProps {
   params: Promise<{
     garapanId: string;

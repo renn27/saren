@@ -15,6 +15,17 @@ const kolomSchema = z.object({
   isAccumulated: z.boolean().optional(),
 });
 
+function revalidateKolomPaths(garapanId: string | null, aplikasiId: string) {
+  if (garapanId) {
+    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    revalidatePath(`/garapan/${garapanId}`);
+    revalidatePath("/");
+  } else {
+    revalidatePath(`/aplikasi/${aplikasiId}`);
+    revalidatePath("/aplikasi");
+  }
+}
+
 export async function createKolom(
   garapanId: string | null,
   formData: {
@@ -67,11 +78,7 @@ export async function createKolom(
       },
     });
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateKolomPaths(garapanId, aplikasiId);
     return { success: true };
   } catch (error) {
     console.error("Error creating kolom:", error);
@@ -105,11 +112,7 @@ export async function deleteKolom(id: string, garapanId: string | null, aplikasi
       );
     }
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateKolomPaths(garapanId, aplikasiId);
     return { success: true };
   } catch (error) {
     console.error("Error deleting kolom:", error);
@@ -168,11 +171,7 @@ export async function updateKolom(
       },
     });
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateKolomPaths(garapanId, aplikasiId);
     return { success: true };
   } catch (error) {
     console.error("Error updating kolom:", error);
@@ -235,11 +234,7 @@ export async function swapKolomUrutan(
       }),
     ]);
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateKolomPaths(garapanId, aplikasiId);
     return { success: true };
   } catch (error) {
     console.error("Error swapping kolom:", error);
@@ -276,11 +271,7 @@ export async function clearKolomData(id: string, garapanId: string | null, aplik
       })
     );
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateKolomPaths(garapanId, aplikasiId);
     return { success: true };
   } catch (error) {
     console.error("Error clearing kolom data:", error);

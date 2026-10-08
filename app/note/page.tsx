@@ -5,6 +5,9 @@ export const metadata = {
   title: "Note - SAREN",
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function NotePage() {
   const [notes, labels, folders] = await Promise.all([
     db.note.findMany({

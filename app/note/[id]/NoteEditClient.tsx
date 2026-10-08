@@ -342,6 +342,11 @@ export function NoteEditClient({ initialNote, initialLabels, initialFolders }: P
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  React.useEffect(() => {
+    setNote(initialNote);
+    lastSavedRef.current = serializeNote(initialNote);
+  }, [initialNote]);
+
   // Link Previews State
   const [linkPreviews, setLinkPreviews] = React.useState<{
     url: string;

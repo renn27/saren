@@ -12,6 +12,17 @@ const akunSchema = z.object({
   nomorHp: z.string().nullable().optional(),
 });
 
+function revalidateAkunPaths(garapanId: string | null, aplikasiId: string) {
+  if (garapanId) {
+    revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
+    revalidatePath(`/garapan/${garapanId}`);
+    revalidatePath("/");
+  } else {
+    revalidatePath(`/aplikasi/${aplikasiId}`);
+    revalidatePath("/aplikasi");
+  }
+}
+
 export async function createAkun(
   garapanId: string | null,
   data: {
@@ -92,11 +103,7 @@ export async function createAkun(
       },
     });
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateAkunPaths(garapanId, aplikasiId);
     return { success: true };
   } catch (error) {
     console.error("Error creating akun:", error);
@@ -183,11 +190,7 @@ export async function updateAkun(
       },
     });
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateAkunPaths(garapanId, aplikasiId);
     return { success: true };
   } catch (error) {
     console.error("Error updating akun:", error);
@@ -218,11 +221,7 @@ export async function deleteAkun(id: string, garapanId: string | null, aplikasiI
       );
     }
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateAkunPaths(garapanId, aplikasiId);
     return { success: true };
   } catch (error) {
     console.error("Error deleting akun:", error);
@@ -286,11 +285,7 @@ export async function swapAkunUrutan(
       }),
     ]);
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateAkunPaths(garapanId, aplikasiId);
     return { success: true };
   } catch (error) {
     console.error("Error swapping akun:", error);
@@ -345,11 +340,7 @@ export async function bulkUpdateCentang(
       })
     );
 
-    if (garapanId) {
-      revalidatePath(`/garapan/${garapanId}/aplikasi/${aplikasiId}`);
-    } else {
-      revalidatePath(`/aplikasi/${aplikasiId}`);
-    }
+    revalidateAkunPaths(garapanId, aplikasiId);
 
     return { success: true };
   } catch (error) {
