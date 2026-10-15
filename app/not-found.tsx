@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Compass, Home } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export const metadata = {
   title: "404 - Halaman Tidak Ditemukan - SAREN",
@@ -29,11 +28,12 @@ export default function NotFound() {
         </p>
 
         {/* Return Button */}
-        <Link href="/" className="w-full">
-          <Button variant="primary" className="w-full justify-center gap-2 h-11">
-            <Home className="h-4 w-4" />
-            <span>Kembali ke Beranda</span>
-          </Button>
+        <Link
+          href="/"
+          className="w-full inline-flex items-center justify-center gap-2 h-11 px-5 rounded-2xl bg-accent text-white font-medium hover:bg-accent/90 shadow-sm transition-all duration-200 active:scale-[0.97] text-sm cursor-pointer"
+        >
+          <Home className="h-4 w-4" />
+          <span>Kembali ke Beranda</span>
         </Link>
       </div>
     </div>
