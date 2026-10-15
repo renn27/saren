@@ -65,11 +65,6 @@ export async function getStandaloneAplikasiList() {
         },
         akun: {
           select: {
-            id: true,
-            nama: true,
-            device: true,
-            nomorHp: true,
-            urutan: true,
             customValues: true,
           },
         },

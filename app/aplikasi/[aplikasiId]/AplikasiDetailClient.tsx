@@ -131,13 +131,8 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
   const router = useRouter();
   const pathname = usePathname();
 
-  // Route transition state
-  const [isExiting, setIsExiting] = React.useState(false);
   const handleNavigate = (url: string) => {
-    setIsExiting(true);
-    setTimeout(() => {
-      router.push(url);
-    }, 250);
+    router.push(url);
   };
 
   const [isReorderMode, setIsReorderMode] = React.useState(false);
@@ -996,7 +991,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
   };
 
   return (
-    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'page-enter'}`}>
+    <div className="w-full">
       {/* Breadcrumbs */}
       <div className="flex flex-col gap-2 mb-3">
         <Button
@@ -1680,7 +1675,7 @@ export function AplikasiDetailClient({ aplikasi, nomorList }: AplikasiDetailClie
                                 col.tipeKolom === "NOMOR" || col.tipeKolom === "NOMINAL" ? "font-mono" : ""
                               } ${
                                 isCellSelected
-                                  ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs"
+                                  ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs animate-cell-pop"
                                   : "hover:bg-accent-soft/30 text-text-primary"
                               }`}
                             >

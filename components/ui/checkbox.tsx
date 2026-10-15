@@ -39,11 +39,11 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
           />
           <span
             className={twMerge(
-              "h-5 w-5 rounded-md border border-border-soft bg-bg-surface flex items-center justify-center transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-accent",
-              localChecked && "bg-accent border-accent text-white"
+              "h-5 w-5 rounded-md border border-border-soft bg-bg-surface flex items-center justify-center transition-all duration-150 active:scale-90 peer-focus-visible:ring-2 peer-focus-visible:ring-accent",
+              localChecked && "bg-accent border-accent text-white shadow-2xs"
             )}
           >
-            {localChecked && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+            {localChecked && <Check className="h-3.5 w-3.5 stroke-[3] animate-check-pop" />}
           </span>
         </span>
       </label>

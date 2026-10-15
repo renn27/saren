@@ -26,6 +26,11 @@ export function ThemeToggle() {
       document.documentElement.classList.remove("dark");
       document.documentElement.setAttribute("data-theme", "light");
     }
+
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute("content", nextTheme === "dark" ? "#080D14" : "#F8FAFC");
+    }
   };
 
   return (

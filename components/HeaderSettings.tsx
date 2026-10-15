@@ -264,11 +264,11 @@ export function HeaderSettings() {
         className="w-56"
         trigger={
           <button
-            className="h-9 w-9 flex items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-text-secondary hover:bg-accent-soft hover:text-accent hover:border-accent/30 transition-all duration-200 cursor-pointer"
+            className="h-9 w-9 flex items-center justify-center rounded-xl border border-border-soft bg-bg-surface text-text-secondary hover:bg-accent-soft hover:text-accent hover:border-accent/30 transition-all duration-200 cursor-pointer active:scale-90 group"
             title="Pengaturan"
             aria-label="Pengaturan"
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="h-4 w-4 transition-transform duration-300 group-hover:rotate-45 group-active:rotate-90" />
           </button>
         }
       >
@@ -296,14 +296,17 @@ export function HeaderSettings() {
           <div className="flex items-center justify-between py-0.5 text-xs">
             <span className="font-semibold text-text-secondary">Notifikasi Push</span>
             <button
+              type="button"
+              role="switch"
+              aria-checked={isSubscribed}
               onClick={handleTogglePush}
-              className={`w-9 h-5 rounded-full relative transition-colors duration-200 ${
-                isSubscribed ? "bg-accent" : "bg-border-soft/80"
-              } cursor-pointer`}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-all duration-200 ease-in-out active:scale-95 ${
+                isSubscribed ? "bg-accent" : "bg-border-soft/80 dark:bg-slate-700"
+              }`}
             >
               <span
-                className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all duration-200 ${
-                  isSubscribed ? "left-[18px]" : "left-0.5"
+                className={`pointer-events-none block h-4 w-4 rounded-full bg-white shadow-xs transition-transform duration-250 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)] ${
+                  isSubscribed ? "translate-x-4" : "translate-x-0"
                 }`}
               />
             </button>

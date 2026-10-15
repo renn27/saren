@@ -10,7 +10,7 @@ export const revalidate = 0;
 
 export default async function NomorPage() {
   const nomorList = await db.nomor.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: { masaAktif: "asc" },
   });
 
   return <NomorClient initialData={nomorList} />;

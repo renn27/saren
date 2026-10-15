@@ -1,16 +1,12 @@
-// SAREN Service Worker - v12
-// Strategi: Cache-First untuk aset statis, Stale-While-Revalidate untuk halaman HTML (0ms load)
+// SAREN Service Worker - v13
+// Strategi: Cache-First untuk aset statis, Network-First untuk navigasi HTML (selalu fresh saat online, offline fallback)
 
-const CACHE_VERSION = 'v12';
+const CACHE_VERSION = 'v13';
 const STATIC_CACHE  = `saren-static-${CACHE_VERSION}`;
 const PAGES_CACHE   = `saren-pages-${CACHE_VERSION}`;
 
-// Aset statis dan halaman inti yang selalu di-cache saat install
+// Aset statis inti yang selalu di-cache saat install
 const STATIC_ASSETS = [
-  '/',
-  '/aplikasi',
-  '/nomor',
-  '/note',
   '/offline.html',
   '/manifest.json',
   '/saren_logo.png',
@@ -79,9 +75,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Halaman navigasi HTML: Stale-While-Revalidate untuk respon instan 0ms
+  // Halaman navigasi HTML: Network-First (online selalu ambil data database segar, offline fallback ke cache)
   if (request.headers.get('accept')?.includes('text/html')) {
-    event.respondWith(staleWhileRevalidateWithOfflineFallback(request));
+    event.respondWith(networkFirstNavigationWithOfflineFallback(request));
     return;
   }
 
@@ -106,25 +102,25 @@ async function cacheFirst(request, cacheName) {
   }
 }
 
-// ── Helper: Stale-While-Revalidate dengan Fallback Offline ────────────────────
-async function staleWhileRevalidateWithOfflineFallback(request) {
-  const cache = await caches.open(PAGES_CACHE);
-  const cachedResponse = await cache.match(request);
+// ── Helper: Network-First untuk Navigasi HTML dengan Fallback Offline ─────────
+async function networkFirstNavigationWithOfflineFallback(request) {
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse && networkResponse.ok) {
+      const cache = await caches.open(PAGES_CACHE);
+      cache.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  } catch (err) {
+    // Jika offline / koneksi terputus, gunakan snapshot cache terakhir
+    const cache = await caches.open(PAGES_CACHE);
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) return cachedResponse;
 
-  const fetchPromise = fetch(request)
-    .then((networkResponse) => {
-      if (networkResponse && networkResponse.ok) {
-        cache.put(request, networkResponse.clone());
-      }
-      return networkResponse;
-    })
-    .catch(async () => {
-      if (cachedResponse) return cachedResponse;
-      const staticCache = await caches.open(STATIC_CACHE);
-      return (await staticCache.match('/offline.html')) || new Response('', { status: 503 });
-    });
-
-  return cachedResponse || fetchPromise;
+    // Jika belum pernah dibuka, tampilkan offline.html
+    const staticCache = await caches.open(STATIC_CACHE);
+    return (await staticCache.match('/offline.html')) || new Response('Offline', { status: 503 });
+  }
 }
 
 // ── Helper: Network-First dengan cache ───────────────────────────────────────

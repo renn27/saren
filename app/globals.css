@@ -29,14 +29,14 @@
 
 :root {
   /* LIGHT MODE */
-  --bg-page: #F4F6F8;
-  --bg-glow: #EBF0F5;
+  --bg-page: #F8FAFC;
+  --bg-glow: #F1F5F9;
   --bg-surface: #FFFFFF;
   --border-soft: #E2E8F0;
   --text-primary: #0F172A;
   --text-secondary: #64748B;
   --accent: #0891B2;
-  --accent-soft: rgba(8, 145, 178, 0.09);
+  --accent-soft: rgba(8, 145, 178, 0.08);
   --danger: #E11D48;
   --danger-soft: rgba(225, 29, 72, 0.08);
   --success: #10B981;
@@ -53,10 +53,10 @@
   --background: var(--bg-page);
   --foreground: var(--text-primary);
 
-  /* Shared shadows */
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-  --shadow-modal: 0 20px 60px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.06);
+  /* Shared shadows: multi-layer subtle depth */
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
+  --shadow-card-hover: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 10px 20px -3px rgba(15, 23, 42, 0.05);
+  --shadow-modal: 0 20px 60px rgba(15, 23, 42, 0.12), 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 .dark {
@@ -64,11 +64,11 @@
   --bg-page: #080D14;
   --bg-glow: #0E1829;
   --bg-surface: #0F1623;
-  --border-soft: #1A2438;
-  --text-primary: #F1F5F9;
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --text-primary: #F8FAFC;
   --text-secondary: #94A3B8;
-  --accent: #05B6D4;
-  --accent-soft: rgba(5, 182, 212, 0.12);
+  --accent: #06B6D4;
+  --accent-soft: rgba(6, 182, 212, 0.12);
   --danger: #F43F5E;
   --danger-soft: rgba(244, 63, 94, 0.12);
   --success: #10B981;
@@ -82,9 +82,10 @@
   --warning-text: #F59E0B;
   --warning-hover: #2C1E0A;
 
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.2);
-  --shadow-modal: 0 20px 60px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.3);
+  /* Layered dark elevation with subtle top rim highlight */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 0 rgba(255,255,255,0.05);
+  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.45), inset 0 1px 0 0 rgba(255,255,255,0.08);
+  --shadow-modal: 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 0 rgba(255,255,255,0.06);
 }
 
 
@@ -126,38 +127,47 @@ html { scrollbar-width: none; } /* Firefox */
   scrollbar-width: none !important;  /* Firefox */
 }
 
-/* ── Stagger animation for grid cards ── */
-@keyframes card-enter {
-  from {
+/* ── Mobile Bottom Sheet Animations ── */
+@keyframes bottom-sheet-in {
+  0% {
     opacity: 0;
-    transform: translateY(12px) scale(0.97);
+    transform: translateY(100%);
   }
-  to {
+  100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
-.card-stagger {
-  animation: card-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+@keyframes bottom-sheet-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
 }
-.card-stagger:nth-child(1)  { animation-delay: 0ms; }
-.card-stagger:nth-child(2)  { animation-delay: 50ms; }
-.card-stagger:nth-child(3)  { animation-delay: 90ms; }
-.card-stagger:nth-child(4)  { animation-delay: 125ms; }
-.card-stagger:nth-child(5)  { animation-delay: 155ms; }
-.card-stagger:nth-child(6)  { animation-delay: 180ms; }
-.card-stagger:nth-child(7)  { animation-delay: 205ms; }
-.card-stagger:nth-child(8)  { animation-delay: 225ms; }
-.card-stagger:nth-child(n+9){ animation-delay: 245ms; }
 
-/* ── Empty state float animation ── */
-@keyframes gentle-float {
-  0%, 100% { transform: translateY(0); }
-  50%       { transform: translateY(-6px); }
+.animate-bottom-sheet-in {
+  animation: bottom-sheet-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.empty-float {
-  animation: gentle-float 3s ease-in-out infinite;
+
+.animate-bottom-sheet-out {
+  animation: bottom-sheet-out 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Sticky column elevation shadow for tables ── */
+th.sticky.left-0,
+td.sticky.left-0,
+.sticky-col-shadow {
+  box-shadow: 3px 0 8px -3px rgba(0, 0, 0, 0.08);
+}
+:where(.dark) th.sticky.left-0,
+:where(.dark) td.sticky.left-0,
+:where(.dark) .sticky-col-shadow {
+  box-shadow: 3px 0 10px -3px rgba(0, 0, 0, 0.45);
 }
 
 /* ── Fix stacking context for cards, table rows, and cells containing an open dropdown ── */
@@ -182,23 +192,23 @@ td:has(.absolute) {
 @keyframes page-enter {
   0% {
     opacity: 0;
-    transform: translateY(14px) scale(0.985);
+    transform: translateY(6px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 .page-enter {
-  animation: page-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: page-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ── Card Staggered Cascade Entrance ── */
 @keyframes card-entrance {
   0% {
     opacity: 0;
-    transform: translateY(18px) scale(0.96);
+    transform: translateY(10px) scale(0.985);
   }
   100% {
     opacity: 1;
@@ -207,18 +217,17 @@ td:has(.absolute) {
 }
 
 .card-stagger {
-  animation: card-entrance 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: card-entrance 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.card-stagger:nth-child(1) { animation-delay: 0.02s; }
-.card-stagger:nth-child(2) { animation-delay: 0.05s; }
-.card-stagger:nth-child(3) { animation-delay: 0.08s; }
-.card-stagger:nth-child(4) { animation-delay: 0.11s; }
-.card-stagger:nth-child(5) { animation-delay: 0.14s; }
-.card-stagger:nth-child(6) { animation-delay: 0.17s; }
-.card-stagger:nth-child(7) { animation-delay: 0.20s; }
-.card-stagger:nth-child(8) { animation-delay: 0.23s; }
-.card-stagger:nth-child(n+9) { animation-delay: 0.26s; }
+.card-stagger:nth-child(1) { animation-delay: 0.015s; }
+.card-stagger:nth-child(2) { animation-delay: 0.035s; }
+.card-stagger:nth-child(3) { animation-delay: 0.055s; }
+.card-stagger:nth-child(4) { animation-delay: 0.075s; }
+.card-stagger:nth-child(5) { animation-delay: 0.095s; }
+.card-stagger:nth-child(6) { animation-delay: 0.115s; }
+.card-stagger:nth-child(7) { animation-delay: 0.135s; }
+.card-stagger:nth-child(n+8) { animation-delay: 0.15s; }
 
 /* ── Empty State Floating Icon ── */
 @keyframes empty-floating {

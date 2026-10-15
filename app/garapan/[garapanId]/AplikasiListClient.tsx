@@ -86,13 +86,8 @@ export function AplikasiListClient({ garapan, initialList, standaloneList = [] }
     setList(initialList);
   }, [initialList]);
 
-  // Route transition state
-  const [isExiting, setIsExiting] = React.useState(false);
   const handleNavigate = (url: string) => {
-    setIsExiting(true);
-    setTimeout(() => {
-      router.push(url);
-    }, 250);
+    router.push(url);
   };
 
   // Modals state
@@ -334,7 +329,7 @@ export function AplikasiListClient({ garapan, initialList, standaloneList = [] }
   const formattedMonthYear = `${MONTH_NAMES[garapan.bulan - 1]} ${garapan.tahun}`;
 
   return (
-    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'page-enter'}`}>
+    <div className="w-full">
       {/* Back Button */}
       <div className="mb-3">
         <Button

@@ -64,16 +64,16 @@ const colorMap: Record<
   { bg: string; bgDark: string; name: string; hex: string }
 > = {
   default: { bg: "",          bgDark: "",              name: "Bawaan",    hex: "" },
-  red:     { bg: "#FFF1F2",   bgDark: "#2D161A",       name: "Merah",     hex: "#E11D48" },
-  orange:  { bg: "#FFF7ED",   bgDark: "#331C0E",       name: "Jingga",    hex: "#EA580C" },
-  yellow:  { bg: "#FEFCE8",   bgDark: "#2D280F",       name: "Kuning",    hex: "#CA8A04" },
-  green:   { bg: "#F0FDF4",   bgDark: "#112918",       name: "Hijau",     hex: "#16A34A" },
-  teal:    { bg: "#F0FDFA",   bgDark: "#0E2725",       name: "Teal",      hex: "#0D9488" },
-  blue:    { bg: "#F0F9FF",   bgDark: "#10253A",       name: "Biru",      hex: "#0284C7" },
-  darkblue:{ bg: "#EEF2FF",   bgDark: "#151D44",       name: "Biru Tua",  hex: "#4F46E5" },
-  purple:  { bg: "#FAF5FF",   bgDark: "#22153D",       name: "Ungu",      hex: "#9333EA" },
-  pink:    { bg: "#FDF2F8",   bgDark: "#2F1424",       name: "Pink",      hex: "#DB2777" },
-  brown:   { bg: "#FAF7F2",   bgDark: "#251B15",       name: "Cokelat",   hex: "#854D0E" },
+  red:     { bg: "#FFF1F2",   bgDark: "#1E1114",       name: "Merah",     hex: "#E11D48" },
+  orange:  { bg: "#FFF7ED",   bgDark: "#20140D",       name: "Jingga",    hex: "#EA580C" },
+  yellow:  { bg: "#FEFCE8",   bgDark: "#1F1B0D",       name: "Kuning",    hex: "#CA8A04" },
+  green:   { bg: "#F0FDF4",   bgDark: "#0E1F14",       name: "Hijau",     hex: "#16A34A" },
+  teal:    { bg: "#F0FDFA",   bgDark: "#0C1E1D",       name: "Teal",      hex: "#0D9488" },
+  blue:    { bg: "#F0F9FF",   bgDark: "#0D1D2E",       name: "Biru",      hex: "#0284C7" },
+  darkblue:{ bg: "#EEF2FF",   bgDark: "#111736",       name: "Biru Tua",  hex: "#4F46E5" },
+  purple:  { bg: "#FAF5FF",   bgDark: "#1B122F",       name: "Ungu",      hex: "#9333EA" },
+  pink:    { bg: "#FDF2F8",   bgDark: "#22111D",       name: "Pink",      hex: "#DB2777" },
+  brown:   { bg: "#FAF7F2",   bgDark: "#1C1613",       name: "Cokelat",   hex: "#854D0E" },
   gray:    { bg: "#F8FAFC",   bgDark: "#1E293B",       name: "Abu-abu",   hex: "#475569" },
 };
 

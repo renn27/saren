@@ -64,13 +64,8 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
     setList(initialList);
   }, [initialList]);
 
-  // Route transition state
-  const [isExiting, setIsExiting] = React.useState(false);
   const handleNavigate = (url: string) => {
-    setIsExiting(true);
-    setTimeout(() => {
-      router.push(url);
-    }, 250);
+    router.push(url);
   };
 
   // Modals state
@@ -261,7 +256,7 @@ export function AplikasiListClient({ initialList }: AplikasiListClientProps) {
   };
 
   return (
-    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'page-enter'}`}>
+    <div className="w-full">
       <Card className="relative flex flex-col gap-4 p-4 sm:p-5 mb-4">
         {/* Top Row: Title */}
         <div className="flex items-center justify-between gap-4 w-full">

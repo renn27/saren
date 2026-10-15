@@ -70,6 +70,19 @@ Seluruh mutasi & pembacaan data dilakukan melalui Next.js Server Actions:
    * Jangan gunakan `overflow-hidden` pada kartu yang memiliki menu dropdown/popover melayang absolut agar tidak terpotong CSS.
 3. **Ukuran Target Sentuh (Touch Targets)**:
    * Jarak sentuh tombol minimal `py-2` / `p-2` dengan ikon yang renggang untuk mencegah salah tekan jari mobile.
+4. **Dilarang Melakukan Git Push Tanpa Perintah Eksplisit & Prosedur Otomatisasi Versi Aplikasi (`YY.MM.DD.NN`)**:
+   * AI Agent **DILARANG KERAS** menjalankan `git push origin main` atau perintah push lainnya secara otomatis tanpa permintaan/perintah langsung dari pengguna.
+   * **Prosedur Wajib Saat Diminta Push**:
+     ```bash
+     npm run bump-version
+     git add lib/constants/version.ts package.json
+     git commit -m "chore: bump version to v..." # atau gabungkan dengan commit fitur
+     git push origin main
+     ```
+5. **Dilarang Membuka Browser / Subagent Browser Sendiri (Verifikasi Manual oleh Pengguna)**:
+   * AI Agent **DILARANG KERAS** menggunakan `browser_subagent` atau membuka browser secara mandiri untuk mengetes / memeriksa antarmuka sistem.
+   * Seluruh verifikasi tampilan dan fungsional dilakukan **secara manual oleh pengguna langsung** di perangkat pengguna.
+   * AI Agent cukup memastikan validitas kode melalui pemeriksaan tipe/sintaks.
 
 ### ⚡ Fitur Optimasi Performa & Indikator Target Client
 1. **Kategori Aplikasi Standalone & Filter Pills (`/aplikasi`)**:
@@ -80,27 +93,32 @@ Seluruh mutasi & pembacaan data dilakukan melalui Next.js Server Actions:
    * Saat menambahkan aplikasi di bulan garapan (misal `/garapan/[garapanId]`), pengguna dapat memilih aplikasi master standalone (misal `Bareksa (5 Akun)` atau `Klik X GoPay (5 Akun)`).
    * Nama aplikasi, deskripsi, logo, dan seluruh daftar akun (`Rendi`, `Ibu`, `Ayah`, dll.) otomatis diimpor ke garapan bulan tersebut.
    * Kolom target untuk bulan tersebut tetap disiapkan bersih agar pengguna dapat menambahkan kolom secara manual sesuai kebutuhan garapan bulan terkait.
-3. **Aturan Pengiriman Notifikasi PWA Kartu Perdana (`/nomor`)**:
+3. **Filter Pills Tahun & Desain Kartu Garapan Bersih**:
+   * Filter tahun horizontal (`Semua`, `2026`, `2025`). Kartu garapan bernuansa minimalis dengan tile kalender dan badge "Bulan Ini". **Jangan membebani kartu Garapan dengan informasi target persentase atau jumlah akun**.
+4. **Aturan Pengiriman Notifikasi PWA Kartu Perdana (`/nomor`)**:
    * **Aturan 1 (Masa Aktif Habis)**: Notifikasi PWA dikirim **hanya pada hari H saat masa aktif kartu habis** (misal tanggal 15 Juli ➔ notifikasi dikirim hanya di tanggal 15 Juli).
    * **Aturan 2 (Masa Tenggang Sisa ≤ 5 Hari)**: Notifikasi PWA dikirim **harian berturut-turut** mulai dari **5 hari sebelum masa tenggang habis** (sisa 5, 4, 3, 2, 1, dan 0 hari) untuk mencegah kartu hangus permanen.
    * Menggunakan helper `checkAppTargetCompleted(app)` dari `@/lib/utils/formulaEvaluator`.
    * Jika seluruh akun pada suatu aplikasi telah mencapai target (misalnya `Bareksa` di mana seluruh akun telah mencapai `Point Rp 100.000`), kartu aplikasi secara otomatis menampilkan badge hijau `100% Target` dengan ikon centang `CheckCircle2`.
    * Jika seluruh aplikasi dalam suatu garapan bulan mencapai 100% target, kartu garapan bulan di dashboard utama juga secara otomatis menampilkan badge hijau `100%`.
-2. **Optimistic UI Updates (0ms Response)**:
+5. **Optimistic UI Updates (0ms Response)**:
    * Semua mutasi (centang checkbox, edit inline, swap urutan, tambah/edit/hapus garapan & aplikasi) memperbarui state React lokal (`setList`, `setAkunList`) secara **instan (0ms)** sebelum Server Action selesai.
-2. **Lazy Loading XLSX (-700KB JS Bundle)**:
+6. **Lazy Loading XLSX (-700KB JS Bundle)**:
    * Library SheetJS (`xlsx`) dieksekusi via Dynamic Import (`await import("xlsx")`) hanya saat tombol Export diklik.
-3. **Instant Route Prefetching**:
-   * Komponen navigasi utama (`AppNavigation`) menggunakan `prefetch={true}` pada Link tujuan.
-4. **Skeleton Loading UI (`loading.tsx`)**:
+7. **Strategi Anti-Stale Data & Caching Komprehensif**:
+   * `staleTimes: { dynamic: 0, static: 0 }` di `next.config.ts` mencegah caching snapshot lama di router client.
+   * `prefetch={false}` pada `AppNavigation` tautan menu utama.
+   * `dynamic = "force-dynamic"` dan `revalidate = 0` pada seluruh Server Component halaman.
+   * `revalidatePath` hierarkis pada seluruh Server Action mutasi.
+8. **Skeleton Loading UI (`loading.tsx`)**:
    * Setiap sub-modul (`/garapan/[id]`, `/aplikasi`, `/nomor`, `/note`) memiliki `loading.tsx` Skeleton berpendar khusus.
-5. **Non-blocking Font Loading**:
+9. **Non-blocking Font Loading**:
    * Font Google (`Inter`, `Plus_Jakarta_Sans`, `IBM_Plex_Mono`) menggunakan `display: "swap"`.
-6. **Component Memoization**:
-   * `NoteCard` dibungkus dengan `React.memo()` untuk mencegah re-rendering kartu lain saat mengetik di search bar.
-7. **PWA Status Alert & Offline Support**:
-   * `public/sw.js` menerapkan strategi Cache-First untuk aset statis dan Network-First untuk HTML.
-   * `ServiceWorkerRegistrar.tsx` memiliki toast listener online/offline.
+10. **Component Memoization**:
+    * `NoteCard` dibungkus dengan `React.memo()` untuk mencegah re-rendering kartu lain saat mengetik di search bar.
+11. **PWA Status Alert & Offline Support**:
+    * `public/sw.js` menerapkan strategi Cache-First untuk aset statis dan Network-First untuk HTML.
+    * `ServiceWorkerRegistrar.tsx` memiliki toast listener online/offline.
 
 ---
 
@@ -110,6 +128,8 @@ Seluruh mutasi & pembacaan data dilakukan melalui Next.js Server Actions:
 d:\A DEV\SAREN\
 ├── app/                        # Next.js App Router
 │   ├── page.tsx                # Halaman Utama (Daftar Garapan)
+│   ├── error.tsx               # Global Error Boundary Recovery UI
+│   ├── not-found.tsx           # Global 404 Not Found Page
 │   ├── loading.tsx             # Root Skeleton Loader (Garapan List)
 │   ├── GarapanListClient.tsx   # Client Component Daftar Garapan (Optimistic)
 │   ├── garapan/

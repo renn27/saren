@@ -1390,7 +1390,7 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
           {/* Grid/List Toggle Button */}
           <button
             onClick={toggleView}
-            className="h-10 w-10 shrink-0 flex items-center justify-center border border-border-soft bg-bg-surface text-text-secondary hover:text-text-primary rounded-xl cursor-pointer hover:bg-accent-soft/40 shadow-sm transition-all"
+            className="h-10 w-10 shrink-0 flex items-center justify-center border border-border-soft bg-bg-surface text-text-secondary hover:text-text-primary rounded-xl cursor-pointer hover:bg-accent-soft/40 shadow-sm transition-all duration-150 active:scale-90"
             title={isGridView ? "Tampilan List" : "Tampilan Grid"}
           >
             {isGridView ? <List className="h-4.5 w-4.5" /> : <Grid className="h-4.5 w-4.5" />}
@@ -1407,9 +1407,9 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
           <button
             onClick={() => setSelectedFolderId(null)}
             className={twMerge(
-              "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border shrink-0",
+              "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all duration-150 border shrink-0 active:scale-95",
               !selectedFolderId
-                ? "bg-accent border-accent text-white shadow-sm"
+                ? "bg-accent border-accent text-white shadow-xs scale-[1.02]"
                 : "bg-bg-surface border-border-soft text-text-secondary hover:text-text-primary hover:border-text-secondary/25"
             )}
           >
@@ -1421,9 +1421,9 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
               key={f.id}
               onClick={() => setSelectedFolderId(f.id)}
               className={twMerge(
-                "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-1.5 shrink-0",
+                "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap cursor-pointer transition-all duration-150 border flex items-center gap-1.5 shrink-0 active:scale-95",
                 selectedFolderId === f.id
-                  ? "bg-accent border-accent text-white shadow-sm"
+                  ? "bg-accent border-accent text-white shadow-xs scale-[1.02]"
                   : "bg-bg-surface border-border-soft text-text-secondary hover:text-text-primary hover:border-text-secondary/25"
               )}
             >
@@ -1432,7 +1432,7 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                 <span className={twMerge(
                   "text-[9px] font-bold px-1.5 py-0.2 rounded-full shrink-0",
                   selectedFolderId === f.id
-                    ? "bg-white/20 text-white"
+                    ? "bg-white/20 text-white animate-badge-bump"
                     : "bg-black/5 dark:bg-white/10 text-text-secondary"
                 )}>
                   {f._count.notes}
@@ -1886,7 +1886,6 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                 <div
                   key={isGridView ? "pinned-grid" : "pinned-list"}
                   className={twMerge(
-                    "page-enter",
                     isGridView
                       ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-3"
                       : "flex flex-col gap-2.5 max-w-2xl mx-auto w-full"
@@ -1928,7 +1927,6 @@ export function NoteClient({ initialNotes, initialLabels, initialFolders }: Note
                 <div
                   key={isGridView ? "other-grid" : "other-list"}
                   className={twMerge(
-                    "page-enter",
                     isGridView
                       ? "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 md:gap-3"
                       : "flex flex-col gap-2.5 max-w-2xl mx-auto w-full"

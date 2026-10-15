@@ -19,23 +19,6 @@ export async function getGarapanList() {
         aplikasi: {
           select: {
             id: true,
-            namaAplikasi: true,
-            logoUrl: true,
-            kolom: {
-              select: {
-                id: true,
-                tipeKolom: true,
-                isTarget: true,
-                nilaiTarget: true,
-                rumus: true,
-              },
-            },
-            akun: {
-              select: {
-                id: true,
-                customValues: true,
-              },
-            },
           },
         },
       },

@@ -586,7 +586,7 @@ export function NomorClient({ initialData }: NomorClientProps) {
                                   <div
                                     className={`w-full h-8 px-2 text-xs font-mono flex items-center justify-between transition-all rounded-lg ${
                                       isPulsaSelected
-                                        ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs"
+                                        ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs animate-cell-pop"
                                         : "hover:bg-accent-soft/30 text-text-primary"
                                     }`}
                                   >
@@ -658,7 +658,7 @@ export function NomorClient({ initialData }: NomorClientProps) {
                                   <div
                                     className={`w-full h-8 px-2 text-xs font-sans flex items-center gap-2 transition-all rounded-lg ${
                                       isDateSelected
-                                        ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs"
+                                        ? "bg-bg-surface border border-accent text-accent font-semibold shadow-2xs animate-cell-pop"
                                         : "hover:bg-accent-soft/30 text-text-primary"
                                     }`}
                                   >

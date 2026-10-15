@@ -42,6 +42,11 @@ Aplikasi SAREN dirancang dan dioptimalkan secara penuh untuk **perangkat layar s
        ```
        Skrip `npm run bump-version` (`node scripts/bump-version.mjs`) secara otomatis membaca tanggal sistem, mendeteksi nomor urut push hari ini, memperbarui [lib/constants/version.ts](file:///d:/A%20DEV/SAREN/lib/constants/version.ts) serta [package.json](file:///d:/A%20DEV/SAREN/package.json), yang ditampilkan langsung pada menu Pengaturan Header ([components/HeaderSettings.tsx](file:///d:/A%20DEV/SAREN/components/HeaderSettings.tsx)).
 
+5. **Dilarang Membuka Browser / Subagent Browser Sendiri (Verifikasi Manual oleh Pengguna)**:
+   * AI Agent **DILARANG KERAS** menggunakan `browser_subagent` atau membuka browser secara mandiri untuk mengetes / memeriksa antarmuka sistem.
+   * Seluruh verifikasi tampilan dan fungsional dilakukan **secara manual oleh pengguna langsung** di perangkat pengguna.
+   * AI Agent cukup memastikan integritas kode melalui pemeriksaan tipe/sintaks (linter / TypeScript compile check jika relevan) tanpa membuka browser.
+
 ---
 
 ## 🛠️ Stack Teknologi & Desain Sistem
@@ -54,7 +59,7 @@ Aplikasi SAREN dirancang dan dioptimalkan secara penuh untuk **perangkat layar s
     - `Aplikasi`: `@@index([garapanId])`, `@@index([garapanId, kategori])`, `@@index([kategori])`
     - `Akun`: `@@index([aplikasiId, urutan])`, `@@index([aplikasiId, nama])`
     - `Kolom`: `@@index([aplikasiId, urutan])`
-    - `Nomor`: `@@index([masaAktif])`
+    - `Nomor`: `@@index([masaAktif])`, `@@index([createdAt])`
     - `Note`: `@@index([isTrashed, isArchived, isPinned])`, `@@index([updatedAt])`, `@@index([createdAt])`, `@@index([folderId, isTrashed, isArchived])`
     - `NoteListItem`: `@@index([noteId, urutan])`, `@@index([noteId])`
   * **Prisma Projection (`select`)**: Query list pada Server Actions/Pages menggunakan `select` projection untuk membatasi kolom data yang ditarik, menghemat beban payload JSON hingga ~50%.
@@ -63,7 +68,7 @@ Aplikasi SAREN dirancang dan dioptimalkan secara penuh untuk **perangkat layar s
   * **Batching Duplikasi Garapan**: Duplikasi garapan bulanan mengeksekusi akun dalam satu batch `createMany` per aplikasi, memangkas waktu duplikasi dari ~3 detik menjadi instan (<200ms).
 * **Optimasi Performa Client**:
   * **Kategori Aplikasi Standalone & Filter Pills**: Pada halaman `/aplikasi`, aplikasi master dapat dikategorikan (misal `E-Wallet`, `Bank`, `Investasi`). Pengguna dapat menambah kategori baru atau memilih dari daftar kategori existing. Dashboard menyajikan **Pills Filter Kategori** horizontal (`Semua`, `Tanpa Kategori`, `E-Wallet (2)`, `Bank (1)`) untuk memfilter kartu secara instan. Kartu aplikasi tetap tampil bersih tanpa teks badge kategori.
-  * **Filter Pills Tahun & Desain Kartu Garapan**: Pada halaman utama Garapan (`/`), header menampilkan ringkasan jumlah bulan dan filter tahun via **Filter Pills Horizontal** (`Semua`, `2026`, `2025`). Kartu garapan menggunakan kelengkungan proporsional `rounded-2xl` dengan **Tile Kalender** (singkatan bulan + angka dua digit dengan aksen gradien tematik), badge **"Bulan Ini"** (glowing pulse dot), keterangan ringkas jumlah aplikasi yang tercatat, serta indikator navigasi `ChevronRight`. Kartu garapan pada bulan berjalan memiliki sorotan aksen halus.
+  * **Filter Pills Tahun & Desain Kartu Garapan**: Pada halaman utama Garapan (`/`), header menampilkan ringkasan jumlah bulan dan filter tahun via **Filter Pills Horizontal** (`Semua`, `2026`, `2025`). Kartu garapan menggunakan kelengkungan proporsional `rounded-2xl` dengan **Tile Kalender** (singkatan bulan + angka dua digit dengan aksen gradien tematik), badge **"Bulan Ini"** (glowing pulse dot), keterangan ringkas jumlah aplikasi yang tercatat, serta indikator navigasi `ChevronRight`. Kartu garapan pada bulan berjalan memiliki sorotan aksen halus. **Catatan Desain**: Jangan membebani kartu Garapan dengan informasi target persentase atau jumlah akun; kartu garapan harus selalu tetap bersih, minimalis, dan elegan.
   * **Fitur Impor Aplikasi Standalone (`importAplikasiToGarapan`)**: Pengguna dapat menambahkan aplikasi baru ke dalam garapan bulanan dengan mengimpor master aplikasi standalone (`Bareksa`, `Klik X GoPay`, dll). Seluruh akun (`nama`, `device`, `nomorHp`) dan logo aplikasi otomatis terfoto/terduplikasi ke garapan baru, sementara kolom target dibuat secara manual per bulan.
   * **Cadangan & Pemulihan Data (.json Backup/Restore Batching)**: Menyediakan Server Action `exportFullBackup` dan `restoreFullBackup` di `@/lib/actions/backup.ts` untuk mengunduh dan memulihkan seluruh data sistem (Garapan, Aplikasi, Akun, Kolom, Nomor, Note, Folder, Label) dalam format `.json`. Mendukung dua mode restore: `Merge` (gabungkan tanpa duplikasi) dan `Overwrite` (hapus total lalu timpa menggunakan batch `createMany` untuk restore data berukuran besar dalam <200ms).
   * **Navigasi Tombol Enter & Mode Input Sel Tabel (`Spreadsheet Navigation`)**: Sel pada tabel catatan mendukung tombol `Enter` untuk otomatis pindah dan memilih sel pada baris bawahnya (atau membuat baris baru jika di baris akhir). Sel bertipe `NOMINAL` dilengkapi `inputMode="decimal"` agar perangkat mobile langsung membuka keypad numerik.
@@ -83,14 +88,19 @@ Aplikasi SAREN dirancang dan dioptimalkan secara penuh untuk **perangkat layar s
   * **Kompresi Otomatis Logo & Gambar Klien (`compressImageFile`)**: Utilitas terpusat di `@/lib/utils/imageCompressor.ts` yang mengompresi logo aplikasi dan gambar catatan secara otomatis di sisi klien menggunakan HTML5 Canvas ke format modern `.webp` sebelum diunggah ke FormData/server. Menghemat bandwidth hingga 80-90% dan mempercepat proses upload di koneksi seluler.
   * **Non-blocking Font Loading**: Pengaturan font Google (`Inter`, `Plus_Jakarta_Sans`, `IBM_Plex_Mono`) menggunakan `display: "swap"`.
   * **Navigasi Bawah Modern Mobile (`AppNavigationBottom`)**: Menggunakan tinggi proporsional `h-16` (64px) dengan efek *glassmorphism* `backdrop-blur-xl bg-bg-surface/92`. Status aktif menggunakan *capsule badge* oval (`h-8 px-4 rounded-full bg-accent-soft text-accent border border-accent/25`) di sekeliling ikon dengan label teks terpusat di bawahnya (`text-[11px] font-bold text-accent`), menghindari tumpang tindih visual dan memberikan ruang sentuh ergonomis.
+  * **Resiliensi Sistem & Error Recovery Boundary (`error.tsx` & `not-found.tsx`)**: Menyediakan komponen Error Boundary khusus di `app/error.tsx` dengan penanganan kesalahan ramah pengguna (*"Terjadi Kendala Teknis"*) dan tombol pemulihan mandiri (*"Coba Lagi"* & *"Ke Beranda"*), serta halaman 404 bermerek di `app/not-found.tsx`.
+  * **Viewport Standar Next.js 15 & Dynamic Status Bar (`export const viewport`)**: Mengadopsi standar Next.js 15 `export const viewport: Viewport` di `app/layout.tsx` yang secara otomatis menyesuaikan warna status bar browser mobile/PWA mengikuti tema (`#F8FAFC` di Light Mode, `#080D14` di Dark Mode) dan mencegah zoom tidak disengaja saat input pada layar sentuh.
+  * **Otomatisasi Serverless Cron Jobs (`vercel.json`)**: Terkonfigurasi otomatis via infrastruktur cron Vercel untuk memicu `/api/cron/check-reminders` (setiap 15 menit) dan `/api/cron/check-expiry` (setiap hari pukul 08:00 WIB / 01:00 UTC) tanpa membutuhkan server daemon terpisah.
+  * **Deteksi Pembaruan PWA Real-time (`reg.onupdatefound`)**: Di [components/ServiceWorkerRegistrar.tsx](file:///d:/A%20DEV/SAREN/components/ServiceWorkerRegistrar.tsx), Service Worker mendeteksi rilis versi baru secara real-time dan menampilkan toast interaktif (*"Versi baru aplikasi tersedia! [Muat Ulang]"*), mencegah pengguna terjebak pada snapshot aset lama.
 * **Server Actions**: Interaksi mutasi database (create, update, delete) dilakukan melalui Server Actions di `@/lib/actions/`.
 
 ### 2. Penataan Gaya (Tailwind CSS)
-Aplikasi ini menggunakan Tailwind CSS dengan variabel tema khusus. Selalu gunakan kelas-kelas utilitas yang sesuai dengan desain sistem berikut:
-* **Backgrounds**: `bg-bg-page` (halaman utama), `bg-bg-surface` (permukaan kartu/sidebar), `bg-accent-soft` (warna sorotan lembut).
-* **Borders**: `border-border-soft` (border tipis abu-abu lembut).
-* **Texts**: `text-text-primary` (warna teks utama gelap/terang), `text-text-secondary` (warna teks sekunder abu-abu), `text-accent` (teks sorotan biru/teal).
-* **Colors**: `colorMap` didefinisikan secara khusus untuk Keep Premium di `NoteClient.tsx` (termasuk `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `darkblue`, `purple`, `pink`, `brown`, `gray`, `default`).
+Aplikasi ini menggunakan Tailwind CSS dengan variabel tema khusus:
+* **Backgrounds**: `bg-bg-page` (Light: `#F8FAFC`, Dark: `#080D14`), `bg-bg-surface` (Light: `#FFFFFF`, Dark: `#0F1623`), `bg-accent-soft` (warna sorotan lembut).
+* **Borders**: `border-border-soft` (Light: `#E2E8F0`, Dark: `rgba(255, 255, 255, 0.08)`).
+* **Card Elevation**: Multi-layer natural shadow di Light Mode dan inner-glow rim light di Dark Mode (`inset 0 1px 0 0 rgba(255,255,255,0.05)`).
+* **Texts**: `text-text-primary` (Light: `#0F172A`, Dark: `#F8FAFC`), `text-text-secondary` (Light: `#64748B`, Dark: `#94A3B8`), `text-accent` (Light: `#0891B2`, Dark: `#06B6D4`).
+* **Colors**: `colorMap` didefinisikan secara khusus untuk Keep Premium di `constants.tsx` (termasuk `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `darkblue`, `purple`, `pink`, `brown`, `gray`, `default`) dengan basis dark slate matte yang bersih di Dark Mode.
 
 ### 3. Pustaka Pendukung
 * **Icons**: `lucide-react` (seperti `Pin`, `Archive`, `Trash2`, `Palette`, `Tag`, `Copy`, `MoreVertical`, dll.).

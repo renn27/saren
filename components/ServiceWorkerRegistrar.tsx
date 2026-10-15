@@ -95,6 +95,24 @@ export function ServiceWorkerRegistrar() {
       .then((reg) => {
         console.log("[SW] Registered with scope:", reg.scope);
 
+        // Deteksi pembaruan Service Worker baru (Update Ready)
+        reg.onupdatefound = () => {
+          const installingWorker = reg.installing;
+          if (!installingWorker) return;
+          installingWorker.onstatechange = () => {
+            if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
+              toast.info("Versi baru aplikasi tersedia!", {
+                description: "Muat ulang untuk menerapkan pembaruan sistem.",
+                action: {
+                  label: "Muat Ulang",
+                  onClick: () => window.location.reload(),
+                },
+                duration: 10000,
+              });
+            }
+          };
+        };
+
         // Jika permission sudah diberikan sebelumnya (user pernah grant),
         // perbarui subscription secara silent tanpa popup baru.
         if ("PushManager" in window && Notification.permission === "granted" && VAPID_PUBLIC_KEY) {

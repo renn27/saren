@@ -44,6 +44,189 @@ export interface NoteCardProps {
   onAssignNoteFolder: (noteId: string, folderId: string | null) => void;
 }
 
+// ── Memoized Table Note Preview ───────────────────────────────────────────────
+
+const TableNotePreview = React.memo(function TableNotePreview({ content }: { content: string | null }) {
+  const tableData = React.useMemo(() => {
+    try {
+      const data = JSON.parse(content || "{}") as {
+        headers: string[];
+        rows: string[][];
+        accumulatedCols?: boolean[];
+        columnTypes?: ("TEKS" | "NOMINAL" | "TANGGAL" | "CENTANG" | "RUMUS")[];
+        columnFormulas?: string[];
+      };
+      if (!data.headers || !data.rows || data.headers.length === 0) {
+        return null;
+      }
+      const displayHeaders = data.headers.slice(0, 3);
+      const displayRows = data.rows.slice(0, 3);
+      const hasMoreCols = data.headers.length > 3;
+      const hasMoreRows = data.rows.length > 3;
+
+      const accumulatedCols = data.accumulatedCols || [];
+      const hasAccumulated = accumulatedCols.slice(0, 3).some(Boolean);
+
+      const totals = data.headers.slice(0, 3).map((_, idx) => {
+        if (accumulatedCols[idx]) {
+          return calculateColumnTotal(data.rows, idx, data.headers, data.columnTypes, data.columnFormulas);
+        }
+        return "";
+      });
+
+      let firstNonAcc = -1;
+      for (let i = 0; i < Math.min(data.headers.length, 3); i++) {
+        if (!accumulatedCols[i]) {
+          firstNonAcc = i;
+          break;
+        }
+      }
+
+      return {
+        data,
+        displayHeaders,
+        displayRows,
+        hasMoreCols,
+        hasMoreRows,
+        accumulatedCols,
+        hasAccumulated,
+        totals,
+        firstNonAcc,
+      };
+    } catch {
+      return null;
+    }
+  }, [content]);
+
+  if (!tableData) {
+    if (content && content.trim() !== "" && content.trim() !== "{}") {
+      try {
+        JSON.parse(content);
+      } catch {
+        return <p className="text-text-secondary break-all">{content}</p>;
+      }
+    }
+    return <em className="opacity-40 text-[11px] font-sans">Kosong</em>;
+  }
+
+  const { data, displayHeaders, displayRows, hasMoreCols, hasMoreRows, accumulatedCols, hasAccumulated, totals, firstNonAcc } = tableData;
+
+  return (
+    <div className="overflow-x-auto w-full max-w-full pb-1 flex flex-col gap-1 select-none">
+      <table className="w-full text-[11px] border-collapse text-left border border-border-soft/60">
+        <thead>
+          <tr className="bg-bg-page/40 dark:bg-black/10 border-b border-border-soft/60">
+            {displayHeaders.map((header, idx) => (
+              <th
+                key={idx}
+                className="p-1 font-semibold truncate max-w-[80px] border-r border-border-soft/60"
+              >
+                <span className="flex items-center gap-1">
+                  {data.columnTypes?.[idx] === "RUMUS" && (
+                    <span className="text-[9px] font-mono font-bold text-purple-500">fx</span>
+                  )}
+                  <span>{header}</span>
+                </span>
+              </th>
+            ))}
+            {hasMoreCols && (
+              <th className="p-1 font-semibold text-text-secondary opacity-60">...</th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {displayRows.map((row, rowIdx) => (
+            <tr
+              key={rowIdx}
+              className="border-b border-border-soft/60 last:border-0 hover:bg-accent-soft/5"
+            >
+              {row.slice(0, 3).map((cell, cellIdx) => {
+                const colType = data.columnTypes?.[cellIdx] || "TEKS";
+                return (
+                  <td
+                    key={cellIdx}
+                    className="p-1 truncate max-w-[80px] border-r border-border-soft/60"
+                  >
+                    {colType === "CENTANG" ? (
+                      <span className="flex items-center justify-center">
+                        {cell === "true" || cell === "1" ? (
+                          <CheckSquare className="h-3.5 w-3.5 text-accent" />
+                        ) : (
+                          <Square className="h-3.5 w-3.5 text-text-secondary/30" />
+                        )}
+                      </span>
+                    ) : colType === "TANGGAL" ? (
+                      cell ? (
+                        <span className="font-mono text-[10px] text-accent">{cell}</span>
+                      ) : (
+                        <span className="opacity-20">-</span>
+                      )
+                    ) : colType === "NOMINAL" ? (
+                      cell ? (
+                        <span className="font-mono text-[10.5px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          {cell.startsWith("Rp") ? cell : `Rp ${new Intl.NumberFormat("id-ID").format(parseNumericValue(cell) || 0)}`}
+                        </span>
+                      ) : (
+                        <span className="opacity-20">-</span>
+                      )
+                    ) : colType === "RUMUS" ? (
+                      (() => {
+                        const formula = data.columnFormulas?.[cellIdx];
+                        if (!formula) return <span className="opacity-20">-</span>;
+                        const calcVal = evaluateTableNoteFormula(formula, data.headers, data.rows, rowIdx, cellIdx);
+                        return (
+                          <span className="font-mono text-text-primary text-[10.5px] font-medium">
+                            {formatTableFormulaResult(calcVal, formula)}
+                          </span>
+                        );
+                      })()
+                    ) : (
+                      cell || <span className="opacity-20">-</span>
+                    )}
+                  </td>
+                );
+              })}
+              {hasMoreCols && (
+                <td className="p-1 text-text-secondary opacity-60">...</td>
+              )}
+            </tr>
+          ))}
+          {hasAccumulated && (
+            <tr className="bg-black/[0.04] dark:bg-white/[0.04] font-semibold border-t border-border-soft text-accent">
+              {data.headers.slice(0, 3).map((_, idx) => {
+                let val = "";
+                if (accumulatedCols[idx]) {
+                  val = `Σ ${totals[idx]}`;
+                } else if (idx === firstNonAcc) {
+                  val = "Total";
+                }
+                return (
+                  <td
+                    key={idx}
+                    className="p-1 truncate max-w-[80px] border-r border-border-soft/60 font-bold font-mono"
+                  >
+                    {val}
+                  </td>
+                );
+              })}
+              {hasMoreCols && (
+                <td className="p-1 text-text-secondary opacity-60">...</td>
+              )}
+            </tr>
+          )}
+        </tbody>
+      </table>
+      {(hasMoreRows || hasMoreCols) && (
+        <div className="text-[10px] text-text-secondary/70 font-medium pl-0.5 pt-0.5">
+          {hasMoreRows && `+ ${data.rows.length - 3} baris lagi`}
+          {hasMoreRows && hasMoreCols && ` • `}
+          {hasMoreCols && `+ ${data.headers.length - 3} kolom lagi`}
+        </div>
+      )}
+    </div>
+  );
+});
+
 // ── NoteCard Component ────────────────────────────────────────────────────────
 
 export const NoteCard = React.memo(function NoteCard({
@@ -227,10 +410,10 @@ export const NoteCard = React.memo(function NoteCard({
         {!note.isTrashed && note.isPinned && (
           <button
             onClick={onPin}
-            className="p-1.5 rounded-lg transition-all cursor-pointer active:scale-95 shrink-0 text-accent bg-accent-soft"
+            className="p-1.5 rounded-lg transition-all cursor-pointer active:scale-75 shrink-0 text-accent bg-accent-soft"
             title="Lepas Sematan"
           >
-            <Pin className="h-3.5 w-3.5" />
+            <Pin className="h-3.5 w-3.5 animate-pin-snap" />
           </button>
         )}
       </div>
@@ -238,159 +421,7 @@ export const NoteCard = React.memo(function NoteCard({
       {/* 2. Content */}
       <div className="px-4 py-2 flex-1 text-[12.5px] leading-relaxed">
         {note.isTable ? (
-          (() => {
-            try {
-              const data = JSON.parse(note.content || "{}") as {
-                headers: string[];
-                rows: string[][];
-                accumulatedCols?: boolean[];
-                columnTypes?: ("TEKS" | "NOMINAL" | "TANGGAL" | "CENTANG" | "RUMUS")[];
-                columnFormulas?: string[];
-              };
-              if (!data.headers || !data.rows || data.headers.length === 0) {
-                return <em className="opacity-40 text-[11px] font-sans">Kosong</em>;
-              }
-              const displayHeaders = data.headers.slice(0, 3);
-              const displayRows = data.rows.slice(0, 3);
-              const hasMoreCols = data.headers.length > 3;
-              const hasMoreRows = data.rows.length > 3;
-
-              const accumulatedCols = data.accumulatedCols || [];
-              const hasAccumulated = accumulatedCols.slice(0, 3).some(Boolean);
-
-              const totals = data.headers.slice(0, 3).map((_, idx) => {
-                if (accumulatedCols[idx]) {
-                  return calculateColumnTotal(data.rows, idx, data.headers, data.columnTypes, data.columnFormulas);
-                }
-                return "";
-              });
-
-              let firstNonAcc = -1;
-              for (let i = 0; i < Math.min(data.headers.length, 3); i++) {
-                if (!accumulatedCols[i]) {
-                  firstNonAcc = i;
-                  break;
-                }
-              }
-
-              return (
-                <div className="overflow-x-auto w-full max-w-full pb-1 flex flex-col gap-1 select-none">
-                  <table className="w-full text-[11px] border-collapse text-left border border-border-soft/60">
-                    <thead>
-                      <tr className="bg-bg-page/40 dark:bg-black/10 border-b border-border-soft/60">
-                        {displayHeaders.map((header, idx) => (
-                          <th
-                            key={idx}
-                            className="p-1 font-semibold truncate max-w-[80px] border-r border-border-soft/60"
-                          >
-                            <span className="flex items-center gap-1">
-                              {data.columnTypes?.[idx] === "RUMUS" && (
-                                <span className="text-[9px] font-mono font-bold text-purple-500">fx</span>
-                              )}
-                              <span>{header}</span>
-                            </span>
-                          </th>
-                        ))}
-                        {hasMoreCols && (
-                          <th className="p-1 font-semibold text-text-secondary opacity-60">...</th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayRows.map((row, rowIdx) => (
-                        <tr
-                          key={rowIdx}
-                          className="border-b border-border-soft/60 last:border-0 hover:bg-accent-soft/5"
-                        >
-                          {row.slice(0, 3).map((cell, cellIdx) => {
-                            const colType = data.columnTypes?.[cellIdx] || "TEKS";
-                            return (
-                              <td
-                                key={cellIdx}
-                                className="p-1 truncate max-w-[80px] border-r border-border-soft/60"
-                              >
-                                {colType === "CENTANG" ? (
-                                  <span className="flex items-center justify-center">
-                                    {cell === "true" || cell === "1" ? (
-                                      <CheckSquare className="h-3.5 w-3.5 text-accent" />
-                                    ) : (
-                                      <Square className="h-3.5 w-3.5 text-text-secondary/30" />
-                                    )}
-                                  </span>
-                                ) : colType === "TANGGAL" ? (
-                                  cell ? (
-                                    <span className="font-mono text-[10px] text-accent">{cell}</span>
-                                  ) : (
-                                    <span className="opacity-20">-</span>
-                                  )
-                                ) : colType === "NOMINAL" ? (
-                                  cell ? (
-                                    <span className="font-mono text-[10.5px] text-emerald-600 dark:text-emerald-400 font-medium">
-                                      {cell.startsWith("Rp") ? cell : `Rp ${new Intl.NumberFormat("id-ID").format(parseNumericValue(cell) || 0)}`}
-                                    </span>
-                                  ) : (
-                                    <span className="opacity-20">-</span>
-                                  )
-                                ) : colType === "RUMUS" ? (
-                                  (() => {
-                                    const formula = data.columnFormulas?.[cellIdx];
-                                    if (!formula) return <span className="opacity-20">-</span>;
-                                    const calcVal = evaluateTableNoteFormula(formula, data.headers, data.rows, rowIdx, cellIdx);
-                                    return (
-                                      <span className="font-mono text-text-primary text-[10.5px] font-medium">
-                                        {formatTableFormulaResult(calcVal, formula)}
-                                      </span>
-                                    );
-                                  })()
-                                ) : (
-                                  cell || <span className="opacity-20">-</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                          {hasMoreCols && (
-                            <td className="p-1 text-text-secondary opacity-60">...</td>
-                          )}
-                        </tr>
-                      ))}
-                      {hasAccumulated && (
-                        <tr className="bg-black/[0.04] dark:bg-white/[0.04] font-semibold border-t border-border-soft text-accent">
-                          {data.headers.slice(0, 3).map((_, idx) => {
-                            let val = "";
-                            if (accumulatedCols[idx]) {
-                              val = `Σ ${totals[idx]}`;
-                            } else if (idx === firstNonAcc) {
-                              val = "Total";
-                            }
-                            return (
-                              <td
-                                key={idx}
-                                className="p-1 truncate max-w-[80px] border-r border-border-soft/60 font-bold font-mono"
-                              >
-                                {val}
-                              </td>
-                            );
-                          })}
-                          {hasMoreCols && (
-                            <td className="p-1 text-text-secondary opacity-60">...</td>
-                          )}
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                  {(hasMoreRows || hasMoreCols) && (
-                    <div className="text-[10px] text-text-secondary/70 font-medium pl-0.5 pt-0.5">
-                      {hasMoreRows && `+ ${data.rows.length - 3} baris lagi`}
-                      {hasMoreRows && hasMoreCols && ` • `}
-                      {hasMoreCols && `+ ${data.headers.length - 3} kolom lagi`}
-                    </div>
-                  )}
-                </div>
-              );
-            } catch (e) {
-              return <p className="text-text-secondary break-all">{note.content}</p>;
-            }
-          })()
+          <TableNotePreview content={note.content} />
         ) : !note.isList ? (
           <p
             className={twMerge(
@@ -527,7 +558,7 @@ export const NoteCard = React.memo(function NoteCard({
             {!note.isPinned && (
               <button
                 onClick={onPin}
-                className="p-1 text-text-secondary hover:text-accent hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-colors"
+                className="p-1 text-text-secondary hover:text-accent hover:bg-accent-soft/40 rounded-lg cursor-pointer transition-all active:scale-75"
                 title="Sematkan Catatan"
               >
                 <Pin className="h-3.5 w-3.5" />

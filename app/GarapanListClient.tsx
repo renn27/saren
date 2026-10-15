@@ -66,13 +66,8 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
     setList(initialList);
   }, [initialList]);
 
-  // Route transition state
-  const [isExiting, setIsExiting] = React.useState(false);
   const handleNavigate = (url: string) => {
-    setIsExiting(true);
-    setTimeout(() => {
-      router.push(url);
-    }, 250);
+    router.push(url);
   };
 
   // Search / Filter Year state
@@ -191,7 +186,7 @@ export function GarapanListClient({ initialList }: GarapanListClientProps) {
   };
 
   return (
-    <div key={pathname} className={`w-full transition-all duration-300 ${isExiting ? 'opacity-0 scale-[0.98] blur-[2px]' : 'page-enter'}`}>
+    <div className="w-full">
       {/* Header Card */}
       <Card className="relative flex flex-row items-center justify-between gap-3 mb-3.5 p-4 sm:p-5 overflow-hidden rounded-2xl border border-border-soft shadow-xs">
         {/* Subtle decorative accent glow */}

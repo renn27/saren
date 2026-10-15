@@ -156,7 +156,7 @@ export function AppNavigationBottom() {
                 className={twMerge(
                   "h-8 px-4 rounded-full flex items-center justify-center transition-all duration-200",
                   active
-                    ? "bg-accent-soft text-accent border border-accent/25 shadow-2xs"
+                    ? "bg-accent-soft text-accent border border-accent/25 shadow-2xs animate-badge-bump"
                     : "text-text-secondary/70 group-hover:text-text-primary group-hover:bg-bg-page/60"
                 )}
               >

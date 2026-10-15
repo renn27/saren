@@ -33,7 +33,7 @@ export const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         onClick={handleClick}
         title={title}
         className={twMerge(
-          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-all duration-200 ease-in-out active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
           localChecked
             ? "bg-accent"
             : "bg-border-soft dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600",
@@ -43,7 +43,7 @@ export const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
       >
         <span
           className={twMerge(
-            "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-200 ease-in-out",
+            "pointer-events-none block h-5 w-5 rounded-full bg-white shadow-md ring-0 transition-transform duration-250 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]",
             localChecked ? "translate-x-5" : "translate-x-0"
           )}
         />

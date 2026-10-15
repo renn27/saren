@@ -96,6 +96,7 @@ model Nomor {
   updatedAt  DateTime @updatedAt
 
   @@index([masaAktif])
+  @@index([createdAt])
   @@map("nomor")
 }
 
