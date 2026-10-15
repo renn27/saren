@@ -73,7 +73,7 @@ export function Dialog({
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 p-0">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className={twMerge(
@@ -86,16 +86,11 @@ export function Dialog({
       {/* Content */}
       <div
         className={twMerge(
-          "relative w-full max-w-lg bg-bg-surface border-t sm:border border-border-soft rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh] sm:max-h-[85vh] md:max-h-[90vh] overflow-hidden z-10 font-sans",
+          "relative w-full max-w-lg bg-bg-surface border border-border-soft rounded-3xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[90vh] overflow-hidden z-10 font-sans",
           maxWidthClassName,
-          isClosing
-            ? "animate-bottom-sheet-out sm:animate-modal-card-out"
-            : "animate-bottom-sheet-in sm:animate-modal-card-in"
+          isClosing ? "animate-modal-card-out" : "animate-modal-card-in"
         )}
       >
-        {/* Mobile Drag Indicator Handle */}
-        <div className="w-10 h-1 bg-border-soft/80 rounded-full mx-auto mt-2.5 mb-0.5 sm:hidden shrink-0 select-none" />
-
         <button
           onClick={onClose}
           className="absolute right-4 top-4 p-1.5 rounded-lg text-text-secondary hover:bg-accent-soft/50 transition-colors cursor-pointer z-20"
@@ -194,7 +189,7 @@ export function AlertDialog({
   if (typeof document === "undefined") return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4 p-0">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className={twMerge(
@@ -207,15 +202,10 @@ export function AlertDialog({
       {/* Content */}
       <div
         className={twMerge(
-          "relative w-full max-w-md bg-bg-surface border-t sm:border border-border-soft rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 md:p-8 z-10 font-sans",
-          isClosing
-            ? "animate-bottom-sheet-out sm:animate-modal-card-out"
-            : "animate-bottom-sheet-in sm:animate-modal-card-in"
+          "relative w-full max-w-md bg-bg-surface border border-border-soft rounded-3xl shadow-2xl p-6 md:p-8 z-10 font-sans",
+          isClosing ? "animate-modal-card-out" : "animate-modal-card-in"
         )}
       >
-        {/* Mobile Drag Indicator Handle */}
-        <div className="w-10 h-1 bg-border-soft/80 rounded-full mx-auto -mt-2 mb-4 sm:hidden shrink-0 select-none" />
-
         <div className="flex flex-col gap-2 mb-6">
           <h2 className="text-[18px] font-semibold text-text-primary font-display">
             {displayContent.title}

@@ -1,6 +1,6 @@
 {
   "name": "saren",
-  "version": "26.10.15.03",
+  "version": "26.10.15.04",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
